@@ -13,7 +13,7 @@
  *   SONG (GLO)   SELECT key   ALG scale    K1 progression  K2 bars/chord  K3 build  K4 peak  PRESETS auto drop
  * Buttons: PLAY start/stop (SEL+PLAY: from the top), SEQ launch, REC drop (tap or hold; EDIT: grab,
  * SEL+REC: clear), ENV lock (EDIT: tie), LFO generate (SEL+LFO: fresh), OCT-/OCT+ octave, SAVE,
- * SEL held = encoders in steps of 10; SEL tapped = the encoder legend. Keys: the key of the music
+ * SEL held = encoders in steps of 10; SEL tapped = the encoder legend on / off. Keys: the key of the music
  * (EDIT: white keys = scale steps, black keys = rest; drums: K S H T C on the first five white keys). */
 
 #define RGBC(h) RGB(((h) >> 16) & 255, ((h) >> 8) & 255, (h) & 255)
@@ -32,9 +32,9 @@ static const char *const LNAME[NLANE] = {"LEAD", "PAD", "BASS", "DRUMS"};
 #define NOWX 60
 #define PPS 4
 #define TOP 20
-#define LH 44
+#define LH 43
 #define GAP 2
-#define FOOT_Y 204
+#define FOOT_Y 200
 
 /* ---- the strip canvas */
 #define STRIP_H 46u
@@ -88,19 +88,33 @@ static void line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c)
         if (2 * e <= dx) { e += dx; y0 += sy; }
     }
 }
-static int32_t text(int32_t x, int32_t y, const char *s, uint16_t c, int32_t sc)    /* 5x7, top-left at x, y */
+/* text in the platform's Terminus fonts (gfx.c): sc 1 = FONT_S (8 px a character, capitals 10 px high),
+ * 2 = FONT_L (16 px a character, capitals 20 px; no small letters). y is the top of the capitals. */
+static int32_t text(int32_t x, int32_t y, const char *s, uint16_t c, int32_t sc)
 {
+    const felucca_font_t *f = sc > 1 ? &FONT_L : &FONT_S;
+    int32_t top = y - (sc > 1 ? 4 : 2);
+    uint16_t sw = SW(c);
     for (; *s; s++) {
-        uint32_t ch = (uint8_t)*s, r, b;
-        if (ch < 32 || ch > 127) ch = '?';
-        for (r = 0; r < 7u; r++)
-            for (b = 0; b < 5u; b++)
-                if (FONT5X7[ch - 32][r] >> (4 - b) & 1u) fill(x + (int32_t)b * sc, y + (int32_t)r * sc, sc, sc, c);
-        x += 6 * sc;
+        uint32_t gi = glyph(f, (uint8_t)*s), w = f->bw[gi], bpr = (w + 1u) / 2u, gx, gy;
+        const uint8_t *gd = f->data + f->off[gi];
+        for (gy = 0; gy < f->h; gy++) {
+            int32_t yy = top + (int32_t)gy;
+            uint16_t *row;
+            if (yy < cy0 || yy >= cy0 + chh) continue;
+            row = cvp + (yy - cy0) * 240;
+            for (gx = 0; gx < w; gx++) {
+                uint32_t v = gd[gy * bpr + gx / 2u];
+                int32_t xx = x - (int32_t)f->pad + (int32_t)gx;
+                v = (gx & 1u) ? (v & 15u) : (v >> 4);
+                if (v >= 8u && xx >= 0 && xx < 240) row[xx] = sw;
+            }
+        }
+        x += f->adv[gi];
     }
     return x;
 }
-static int32_t tw(const char *s, int32_t sc) { int32_t n = 0; while (s[n]) n++; return n ? n * 6 * sc - sc : 0; }
+static int32_t tw(const char *s, int32_t sc) { int32_t n = 0; while (s[n]) n++; return n ? n * (sc > 1 ? 16 : 8) - (sc > 1 ? 4 : 2) : 0; }
 static void textc(int32_t cx, int32_t y, const char *s, uint16_t c, int32_t sc) { text(cx - tw(s, sc) / 2, y, s, c, sc); }
 static void textr(int32_t rx, int32_t y, const char *s, uint16_t c, int32_t sc) { text(rx - tw(s, sc), y, s, c, sc); }
 
@@ -119,7 +133,7 @@ static char *s_sign(char *d, int32_t v) { if (v >= 0) *d++ = '+'; return s_int(d
 
 /* ---- UI state */
 enum { PG_PLAY, PG_FX, PG_TRK, PG_EDIT, PG_SONG, NPG };
-static int32_t page = PG_PLAY, sel = L_BASS, legend_until, debug_on;
+static int32_t page = PG_PLAY, sel = L_BASS, legend_on = 1, debug_on;
 static int32_t cursor, entry_len = 1, entry_oct;
 static char toast_s[48];
 static uint32_t toast_until;
@@ -258,11 +272,12 @@ static const enc_t ENC[NPG][7] = {
      {"CRUSH", t_crush, v_crush}, {"ECHO", t_echo, v_echo}, {"LEVEL", t_level, v_level}},
     {{"LANE", t_lane, v_lane}, {"STEP", t_step, v_step}, {"LENGTH", t_len, v_len}, {"BARS", t_bars, v_bars},
      {"PATTERN", t_use, v_use}, {0, 0, 0}, {0, 0, 0}},
-    {{"KEY", t_key, v_key}, {"SCALE", t_scale, v_scale}, {"PROGRESSION", t_prog, v_prog}, {"BARS/CHORD", t_bpc, v_bpc},
+    {{"KEY", t_key, v_key}, {"SCALE", t_scale, v_scale}, {"CHORDS", t_prog, v_prog}, {"BARS/CHORD", t_bpc, v_bpc},
      {"BUILD", t_build, v_build}, {"PEAK", t_peak, v_peak}, {"AUTO DROP", t_auto, v_auto}},
 };
-static const char *const ENCN[7] = {"SELECT", "ALG", "K1", "K2", "K3", "K4", "PRESETS"};
+static const char *const ENCN[7] = {"SEL", "ALG", "K1", "K2", "K3", "K4", "PRE"};
 static const char *const PGN[NPG] = {"PLAY", "FX", "TRK", "EDIT", "SONG"};
+static const uint16_t PGC[NPG] = {RGBC(0x3fe0e0), RGBC(0x3fe0e0), RGBC(0xefe6c8), RGBC(0xffb04a), RGBC(0xb49bff)};
 
 /* ---- drawing: the lanes */
 static int32_t pos16;                                       /* the play head, in steps Q16 */
@@ -344,20 +359,18 @@ static void draw_lane(int32_t l)
         if (yc > y + LH) yc = y + LH;
         if (lp) darken(0, y, 240, yc - y, 97); else darken(0, yc, 240, y + LH - yc, 97);
         fill(0, yc - fx[l].res / 50, 240, 1 + fx[l].res / 50, cscale(col, 115 + fx[l].res * 140 / 100));
-        textr(234, clampi(lp ? yc + 2 : yc - 9, y + 2, y + LH - 8), lp ? "LP" : "HP", col, 1);
+        { int32_t ty = clampi(lp ? yc + 3 : yc - 13, y + 2, y + LH - 12); fill(213, ty - 2, 20, 14, C_BG); text(215, ty, lp ? "LP" : "HP", col, 1); }
     }
     if (Bc && Bc->muted[l]) darken(0, y, NOWX, LH, 140);
-    fill(1, y + 1, 56, 10, C_BG);                                   /* the label */
-    text(3, y + 2, LNAME[l], col, 1);
-    {
+    fill(1, y + 1, tw(LNAME[l], 1) + 5, 14, C_BG);                 /* the label column: name */
+    text(3, y + 3, LNAME[l], col, 1);
+    {                                                               /* profile (or USR) and FX */
         char t[4] = {PROF[ln[l].prof].name[0], PROF[ln[l].prof].name[1], PROF[ln[l].prof].name[2], 0};
-        textr(55, y + 2, ln[l].up.on ? "USR" : t, ln[l].up.on ? C_CREAM : C_MUTE, 1);
+        fill(1, y + 15, 27, 14, C_BG);
+        text(3, y + 17, ln[l].up.on ? "USR" : t, ln[l].up.on ? C_CREAM : C_MUTE, 1);
+        if (fx[l].filt || fx[l].wob || fx[l].drive || fx[l].bright != 25 || fx[l].slide || fx[l].retrig || fx[l].crush || fx[l].echo) { fill(30, y + 15, 19, 14, col); text(32, y + 17, "FX", C_BG, 1); }
     }
-    {
-        int32_t cx = 3;
-        if (ln[l].lock) { fill(cx, y + 13, 20, 9, C_CREAM); text(cx + 1, y + 14, "LCK", C_BG, 1); cx += 23; }
-        if (fx[l].filt || fx[l].wob || fx[l].drive || fx[l].bright != 25 || fx[l].slide || fx[l].retrig || fx[l].crush || fx[l].echo) { fill(cx, y + 13, 14, 9, col); text(cx + 1, y + 14, "FX", C_BG, 1); }
-    }
+    if (ln[l].lock) { fill(1, y + 29, 27, 13, C_CREAM); text(3, y + 31, "LCK", C_BG, 1); }
     if (!ln[l].lock && LORDER[l] < blend && target != ln[l].prof) fill(236, y + 2, 2, LH - 4, C_WHITE);
     fill(NOWX, y, 1, LH + GAP, cscale(C_WHITE, 218));               /* now */
     if (l == 0) { fill(NOWX - 3, y, 7, 1, C_WHITE); fill(NOWX - 2, y + 1, 5, 1, C_WHITE); fill(NOWX - 1, y + 2, 3, 1, C_WHITE); }
@@ -376,7 +389,7 @@ static void draw_edit_area(void)
         char t[3] = {0, 0, 0};
         fill(x0, yy, 236 - x0, rh - 1, strong ? C_GRID : RGBC(0x0a1414));
         if (sel == L_DRUMS) t[0] = DKN[i][0]; else t[0] = (char)('1' + fmodp(k, 7));
-        textc(8, yy + (rh - 7) / 2, t, strong ? col : C_DIMG, 1);
+        if (strong) textc(8, yy + (rh - 10) / 2, t, col, 1);
     }
     for (s = 0; s <= n; s++) fill(CX(s), top, 1, h, s % 16 == 0 ? RGBC(0x9fb3b0) : s % 4 == 0 ? RGBC(0x3b5150) : RGBC(0x1b2928));
     fill(CX(cursor), top, CX(cursor + 1) - CX(cursor), h, RGBC(0x2a3a3a));
@@ -396,19 +409,20 @@ static void draw_song_area(void)
     char t[48];
     int32_t auto_ = prog_sel == 0, i, n, cur, per, bw;
     int32_t roots[8]; int8_t tones[8][3];
-    text(6, 26, "KEY", C_MUTE, 1);
-    text(6, 38, NN[key], C_CYAN, 3);
-    text(52, 26, "SCALE", C_MUTE, 1);
+    text(6, 26, NN[key], C_CYAN, 2);
     t[0] = 0;
-    if (auto_) { char *o = s_cat(t, "PROFILE: "); s_cat(o, PROF[ln[L_BASS].prof].name); } else s_cat(t, SCALES[scale_sel].name);
-    text(52, 40, t, C_CREAM, 2);
+    if (auto_) { char *o = s_cat(t, "PROFILE "); s_cat(o, PROF[ln[L_BASS].prof].name); } else s_cat(t, SCALES[scale_sel].name);
+    text(48, 26, t, C_CREAM, 1);
+    t[0] = 0;
+    if (auto_) s_cat(t, "ITS OWN CHORDS"); else { char *o = s_int(t, bpc); s_cat(o, bpc == 1 ? " BAR A CHORD" : " BARS A CHORD"); }
+    text(48, 40, t, C_MUTE, 1);
     {                                                       /* the suggestions, the chosen one in the middle */
         int32_t j;
-        for (j = -2; j <= 2; j++) {
-            int32_t k = prog_sel + j, yy = 62 + (j + 2) * 14;
+        for (j = -1; j <= 1; j++) {
+            int32_t k = prog_sel + j, yy = 58 + (j + 1) * 16;
             if (k < 0 || k > (auto_ ? 0 : NPROG)) continue;
             if (k == 0) s_cat(t, "FROM THE PROFILE"); else prog_text(t, k - 1);
-            if (!j) { fill(4, yy, 232, 12, C_GRID); fill(4, yy, 2, 12, C_CYAN); }
+            if (!j) { fill(4, yy, 232, 15, C_GRID); fill(4, yy, 3, 15, C_CYAN); }
             text(12, yy + 3, t, j ? C_DIMG : C_WHITE, 1);
         }
     }
@@ -417,30 +431,32 @@ static void draw_song_area(void)
     cur = auto_ ? fmodp(cur_bar(), n) : (cur_bar() / bpc) % n;
     per = n > 4 ? 4 : n; bw = (232 - (per - 1) * 4) / per;
     for (i = 0; i < n; i++) {
-        int32_t x = 4 + (i % per) * (bw + 4), yy = 140 + (i / per) * 31, on = seq_playing && i == cur;
+        int32_t x = 4 + (i % per) * (bw + 4), yy = 110 + (i / per) * 34, on = seq_playing && i == cur;
         char *o = t;
         o = s_cat(o, NN[(key + roots[i]) % 12]);
         s_cat(o, tones[i][1] == 7 ? "5" : tones[i][2] == 6 ? "dim" : tones[i][2] == 8 ? "+" : tones[i][1] == 3 ? "m" : "");
-        fill(x, yy, bw, 28, on ? C_CYAN : RGBC(0x1b2928));
-        textc(x + bw / 2, yy + 5, t, on ? C_BG : C_CREAM, 1);
+        fill(x, yy, bw, 31, on ? C_CYAN : RGBC(0x1b2928));
+        textc(x + bw / 2, yy + 4, t, on ? C_BG : C_CREAM, 1);
         numeral(t, roots[i], tones[i]);
         textc(x + bw / 2, yy + 17, t, on ? C_BG : C_MUTE, 1);
     }
 }
 static void draw_legend(void)
 {
-    int32_t i, y0 = 34;
-    fill(16, y0, 208, 140, RGBC(0x0b1414));
-    outline(16, y0, 208, 140, C_CYAN);
-    text(24, y0 + 6, PGN[page], C_CYAN, 2);
-    text(84, y0 + 10, "PAGE", C_MUTE, 1);
+    int32_t i, x0 = 4, y0 = 24, w = 232, h = 172;
+    fill(x0, y0, w, h, RGBC(0x0b1414));
+    outline(x0, y0, w, h, PGC[page]);
+    text(x0 + 8, y0 + 7, PGN[page], PGC[page], 2);
+    textr(x0 + w - 8, y0 + 13, "SEL HIDES", C_DIMG, 1);
     for (i = 0; i < 7; i++) {
         char v[40];
+        int32_t ry = y0 + 38 + i * 19, vx;
         if (!ENC[page][i].name) continue;
-        text(24, y0 + 28 + i * 15, ENCN[i], C_MUTE, 1);
-        text(80, y0 + 28 + i * 15, ENC[page][i].name, C_WHITE, 1);
         v[0] = 0; ENC[page][i].val(v);
-        textr(216, y0 + 28 + i * 15, v, C_CREAM, 1);
+        vx = x0 + w - 8 - tw(v, 1);
+        text(x0 + 8, ry, ENCN[i], C_MUTE, 1);
+        if (x0 + 40 + tw(ENC[page][i].name, 1) < vx - 6) text(x0 + 40, ry, ENC[page][i].name, C_WHITE, 1);
+        text(vx, ry, v, C_CREAM, 1);
     }
 }
 
@@ -452,24 +468,27 @@ static void draw_header(void)
     char t[40], *o;
     int32_t cb = cur_bar(), x;
     arc_t A = arc_at(cb);
+    int32_t cw = tw(PGN[page], 1) + 6, xr;
     cs_begin(0, TOP, C_BG);
-    text(4, 4, "ESPADA", C_CYAN, 1);
-    textc(120, 4, PROF[ln[L_BASS].prof].name, C_CREAM, 1);
-    o = s_cat(t, MODEN[A.mode]); o = s_int(o, cb / 4 + 1); o = s_cat(o, "."); o = s_int(o, cb % 4 + 1); o = s_cat(o, "  "); s_int(o, seq_bpm);
-    textr(236, 4, t, MODEC[A.mode], 1);
+    fill(0, 0, cw, 15, PGC[page]);
+    text(3, 3, PGN[page], C_BG, 1);
+    o = s_cat(t, MODEN[A.mode]); o = s_int(o, cb / 4 + 1); o = s_cat(o, "."); o = s_int(o, cb % 4 + 1); o = s_cat(o, " "); s_int(o, seq_bpm);
+    xr = 238 - tw(t, 1);
+    text(xr, 3, t, MODEC[A.mode], 1);
+    if (!debug_on && cw + 6 + tw(PROF[ln[L_BASS].prof].name, 1) < xr - 6) text(cw + 6, 3, PROF[ln[L_BASS].prof].name, C_CREAM, 1);
     if (arc_on && page != PG_EDIT && page != PG_SONG) {
         int32_t lastb = -99999; arc_t M = A;
         for (x = 0; x < 240; x += 2) {
             int32_t bb = ((pos16 >> 16) + (x - NOWX) / PPS) / 16, hgt;
             if ((pos16 >> 16) + (x - NOWX) / PPS < 0) continue;
             if (bb != lastb) { M = arc_at(bb); lastb = bb; }
-            hgt = 1 + M.e * 4 / 256;
-            fill(x, 19 - hgt, 2, hgt, x < NOWX ? cscale(MODEC[M.mode], 90) : MODEC[M.mode]);
+            hgt = 1 + M.e * 3 / 256;
+            fill(x, 20 - hgt, 2, hgt, x < NOWX ? cscale(MODEC[M.mode], 90) : MODEC[M.mode]);
         }
     }
     if (debug_on) {
         o = s_cat(t, "ISR "); o = s_int(o, (int32_t)isr_us_max); s_cat(o, "US");
-        text(44, 12, t, C_WHITE, 1);
+        text(cw + 6, 3, t, C_WHITE, 1);
     }
     cs_end();
 }
@@ -478,23 +497,21 @@ static void draw_footer(int force)
 {
     char a[56], b[56], *o;
     uint16_t ca = C_LIGHT, cb_ = C_LIGHT;
-    const char *chip = 0;
-    uint16_t chipc = C_CYAN;
     int32_t cb = cur_bar(), boxes = page == PG_PLAY;
     arc_t A = arc_at(cb);
     uint32_t h = 2166136261u, i;
     a[0] = b[0] = 0;
     switch (page) {
     case PG_PLAY: o = s_cat(a, "NEXT "); s_cat(o, PROF[target].name); ca = target == ln[L_BASS].prof && !blend ? C_MUTE : C_CYAN; break;
-    case PG_FX: chip = "FX"; o = s_cat(a, LNAME[sel]); o = s_cat(o, "  "); v_filt(o); while (*o) o++; o = s_cat(o, "  RES "); s_pct(o, fx[sel].res);
-        o = s_cat(b, "WOB "); o = s_cat(o, WOBN[fx[sel].wob]); o = s_cat(o, "  BRT "); v_bright(o); while (*o) o++; o = s_cat(o, "  DRV "); o = s_pct(o, fx[sel].drive); o = s_cat(o, "  LVL "); s_pct(o, fx[sel].level); break;
-    case PG_TRK: chip = "TRK"; chipc = C_CREAM; o = s_cat(a, LNAME[sel]); o = s_cat(o, "  SLD "); v_slide(o); while (*o) o++; o = s_cat(o, "  RTG "); o = s_pct(o, fx[sel].retrig); o = s_cat(o, " X"); s_int(o, fx[sel].rtg_rate);
-        o = s_cat(b, "CRUSH "); o = s_pct(o, fx[sel].crush); o = s_cat(o, "  ECHO "); o = s_pct(o, fx[sel].echo); o = s_cat(o, "  LVL "); s_pct(o, fx[sel].level); break;
-    case PG_EDIT: chip = "EDIT"; chipc = RGBC(0xffb04a); o = s_cat(a, LNAME[sel]); o = s_cat(o, "  STEP "); v_step(o); while (*o) o++;
-        if (sel != L_DRUMS) { o = s_cat(o, "  LEN "); o = s_int(o, entry_len); o = s_cat(o, "  OCT "); s_sign(o, entry_oct); }
+    case PG_FX: o = s_cat(a, LNAME[sel]); o = s_cat(o, "  "); v_filt(o); while (*o) o++; o = s_cat(o, "  RES "); s_pct(o, fx[sel].res);
+        o = s_cat(b, "WOB "); o = s_cat(o, WOBN[fx[sel].wob]); o = s_cat(o, "  BRT "); v_bright(o); while (*o) o++; o = s_cat(o, "  DRV "); s_pct(o, fx[sel].drive); break;
+    case PG_TRK: o = s_cat(a, LNAME[sel]); o = s_cat(o, "  SLIDE "); v_slide(o); while (*o) o++; o = s_cat(o, "  RTG "); o = s_pct(o, fx[sel].retrig); o = s_cat(o, " X"); s_int(o, fx[sel].rtg_rate);
+        o = s_cat(b, "CRUSH "); o = s_pct(o, fx[sel].crush); o = s_cat(o, "  ECHO "); s_pct(o, fx[sel].echo); break;
+    case PG_EDIT: o = s_cat(a, LNAME[sel]); o = s_cat(o, "  STEP "); v_step(o); while (*o) o++;
+        if (sel != L_DRUMS) { o = s_cat(o, "  LEN "); o = s_int(o, entry_len); o = s_cat(o, " O"); s_sign(o, entry_oct); }
         o = s_cat(b, ln[sel].up.on ? "YOUR PATTERN" : "PROFILE PLAYS"); o = s_cat(o, "  BARS "); s_int(o, ln[sel].up.bars); cb_ = ln[sel].up.on ? C_CREAM : C_MUTE; break;
-    default: chip = "SONG"; chipc = RGBC(0xb49bff); o = s_cat(a, "KEY "); o = s_cat(o, NN[key]); o = s_cat(o, "  "); v_scale(o); while (*o) o++;
-        if (prog_sel) { o = s_cat(o, "  "); o = s_int(o, bpc); s_cat(o, "B/CH"); }
+    default: o = s_cat(a, "KEY "); o = s_cat(o, NN[key]); o = s_cat(o, "  "); v_scale(o); while (*o) o++;
+        if (prog_sel) { o = s_cat(o, "  "); o = s_int(o, bpc); s_cat(o, " B/CH"); }
         o = s_cat(b, "ARC "); if (!arc_on) s_cat(o, "OFF"); else { o = s_cat(o, "BUILD "); o = s_int(o, build_ph); o = s_cat(o, " PEAK "); o = s_int(o, peak_ph); s_cat(o, auto_drop ? " AUTO" : ""); }
         cb_ = arc_on ? C_CYAN : C_MUTE; break;
     }
@@ -521,26 +538,21 @@ static void draw_footer(int force)
     if (!force && h == foot_hash) return;
     foot_hash = h;
     cs_begin(FOOT_Y, 240 - FOOT_Y, C_FOOT);
-    {
-        int32_t x = 4;
-        if (chip) { int32_t w = tw(chip, 1) + 4; fill(x, FOOT_Y + 5, w, 11, chipc); text(x + 2, FOOT_Y + 7, chip, C_BG, 1); x += w + 5; }
-        text(x, FOOT_Y + 7, a, ca, 1);
-    }
-    if (boxes) {
+    text(4, FOOT_Y + 6, a, ca, 1);
+    if (boxes) {                                                    /* the blend: drums, bass, pad, lead */
         static const char *const BX[4] = {"D", "B", "P", "L"};
-        text(124, FOOT_Y + 7, "MIX", C_MUTE, 1);
-        for (i = 0; i < 4u; i++) { int32_t x = 146 + (int32_t)i * 22, on = (int32_t)i < blend; fill(x, FOOT_Y + 5, 19, 11, on ? C_CYAN : RGBC(0x1d2b2b)); textc(x + 10, FOOT_Y + 7, BX[i], on ? C_BG : C_MUTE, 1); }
+        for (i = 0; i < 4u; i++) { int32_t x = 150 + (int32_t)i * 22, on = (int32_t)i < blend; fill(x, FOOT_Y + 3, 20, 15, on ? C_CYAN : RGBC(0x1d2b2b)); textc(x + 10, FOOT_Y + 6, BX[i], on ? C_BG : C_MUTE, 1); }
     }
-    text(4, FOOT_Y + 23, b, cb_, 1);
+    text(4, FOOT_Y + 24, b, cb_, 1);
     cs_end();
 }
 
 /* ---- the frame */
 static uint32_t frames, fps_t0, fps;
-static int32_t last_drawn_pos = -1, area_dirty = 1, legend_was;
+static int32_t last_drawn_pos = -1, area_dirty = 1, legend_was = -1;
 static void draw_frame(int force)
 {
-    int32_t l, legend = (int32_t)(legend_until - (int32_t)fm1_ms) > 0;
+    int32_t l, legend = legend_on;
     pos16 = cur_step() * 65536 + (seq_playing ? (int32_t)vis_frac : 0);
     if (legend != legend_was) { legend_was = legend; force = 1; }
     if (!force && pos16 == last_drawn_pos && !area_dirty && !seq_playing) { draw_footer(0); return; }
@@ -624,7 +636,7 @@ static void start_stop(int from_top)
     seq_start_step = frozen_step;
     seq_start_req = 1;
 }
-static void set_page(int32_t p) { page = page == p && p != PG_PLAY ? PG_PLAY : p; legend_until = (int32_t)fm1_ms + 1500; area_dirty = 1; }
+static void set_page(int32_t p) { page = page == p && p != PG_PLAY ? PG_PLAY : p; area_dirty = 1; }
 static void edit_key(int32_t k, int32_t sel_held_now)
 {
     upat_t *U = &ln[sel].up;
@@ -670,7 +682,7 @@ static void input(void)
         toast(t);
         area_dirty = 1;
     }
-    if (rel & (1u << BTN_SEL) && !sel_used) legend_until = (int32_t)fm1_ms + 2500;
+    if (rel & (1u << BTN_SEL) && !sel_used) { legend_on = !legend_on; area_dirty = 1; }
     if (b & (1u << BTN_PLAY)) { start_stop(held); sel_used |= held; }
     if (b & (1u << BTN_HOME)) set_page(PG_PLAY);
     if (b & (1u << BTN_FX)) set_page(PG_FX);
@@ -697,7 +709,7 @@ static void input(void)
         char t[40], *o;
         sel_used |= held;
         if (n) { o = s_cat(t, LNAME[sel]); o = s_cat(o, held ? ": NEW PATTERN #" : ": VARIATION #"); s_int(o, n - 1); toast(t); gen_count[sel] = n; }
-        else toast("NO NEW VARIATION: SEL+LFO = FRESH");
+        else toast("NO NEW ONE: SEL+LFO = FRESH");
     }
     if (b & (1u << BTN_OCT_DOWN)) { if (page == PG_EDIT) entry_oct = clampi(entry_oct - 1, -1, 1); else t_oct(-1); area_dirty = 1; }
     if (b & (1u << BTN_OCT_UP)) { if (page == PG_EDIT) entry_oct = clampi(entry_oct + 1, -1, 1); else t_oct(1); area_dirty = 1; }
@@ -747,7 +759,7 @@ static void splash(void)
             uint16_t *dst = cvp + r * 240;
             for (x = 0; x < 120; x++) { dst[2 * x] = SW(LOGO_PAL[src[x] >> 4]); dst[2 * x + 1] = SW(LOGO_PAL[src[x] & 15]); }
         }
-        textr(236, 230, "v" APP_VER, C_DIMG, 1);
+        textr(236, 226, "v" APP_VER, C_DIMG, 1);
         cs_end();
     }
 }
@@ -764,7 +776,6 @@ static void app_main(void)
     t_splash = fm1_ms;
     while (fm1_ms - t_splash < 1500u) platform_poll();
     lcd_fill(0, 0, 240, 240, C_BG);
-    legend_until = (int32_t)fm1_ms + 2500;
     for (;;) {
         uint8_t st, d1, d2;
         platform_poll();
@@ -774,7 +785,7 @@ static void app_main(void)
             else if (st == 0xFB) { if (!seq_playing) start_stop(0); }
             else if (st == 0xFC) { if (seq_playing) start_stop(0); }
         }
-        while (mo_r != mo_w) { uint32_t m = mo_q[mo_r % 64u]; mo_r++; midi_send(m & 0xFFu, m >> 8 & 0xFFu, m >> 16 & 0xFFu); }
+        while (esp_mq_r != esp_mq_w) { uint32_t m = esp_mq[esp_mq_r % 64u]; esp_mq_r++; midi_send(m & 0xFFu, m >> 8 & 0xFFu, m >> 16 & 0xFFu); }
         if (launch_bar >= 0 && cur_bar() >= launch_bar) { commit_launch(); toast("LAUNCHED"); }
         bars_update();
         bars_update();

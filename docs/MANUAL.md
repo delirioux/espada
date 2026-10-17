@@ -2,14 +2,15 @@
 
 ## The screen
 
-- **Header:** the name, the profile that sets the chords, the arc's phase (BUILD, BREAK, PEAK, DOWN), phrase.bar
+- **Header:** the page, the profile that sets the chords, the arc's phase (BUILD, BREAK, PEAK, DOWN), phrase.bar
   and the tempo. The thin strip under it is the arc's energy along the timeline.
 - **Lanes:** LEAD, PAD, BASS, DRUMS from top to bottom. Notes scroll past the white "now" line; the past is dimmed.
   Solid blocks play now; outlined blocks show what the queued profile will play. Each lane's label shows its profile
   (or USR for your own pattern), LCK when locked and FX when an effect is on. The selected lane has a frame.
 - **Footer:** the page's values; changes and messages show here for a moment.
 
-Tap **SEL** to see what the encoders do on the current page.
+The **legend** (a panel with what each encoder does on this page, and its value) is up when Espada starts. Tap **SEL**
+to hide it, tap again to bring it back; it follows you from page to page.
 
 ## Buttons
 
@@ -27,7 +28,7 @@ Tap **SEL** to see what the encoders do on the current page.
 | LFO | GENERATE a pattern for the selected lane (a variation of the one there). SEL + LFO: a fresh one |
 | OCT- / OCT+ | the lane's octave. On the EDIT page: the octave you enter in |
 | SAVE | keep everything (settings and patterns) in flash; while playing it waits until you stop. SEL + SAVE: show the audio interrupt's time |
-| SEL | held: encoders turn in steps of 10 |
+| SEL | tap: the legend on / off; held: encoders turn in steps of 10 |
 
 ## Encoders
 
@@ -37,7 +38,7 @@ Tap **SEL** to see what the encoders do on the current page.
 | FX | lane | filter | resonance | wobble | brightness | drive | level |
 | TRK | lane | slide | retrigger | retrigger rate | crush | echo | level |
 | EDIT | lane | step | length | bars | pattern on/off | | |
-| SONG | key | scale | progression | bars per chord | build (OFF = no arc) | peak | auto drop |
+| SONG | key | scale | chords (the progression) | bars per chord | build (OFF = no arc) | peak | auto drop |
 
 - **Blend** moves lanes to the queued profile from the bottom up: drums, then bass, pad, lead (the D B P L boxes).
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.

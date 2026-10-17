@@ -104,12 +104,14 @@ typedef struct { uint32_t when, dur; uint8_t lane, n, flags, lvl, kind, slide; u
 static pend_t pend[NPEND];
 static uint32_t npend;
 
-/* ---- MIDI out (the interrupt queues, the main loop sends) */
-static volatile uint32_t mo_q[64];
-static volatile uint32_t mo_w, mo_r;
+/* ---- MIDI out (the interrupt queues, the main loop sends). Names with an esp_ prefix: usb.c is in this same
+ * file and has its own mo_w / mo_r, and C merges two `static` declarations of one name into one variable. Shared,
+ * every midi_send() moved the counter the main loop drains to, so it never finished (a freeze on PLAY). */
+static volatile uint32_t esp_mq[64];
+static volatile uint32_t esp_mq_w, esp_mq_r;
 static void mo_push(uint32_t st, uint32_t d1, uint32_t d2)
 {
-    if (mo_w - mo_r < 64u) { mo_q[mo_w % 64u] = st | d1 << 8 | d2 << 16; mo_w++; }
+    if (esp_mq_w - esp_mq_r < 64u) { esp_mq[esp_mq_w % 64u] = st | d1 << 8 | d2 << 16; RING_PUBLISH(); esp_mq_w++; }
 }
 static const uint8_t GM_DRUM[NDK] = {36, 38, 42, 47, 49};
 

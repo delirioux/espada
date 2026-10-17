@@ -25,6 +25,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install Pillow
+      - name: No variable shared with the platform by name (C merges two `static` declarations of one name)
+        run: python3 tools/check_names.py
+
       - name: Host mode (the default script and the tour)
         run: |
           sh tests/run_host.sh

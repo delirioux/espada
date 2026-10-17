@@ -18,7 +18,6 @@ static void espada_host_stats(void);
 #define HOST_STATS_HOOK espada_host_stats
 #endif
 #include "platform.c"
-#include "espada_font5x7.h"
 #include "espada_logo.h"
 
 /* ---- shared between the main loop and the audio interrupt (one writer each) */
