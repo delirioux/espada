@@ -10,16 +10,49 @@ profile, blend it in lane by lane from the bottom up, or launch it on the next p
 filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, retrigger, a bit crusher and
 echo. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
 
-<p align="center"><img src="docs/screen.png" width="240" alt="Espada's screen: five lanes of notes scrolling past a fixed play line"></p>
+<p align="center"><img src="docs/screens/main.png" width="320" alt="Espada's MAIN view: five lanes of notes scrolling past a fixed play line, a riser building on the SFX lane before the drop"></p>
 
-> **Status: 0.1, first version.** Runs in host mode (screen and sound on a computer). Not yet confirmed on an FM-1:
-> install it over the official firmware and keep the USB rescue in mind (below).
+> **Status: 0.1, in development.** It boots and runs on the FM-1; playing on the hardware is still being tested.
+> Install it over the official firmware and keep the USB rescue in mind (below).
+
+## The screens
+
+<table>
+<tr>
+<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="MAIN view"><br><b>MAIN</b>: all five lanes. The riser on the SFX lane climbs into the drop; the footer counts down to it.</td>
+<td align="center" width="33%"><img src="docs/screens/channel.png" width="240" alt="BASS channel view"><br><b>A channel</b> (HOME steps through them): its lane large, its six encoder values written out. The knob just turned is framed.</td>
+<td align="center" width="33%"><img src="docs/screens/fx.png" width="240" alt="BASS FX page"><br><b>FX</b>: a low-pass with resonance and drive on the bass. The screen darkens what the filter cuts away.</td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screens/sfx.png" width="240" alt="SFX channel view"><br><b>SFX</b>: noise effects. On AUTO a riser fills the bar before each drop and the impact lands on it.</td>
+<td align="center"><img src="docs/screens/edit.png" width="240" alt="LEAD EDIT page"><br><b>EDIT</b>: your own part, step by step, in scale steps from the chord root, so it follows the chords.</td>
+<td align="center"><img src="docs/screens/song.png" width="240" alt="SONG page"><br><b>SONG</b>: key, scale and a suggested progression, with the chords as they play.</td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screens/legend.png" width="240" alt="The encoder legend"><br><b>The legend</b>: what each encoder does here, and its value. Tap SEL to show or hide it.</td>
+<td colspan="2">
+
+| Button | Does |
+| --- | --- |
+| HOME | the next view: MAIN, LEAD, PAD, BASS, DRUMS, SFX (SEL + HOME: MAIN) |
+| FX / ARP / EDIT | the channel's effects, tracker effects, step editor |
+| GLO | the SONG page |
+| PLAY | start / stop |
+| SEQ | launch the queued profile on the next phrase |
+| REC | DROP: tap for a break and a drop on the phrase, or hold |
+| ENV | lock the lane's profile |
+| LFO | generate a pattern (a variation; SEL + LFO: a fresh one) |
+| SAVE | keep settings and patterns |
+
+</td>
+</tr>
+</table>
 
 ## How it plays
 
 - **Lanes.** Notes scroll from right to left past a fixed "now" line. Solid blocks are what a lane plays; outlined
   blocks are a preview of the queued profile. HOME steps from the overview (MAIN) to each lane on its own, large,
-  with its values written out, and back.
+  with its values written out, and back. The keys only play notes and steps; every setting is on an encoder.
 - **SFX.** The fifth lane: a noise riser into every drop, the impact on it, washes, laser zaps, crackle and 8-bit
   noise, following the arc and the profile.
 - **Profiles.** EPIC (orchestral minor), HYPERSPACE (techno minor with power chords), FUSION (melodic major with a
@@ -70,13 +103,14 @@ git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
 GitHub Actions builds the package on every push (the run's artifact `espada-firmware`).
 
 **Host mode** runs the same code on a computer: `tests/run_host.sh` writes the screens as PNG and the sound as a WAV.
-`build/host/espada OUT tests/demo.txt` plays a scripted tour (buttons, encoders, keys over time).
+`build/host/espada OUT tests/demo.txt` plays a scripted tour (buttons, encoders, keys over time). The screenshots
+above come from host mode, pixel for pixel what the FM-1 draws, at twice the size.
 
 ```
 firmware/src/espada.c         the app: shared state, includes the parts below
-firmware/src/espada_synth.c   the audio interrupt: FM and drum voices, lane effects, the step clock
+firmware/src/espada_synth.c   the audio interrupt: FM, drum and sfx voices, lane effects, the step clock
 firmware/src/espada_music.c   harmony, profiles, generators, density, the arc, your patterns, the bar cache
-firmware/src/espada_ui.c      the screen, the pages, the panel, saving
+firmware/src/espada_ui.c      the screen, the views and pages, the panel, saving
 firmware/src/platform.c       Dinghy's wiring of the FM-1 platform (boot, USB, updates, panel, screen, settings)
 ```
 
