@@ -3,6 +3,8 @@
 # JieLi AC79 SDK (Apache-2.0) come from JieLi's own servers. Every push builds the package (the run's artifact
 # "espada-firmware") and runs the host mode (artifact "espada-host": screens as PNG, the sound as WAV).
 # A tag vX.Y builds the release package (identity FM-1_96Y) and attaches it to a GitHub release.
+# A push to main also publishes the site on GitHub Pages: the web installer with that package
+# (web/espada_make_site.py). The site needs Settings > Pages > Source: GitHub Actions.
 name: Firmware
 
 on:
@@ -38,6 +40,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0              # the site names the build with git describe
 
       - uses: actions/setup-python@v5
         with:
@@ -85,3 +89,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" dist/espada-*.fwsc --title "Espada ${GITHUB_REF_NAME#v}" --notes-file docs/RELEASE.md
+
+      - name: Site (the web installer with this package)
+        if: github.ref == 'refs/heads/main'
+        run: python3 web/espada_make_site.py build/espada.fwsc "$(git describe --tags --always)" _site
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: _site
+
+  pages:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

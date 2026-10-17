@@ -39,7 +39,8 @@ The full guide to the panel is in [docs/MANUAL.md](docs/MANUAL.md).
 
 ## Install
 
-Use the [FM-1 Firmware Hub](https://fm1.designburgapps.com) or a web installer in Chrome or Edge, or from the command
+**[Espada's web installer](https://delirioux.github.io/espada/)** in Chrome or Edge on a computer (it also takes a test
+build, and brings back the official V15), the [FM-1 Firmware Hub](https://fm1.designburgapps.com), or from the command
 line (once: `pip3 install mido python-rtmidi`):
 
 ```
