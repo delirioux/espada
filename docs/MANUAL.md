@@ -56,9 +56,11 @@ it back; moving to another view hides it.
 
 - **Blend** moves lanes to the queued profile from the bottom up: drums, then bass, pad, lead (the D B P L boxes).
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.
-- **Instrument:** AUTO (A:) follows the profile; or one of fourteen FM patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
-  STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO), or one of three drum kits (STANDARD, TRACKER,
-  ELECTRO). RAZOR is a cutting, saw-like lead; PULSE a hollow one; PIANO and E.PIANO ring out.
+- **Instrument:** AUTO (A:) follows the profile; or one of fifteen FM patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
+  STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS), or one of three drum kits (STANDARD,
+  TRACKER, ELECTRO). RAZOR is a cutting, saw-like lead; PULSE a hollow one; PIANO and E.PIANO ring out. CHAOS is
+  three sounds in one: a light saw lead, a heavy pad under it (two detuned oscillators, one an octave down, fading
+  in slowly and out late) and brown noise that breathes with the pad.
 - **Vary:** each 4-bar phrase gives the lane a character on top of your effects: CLEAN, ECHO, SLIDE, BITE
   (brightness and drive), FILTER (a low-pass with resonance) or STUTTER (retrigger). VARY sets how far it reaches;
   the value shows the phrase's character. The lead starts at 40 %, the other lanes at 0. Your own settings stay as

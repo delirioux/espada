@@ -2,7 +2,9 @@
 /* Espada's sound: runs in the audio interrupt (44.1 kHz, 256 frames a call). Integers only.
  *
  *   FM voices     two operators (a modulator into a carrier's phase), an index envelope, an amplitude
- *                 envelope, slide, vibrato, the tracker arpeggio (a chord cycled every 42 ms), square option
+ *                 envelope, slide, vibrato, the tracker arpeggio (a chord cycled every 42 ms), square option;
+ *                 CHAOS layers a light saw lead, a heavy pad (two detuned oscillators, one an octave down,
+ *                 fading in slowly and out late) and brown noise breathing with the pad
  *   drum voices   kick and kettle drum (a swept sine), snare (band-passed noise + a tone), hat, crash
  *   sfx voices    wash (filtered noise, a slow sweep), riser (noise opening up + a tone climbing four octaves),
  *                 impact (a falling sub + a noise burst), zap (a sine falling fast), crackle (clicks + hiss),
@@ -43,6 +45,7 @@ typedef struct {
     uint16_t r_ms;              /* release */
     uint8_t vib, square;
     uint16_t d_ms;              /* decay toward the sustain (0 = 80 ms); with sus 0 a long one rings out, as a piano */
+    uint8_t chaos;              /* 1: add the pad and the brown noise under the lead (CHAOS) */
 } patch_t;
 static const patch_t PATCH[] = {
     {"FM BASS", 16, 1138, 260, 180,   4, 6200,  178,  80, 0, 0},
@@ -59,6 +62,7 @@ static const patch_t PATCH[] = {
     {"PULSE",   32,  420, 150, 250,   2, 1500,  210,  90, 1, 1},   /* 2:1 through the square: a hollow pulse */
     {"PIANO",   16,  700,  90, 450,   1, 2600,    0, 260, 0, 0, 1100},   /* 1:1, the hammer's brightness fades, rings out */
     {"E.PIANO", 224, 120,   0, 160,   1, 2500,    0, 300, 0, 0, 1500},   /* 14:1 tine on the attack, then a sine */
+    {"CHAOS",   16,  520, 380, 400,   4, 3800,  230, 500, 1, 0,    0, 1},   /* a light saw + a heavy pad + brown noise */
 };
 #define NPATCH (sizeof PATCH / sizeof PATCH[0])
 
@@ -86,6 +90,9 @@ typedef struct {
     uint32_t arp[3];
     int32_t s1, s2, s3;                         /* filter states (snare, hat) */
     int32_t tone_amp; uint32_t tph;             /* the snare's tone */
+    uint8_t chaos;                              /* CHAOS: the pad and the noise */
+    uint32_t pph1, pph2;                        /* the pad's two oscillators */
+    int32_t pamp, brown;                        /* the pad's level (Q15, slow), the brown noise */
 } voice_t;
 #define NVOICE 30u
 static voice_t vc[NVOICE];
@@ -183,6 +190,7 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
     v->arp_n = (uint8_t)arp_n; v->arp_i = 0; v->arp_t = 0;
     for (i = 0; i < arp_n && i < 3u; i++) v->arp[i] = arp[i];
     v->midi = (uint8_t)midi; v->midi_ch = (uint8_t)lane;
+    v->chaos = P->chaos; v->pph1 = 0x40000000u; v->pph2 = 0; v->pamp = 0; v->brown = 0;
     if (midi) mo_push(0x90u | lane, midi, 100);
 }
 
@@ -191,7 +199,7 @@ static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_ori
     voice_t *v = alloc_voice(L_DRUMS);
     const kit_t *K = &KITS[kit < NKIT ? kit : 0];
     v->lane = L_DRUMS; v->stage = 1; v->ph = 0; v->ctr = 0; v->age = ++vage; v->s1 = v->s2 = v->s3 = 0;
-    v->gate = 0xFFFFFFFFu; v->midi = 0;
+    v->gate = 0xFFFFFFFFu; v->midi = 0; v->chaos = 0;
     switch (kind) {
     case DK_KICK: case DK_KETTLE: {
         uint32_t lo = kind == DK_KETTLE ? note_inc(38 + key_off) : HZ_INC(K->kl);
@@ -223,7 +231,7 @@ static void start_sfx(uint32_t kind, uint32_t pitch, uint32_t dur, uint32_t lvl)
     voice_t *v = alloc_voice(L_SFX);
     if (dur < CTRL * 4u) dur = CTRL * 4u;
     v->lane = L_SFX; v->kind = (uint8_t)(V_WASH + (kind < NSX ? kind : 0)); v->ph = 0; v->ctr = 0; v->age = ++vage;
-    v->s1 = v->s2 = v->s3 = 0; v->tph = 0; v->tone_amp = 0; v->midi = 0; v->gate = 0xFFFFFFFFu; v->stage = 2; v->peak = 0;
+    v->s1 = v->s2 = v->s3 = 0; v->tph = 0; v->tone_amp = 0; v->midi = 0; v->gate = 0xFFFFFFFFu; v->stage = 2; v->peak = 0; v->chaos = 0;
     switch (v->kind) {
     case V_WASH:                                    /* in over a third of its time, out over 0.6 s */
         v->peak = (int32_t)((15000u * lvl) >> 8); v->amp = 0; v->stage = 0;
@@ -348,6 +356,10 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                     int32_t d = (int32_t)(v->target - v->inc);
                     v->inc += (uint32_t)(int32_t)(((int64_t)d * v->glide_k) >> 15);
                 }
+                if (v->chaos) {
+                    int32_t to = v->stage == 2u ? 0 : v->peak;
+                    v->pamp += (int32_t)(((int64_t)(to - v->pamp) * (to > v->pamp ? 68 : 34)) >> 15);   /* per 32 samples: tau 350 ms in, 700 ms out */
+                }
                 if (v->arp_n > 1u && (v->arp_t += CTRL) >= 1852u) { v->arp_t = 0; v->arp_i = (uint8_t)((v->arp_i + 1u) % v->arp_n); v->inc = v->target = v->arp[v->arp_i]; }
             } else if (v->kind >= V_WASH) {                               /* sfx */
                 switch (v->kind) {
@@ -384,7 +396,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                     if (v->midi) { mo_push(0x80u | v->midi_ch, v->midi, 0); v->midi = 0; }
                 }
             }
-            if (v->amp < 4 && (v->stage == 2u || (v->kind != V_FM && v->kind < V_WASH))) {
+            if (v->amp < 4 && (v->stage == 2u || (v->kind != V_FM && v->kind < V_WASH)) && (!v->chaos || v->pamp < 4)) {
                 if (v->midi) { mo_push((v->kind == V_FM ? 0x80u | v->midi_ch : 0x89u), v->midi, 0); v->midi = 0; }
                 v->kind = V_OFF; return;
             }
@@ -402,6 +414,16 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
             s = SIN[(v->ph + off) >> 22];
             if (v->square) s = s >= 0 ? 26000 : -26000;
             s = (s * v->amp) >> 15;
+            if (v->chaos) {                                             /* the light lead under a heavy pad and noise */
+                int32_t pad, br;
+                v->pph1 += inc - (inc >> 8);                            /* 7 cents flat */
+                v->pph2 += (inc >> 1) + (inc >> 9);                     /* an octave down, 3 cents sharp */
+                pad = (SIN[(v->pph1 + ((uint32_t)(int32_t)SIN[v->pph1 >> 22] << 13)) >> 22]
+                     + SIN[(v->pph2 + ((uint32_t)(int32_t)SIN[v->pph2 >> 22] << 13)) >> 22]) >> 1;
+                v->brown += (noise() >> 3) - (v->brown >> 5);           /* leaky integral of white: brown */
+                br = v->brown > 32767 ? 32767 : v->brown < -32767 ? -32767 : v->brown;
+                s = ((s * 3) >> 3) + ((((pad * 5) >> 3) * v->pamp) >> 15) + (((br >> 2) * v->pamp) >> 15);
+            }
             break; }
         case V_KICK: case V_KETTLE:
             v->ph += v->inc;
