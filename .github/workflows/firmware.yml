@@ -62,11 +62,11 @@ jobs:
         run: |
           if [ "${GITHUB_REF_TYPE}" = tag ]; then ./build.sh --release "${GITHUB_REF_NAME#v}"; else ./build.sh; fi
 
-      - name: No 64-bit division or float helpers in the image
+      - name: No 64-bit division or soft-float routines in the image (a routine like __mulsf3 crashed an FM-1 in Tuna)
         run: |
           NM=$(find "$HOME/.jieli/toolchain/" -name "*nm" -type f -perm -u+x | head -1)
-          if "$NM" build/espada.elf | grep -E '\s__(u?divdi3|u?moddi3|(add|sub|mul|div)[sd]f3|fix\w*[sd]f\w*|float\w*[sd]f)$'; then
-            echo "helper routines the chip does not have"; exit 1
+          if "$NM" build/espada.elf | grep -E '\s__(u?divdi3|u?moddi3)$|\s__(add|sub|mul|div|neg)[sd]f[23]$|\s__(fix|float|extend|trunc)\w*[sd]f\w*$|\s__(eq|ne|lt|le|gt|ge|unord|cmp)[sd]f2$'; then
+            echo "helper routines the chip does not have (Espada is integers only: docs/RULES.md)"; exit 1
           fi
           echo "none"
 
