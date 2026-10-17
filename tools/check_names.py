@@ -15,7 +15,8 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parent.parent / "firmware" / "src"
 APP = sorted(SRC.glob("espada*.c"))
-PLATFORM = [SRC / n for n in ("platform.c", "usb.c", "ota.c", "lcd.c", "gfx.c", "libc.c", "recovery.c")]
+PLATFORM = [SRC / n for n in ("platform.c", "usb.c", "ota.c", "lcd.c", "gfx.c", "libc.c", "recovery.c")] + \
+    [SRC.parent.parent / "web/emu/espada_web.c", SRC.parent.parent / "tests/host.c"]   # the stand-ins: the same unit
 
 
 def file_scope_vars(path):

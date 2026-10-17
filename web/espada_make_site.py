@@ -8,6 +8,7 @@
   firmware/espada-VER.fwsc      the package (+ LICENSE, LICENSING.md, LICENSES/: it holds JieLi SDK files under
                                 Apache-2.0, see LICENSING.md)
   espada-logo.png
+  try/                          Espada in the browser (build/espada_emu, web/emu/espada_build.sh), when it was built
 
   python3 web/espada_make_site.py build/espada.fwsc VERSION OUT_DIR
 
@@ -82,6 +83,15 @@ def main(pkg, version, out):
     Image.open(ROOT / "assets/logo.png").convert("RGB").resize((256, 256), Image.LANCZOS) \
         .save(out / "espada-logo.png", optimize=True)
 
+    emu = ROOT / "build/espada_emu"
+    try_link = ""
+    if (emu / "espada.wasm").exists():
+        dst = out / "try"
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(emu, dst)
+        try_link = '<a class="b" href="try/">Try it in the browser</a>'
+
     (out / "index.html").write_text(f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Espada</title><link rel="icon" href="espada-logo.png">
@@ -104,13 +114,13 @@ def main(pkg, version, out):
 <h1>ESPADA</h1>
 <p>Generative tracker grooves for the M-VAVE FM-1, razor sharp. Four lanes in the style of early-90s PC tracker
 music, on FM: queue a profile, blend it in, call the drop.</p>
-<a class="b" href="install/">Install on the FM-1</a>
+<a class="b" href="install/">Install on the FM-1</a>{try_link}
 <small>Espada {version} · GPL-3.0 · <a href="https://github.com/delirioux/espada">Source</a> ·
 <a href="https://github.com/delirioux/espada/blob/main/docs/MANUAL.md">Manual</a><br>
 On the FM-1 platform of Felucca (Leo Kuroshita, Hügelton Instruments), SLOOP and Dinghy</small>
 </main></body></html>
 """, encoding="utf-8")
-    print(f"site: {out}: install ({len(html)} B), firmware/{name} ({len(raw)} B, {product})")
+    print(f"site: {out}: install ({len(html)} B), firmware/{name} ({len(raw)} B, {product})" + (", try" if try_link else ""))
 
 
 if __name__ == "__main__":

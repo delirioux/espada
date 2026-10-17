@@ -4,7 +4,8 @@
 # "espada-firmware") and runs the host mode (artifact "espada-host": screens as PNG, the sound as WAV).
 # A tag vX.Y builds the release package (identity FM-1_96Y) and attaches it to a GitHub release.
 # A push to main also publishes the site on GitHub Pages: the web installer with that package
-# (web/espada_make_site.py). The site needs Settings > Pages > Source: GitHub Actions.
+# (web/espada_make_site.py) and Espada in the browser (web/emu). The site needs Settings > Pages > Source:
+# GitHub Actions.
 name: Firmware
 
 on:
@@ -92,6 +93,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" dist/espada-*.fwsc --title "Espada ${GITHUB_REF_NAME#v}" --notes-file docs/RELEASE.md
+
+      - name: Espada in the browser (WebAssembly, on Felucca's page)
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true            # (the site goes out without it)
+        run: |
+          command -v wasm-ld >/dev/null || sudo apt-get install -y -q lld
+          sh web/emu/espada_build.sh "$(git describe --tags --always)"
+          node web/emu/espada_emu_test.mjs build/espada_emu/espada.wasm
 
       - name: Site (the web installer with this package)
         if: github.ref == 'refs/heads/main'

@@ -25,6 +25,8 @@ enum { ENC_SELECT = 0, ENC_ALGORITHM = 1, ENC_KNOB1 = 2, ENC_KNOB2 = 3, ENC_KNOB
 
 #ifdef DINGHY_HOST
 #include "../../tests/host.c"                  /* on a computer: a fake FM-1 (tests/host.c) */
+#elif defined(DINGHY_WEB)
+#include "../../web/emu/espada_web.c"          /* in a browser: a simulated FM-1, for Felucca's page (web/emu) */
 #else
 #include <stdint.h>
 #include "fm1_time.h"

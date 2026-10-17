@@ -82,6 +82,12 @@ steps from the overview to each channel.
 
 The full guide to the panel is in [docs/MANUAL.md](docs/MANUAL.md).
 
+## Try it in the browser
+
+**[Espada in the browser](https://delirioux.github.io/espada/try/)**: the same code the FM-1 runs, compiled to
+WebAssembly, on Felucca's browser FM-1 (knobs, buttons, keys; your computer's keyboard plays it too, a MIDI
+controller turns the knobs). Chrome, Edge, Firefox or Safari.
+
 ## Install
 
 **[Espada's web installer](https://delirioux.github.io/espada/)** in Chrome or Edge on a computer (it also takes a test
@@ -110,6 +116,10 @@ git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
 ```
 
 GitHub Actions builds the package on every push (the run's artifact `espada-firmware`).
+
+**In the browser:** `web/emu/espada_build.sh` (clang with wasm-ld, or Emscripten) writes `build/espada_emu/`;
+serve that folder and open it. `node web/emu/espada_emu_test.mjs build/espada_emu/espada.wasm` checks it without
+a browser.
 
 **Host mode** runs the same code on a computer: `tests/run_host.sh` writes the screens as PNG and the sound as a WAV.
 `build/host/espada OUT tests/demo.txt` plays a scripted tour (buttons, encoders, keys over time). The screenshots

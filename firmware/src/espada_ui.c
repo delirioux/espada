@@ -875,9 +875,11 @@ static void splash(void)
     }
 }
 
-static void app_main(void)
+/* the boot, then the main loop a pass at a time (the browser build runs the passes as its audio asks for time) */
+static uint32_t t_frame;
+static void app_boot(void)
 {
-    uint32_t t_frame = 0, t_splash;
+    uint32_t t_splash;
     synth_init();
     music_init();
     { uint32_t l; for (l = 0; l < NLANE; l++) fxu[l] = fx[l]; fxu[L_LEAD].vary = 40; }
@@ -889,22 +891,28 @@ static void app_main(void)
     while (fm1_ms - t_splash < 1500u) platform_poll();
     lcd_fill(0, 0, 240, 240, C_BG);
     fm1_glow_all();
-    for (;;) {
-        uint8_t st, d1, d2;
-        platform_poll();
-        input();
-        while (midi_get(&st, &d1, &d2)) {                           /* MIDI in: start / stop / continue */
-            if (st == 0xFA) { if (!seq_playing) start_stop(1); }
-            else if (st == 0xFB) { if (!seq_playing) start_stop(0); }
-            else if (st == 0xFC) { if (seq_playing) start_stop(0); }
-        }
-        while (esp_mq_r != esp_mq_w) { uint32_t m = esp_mq[esp_mq_r % 64u]; esp_mq_r++; midi_send(m & 0xFFu, m >> 8 & 0xFFu, m >> 16 & 0xFFu); }
-        if (launch_bar >= 0 && cur_bar() >= launch_bar) { commit_launch(); toast("LAUNCHED"); }
-        fx_apply();
-        bars_update();
-        bars_update();
-        if (save_pending && !seq_playing) { save_pending = 0; do_save(); }
-        leds();
-        if (fm1_ms - t_frame >= 33u || area_dirty) { t_frame = fm1_ms; draw_frame(area_dirty); }
+}
+static void app_pass(void)
+{
+    uint8_t st, d1, d2;
+    platform_poll();
+    input();
+    while (midi_get(&st, &d1, &d2)) {                           /* MIDI in: start / stop / continue */
+        if (st == 0xFA) { if (!seq_playing) start_stop(1); }
+        else if (st == 0xFB) { if (!seq_playing) start_stop(0); }
+        else if (st == 0xFC) { if (seq_playing) start_stop(0); }
     }
+    while (esp_mq_r != esp_mq_w) { uint32_t m = esp_mq[esp_mq_r % 64u]; esp_mq_r++; midi_send(m & 0xFFu, m >> 8 & 0xFFu, m >> 16 & 0xFFu); }
+    if (launch_bar >= 0 && cur_bar() >= launch_bar) { commit_launch(); toast("LAUNCHED"); }
+    fx_apply();
+    bars_update();
+    bars_update();
+    if (save_pending && !seq_playing) { save_pending = 0; do_save(); }
+    leds();
+    if (fm1_ms - t_frame >= 33u || area_dirty) { t_frame = fm1_ms; draw_frame(area_dirty); }
+}
+static void app_main(void)
+{
+    app_boot();
+    for (;;) app_pass();
 }
