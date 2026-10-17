@@ -27,7 +27,7 @@ Hold **SEL** to turn in steps of 10.
 
 | Page | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
-| MAIN | queue (the next profile) | blend | energy | arc on / off |
+| MAIN | queue (the next profile) | blend | energy | space (the room) |
 | a channel (HOME) | its profile (SFX: its sound) | density | octave | level |
 | FX | filter | resonance | wobble | drive |
 | FX 2 (FX again) | brightness | crush | vary | |
@@ -59,7 +59,8 @@ lane, a save waiting, the keys' octave off 0.
 ## What the knobs do
 
 - **Energy** (MAIN) adds to or takes from every lane's density at once: one knob for a build or a breakdown.
-- **The arc** is off until you turn it on (MAIN, or GLO twice). On: it starts with a few drum hits and builds bass,
+- **Space** (MAIN) is the room: a stereo reverb the lanes send to, the pad and sfx most, the bass hardly.
+- **The arc** is off until you turn it on (GLO twice, knob 1). On: it starts with a few drum hits and builds bass,
   pad and lead in as the energy rises, breaks, drops and builds again; the ARC page draws it. DROP works without it.
 - **Blend** moves lanes to the queued profile from the bottom up: drums, then bass, pad, lead (the D B P L boxes).
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.
@@ -78,6 +79,11 @@ lane, a save waiting, the keys' octave off 0.
 - **Slide** glides each note in from the last one. **Retrigger** makes a share of the notes stutter (always the same
   notes, so it stays a pattern); the rate sets 1 to 3 repeats per 16th. **Crush** lowers the bits and the sample rate.
   **Echo** plays two quieter copies a dotted 8th apart.
+- **Stereo:** as a tracker spreads its channels left and right, Espada spreads its voices: the pad's and the sfx's
+  every other voice to the right, hats and crash right of centre, the lead a little right, bass and kick in the
+  middle. STRINGS and BRASS play as sections (two more players a little out of tune) and the strings swell in.
+  HYPERSPACE's pad is chopped: the chord struck every 16th with an accent pattern, as a tracker re-strikes a long
+  pad sample.
 - **A channel's profile** sets that lane alone (MAIN's profile is the one blend and launch move to).
 - **The lead** follows the chords: every beat is a chord tone, the notes between lead into the next one by scale
   steps, and each 4-bar phrase states a motif, answers it, varies it and lands on the root or third. Density adds a

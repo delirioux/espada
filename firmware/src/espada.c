@@ -51,6 +51,8 @@ typedef struct {
     uint8_t note[3];            /* MIDI notes; drums: note[0] = drum kind; sfx: note[0] = kind, note[1] = pitch */
 } ev_t;
 #define EV_ARP 1u
+#define EV_ACC1 2u              /* accents (the chopped pad): a step softer */
+#define EV_ACC2 4u              /* two steps softer */
 #define MAXEV 80u
 typedef struct {
     int32_t num;                /* the bar this buffer holds (-1 = none) */

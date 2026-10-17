@@ -285,6 +285,8 @@ static void t_peak(int32_t d) { peak_ph = clampi(peak_ph + (d > 0 ? 1 : -1), 1, 
 static void v_peak(char *o) { s_int(o, peak_ph); }
 static void t_energy(int32_t d) { energy = clampi(energy + d, -50, 50); invalidate(); }
 static void v_energy(char *o) { if (energy) s_sign(o, energy); else s_cat(o, "0"); }
+static void t_space(int32_t d) { space = clampi(space + d, 0, 100); }
+static void v_space(char *o) { s_pct(o, space); }
 static void s_blend(char *o) { static const char *const W[5] = {"", "DRUMS", "+BASS", "+PAD", "ALL"}; s_cat(o, W[blend]); }
 static void t_auto(int32_t d) { auto_drop = d > 0; invalidate(); }
 static void v_auto(char *o) { s_cat(o, auto_drop ? "ON" : "OFF"); }
@@ -301,7 +303,7 @@ static const card_t CARDS[NPG][4] = {
     {{"ARC", t_arc, v_arc, 0}, {"BUILD", t_build, v_build, s_phr}, {"PEAK", t_peak, v_peak, s_phr}, {"AUTODROP", t_auto, v_auto, 0}},
 };
 static const card_t CARDS_MAIN[4] = {
-    {"QUEUE", t_prof, v_prof, 0}, {"BLEND", t_blend, v_blend, s_blend}, {"ENERGY", t_energy, v_energy, 0}, {"ARC", t_arc, v_arc, 0}};
+    {"QUEUE", t_prof, v_prof, 0}, {"BLEND", t_blend, v_blend, s_blend}, {"ENERGY", t_energy, v_energy, 0}, {"SPACE", t_space, v_space, 0}};
 static const card_t CARDS_SFX[4] = {
     {"SOUND", t_inst, v_inst, 0}, {"DENSITY", t_dens, v_dens, 0}, {0, 0, 0, 0}, {"LEVEL", t_level, v_level, 0}};
 static const card_t *card_at(int32_t c)
@@ -639,7 +641,7 @@ static void draw_frame(int force)
 
 /* ---- saving: settings (256 B) and patterns (their own sector), only while stopped (an erase stalls the sound) */
 typedef struct {
-    uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy;
+    uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy; uint8_t space;
     struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary; } l[NLANE];
 } save_t;
 typedef struct { upat_t p[NLANE]; } pats_t;
@@ -648,7 +650,7 @@ static void do_save(void)
     static save_t S;
     static pats_t P;
     int32_t l, rc;
-    S.ver = 4; S.energy = (int8_t)energy; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
+    S.ver = 5; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
     for (l = 0; l < (int32_t)NLANE; l++) {
         S.l[l].prof = ln[l].prof; S.l[l].lock = ln[l].lock; S.l[l].dens = ln[l].dens; S.l[l].oct = ln[l].oct; S.l[l].filt = (int8_t)fxu[l].filt;
@@ -666,8 +668,8 @@ static void do_load(void)
     static save_t S;
     static pats_t P;
     int32_t l;
-    if (settings_load(&S, sizeof S) == 0 && S.ver == 4) {
-        energy = clampi(S.energy, -50, 50);
+    if (settings_load(&S, sizeof S) == 0 && S.ver == 5) {
+        energy = clampi(S.energy, -50, 50); space = clampi(S.space, 0, 100);
         set_key(S.key % 12u); scale_sel = S.scale < NSCALE ? S.scale : 0; prog_sel = S.prog <= NPROG ? S.prog : 0; bpc = clampi(S.bpc, 1, 4);
         arc_on = S.arc != 0; build_ph = clampi(S.build, 2, 16); if (arc_on) arc_restart(0); peak_ph = clampi(S.peak, 1, 8); auto_drop = S.autod != 0; target = S.target % NPROF; set_bpm(S.bpm);
         for (l = 0; l < (int32_t)NLANE; l++) {

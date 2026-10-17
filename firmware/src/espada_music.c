@@ -86,7 +86,7 @@ static int32_t snap(const tools_t *T, int32_t note)
 /* ---- profiles */
 enum { S_DRIVE, S_PEDAL, S_OCTAVE,                       /* bass */
        S_EPIC, S_STAB, S_RIFF, S_MELODY,                 /* lead */
-       S_STRINGS, S_SUS, S_LUSH, S_ARP,                  /* pad */
+       S_STRINGS, S_SUS, S_LUSH, S_ARP, S_CHOP,          /* pad */
        S_DEPIC, S_DTECH, S_DFUSION, S_DOLD };            /* drums */
 static const int8_t AEO[7] = {0, 2, 3, 5, 7, 8, 10}, ION[7] = {0, 2, 4, 5, 7, 9, 11}, DOR[7] = {0, 2, 3, 5, 7, 9, 10};
 typedef struct {
@@ -102,7 +102,7 @@ static const prof_t PROF[] = {
     {"EPIC", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}},
      {S_EPIC, S_STRINGS, S_DRIVE, S_DEPIC}, {10, 5, 2, 1}},
     {"HYPERSPACE", AEO, {{0, Q_5}, {0, Q_5}, {10, Q_5}, {5, Q_5}, {7, Q_5}, {5, Q_5}, {3, Q_5}, {10, Q_5}},
-     {S_STAB, S_SUS, S_DRIVE, S_DTECH}, {11, 7, 0, 2}},
+     {S_STAB, S_CHOP, S_DRIVE, S_DTECH}, {11, 7, 0, 2}},
     {"FUSION", ION, {{0, Q_MAJ}, {9, Q_MIN}, {0, Q_MAJ}, {9, Q_MIN}, {9, Q_MAJ}, {1, Q_MAJ}, {9, Q_MAJ}, {5, Q_MAJ}},
      {S_RIFF, S_LUSH, S_PEDAL, S_DFUSION}, {9, 13, 1, 0}},
     {"OLDSKOOL", AEO, {{5, Q_MIN}, {3, Q_MAJ}, {1, Q_MAJ}, {5, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {0, Q_MIN}, {3, Q_MAJ}},
@@ -359,6 +359,15 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
     case S_ARP:
         g_add(G, 0, 16, 3, ct(T, 0), ct(T, 1), ct(T, 2), EV_ARP);
         break;
+    case S_CHOP: {              /* a chopped pad (a tracker re-strikes a long sample by offset): the chord every 16th, accented */
+        static const uint8_t AC[3][16] = {{0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 1},
+                                          {0, 2, 2, 1, 2, 2, 1, 2, 0, 2, 2, 1, 2, 1, 2, 1},
+                                          {0, 3, 1, 2, 0, 3, 1, 2, 0, 3, 1, 2, 0, 2, 1, 2}};
+        rng_t m = {hash3(b / 4, 41, p)};
+        const uint8_t *a = AC[(rnd(&m) >> 16) * 3u >> 16];
+        for (s = 0; s < 16; s++)
+            if (a[s] < 3) g_add(G, s, 1, 3, ct(T, 0), ct(T, 1), ct(T, 2), a[s] == 1 ? EV_ACC1 : a[s] == 2 ? EV_ACC2 : 0);
+        break; }
     case S_DEPIC: {
         static const int8_t K[16] = {100, 0, 20, 0, 0, 0, 20, 0, 100, 0, 20, 0, 36, 0, 0, 0}, TT[16] = {60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45, 0, 40, 25},
                             SN[16] = {0, 0, 0, 0, 92, 0, 0, 20, 0, 0, 0, 0, 92, 0, 35, 20}, H[16] = {75, 38, 75, 38, 75, 38, 75, 38, 75, 38, 75, 38, 75, 38, 75, 38};

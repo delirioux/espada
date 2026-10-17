@@ -10,7 +10,10 @@
  *                 impact (a falling sub + a noise burst), zap (a sine falling fast), crackle (clicks + hiss),
  *                 bits (1-bit periodic noise, the 8-bit metallic kind)
  *   lanes         each lane renders into its own bus: drive, a state-variable filter (low- or high-pass)
- *                 with a tempo-synced wobble, the bit crusher, the level; then the mix
+ *                 with a tempo-synced wobble, the bit crusher, the level; then the mix, in stereo: each lane
+ *                 has its place (as a tracker's channels sit left and right) and a send to the room
+ *   the room      a small stereo reverb (four damped combs, then two allpasses a side, different left and
+ *                 right) at half the sample rate, fed by the lanes' sends; SPACE sets how much
  *   the clock     16ths at the tempo, sample-accurate; each step fires the events of the bar cache; retrigger
  *                 repeats and echo copies wait in a small queue with their sample time */
 
@@ -45,15 +48,16 @@ typedef struct {
     uint16_t r_ms;              /* release */
     uint8_t vib, square;
     uint16_t d_ms;              /* decay toward the sustain (0 = 80 ms); with sus 0 a long one rings out, as a piano */
-    uint8_t chaos;              /* 1: add the pad and the brown noise under the lead (CHAOS) */
+    uint8_t chaos;              /* 1: add the pad and the brown noise under the lead (CHAOS); 2: an ensemble, two
+                                 * more detuned oscillators with the note (strings and brass as sections) */
 } patch_t;
 static const patch_t PATCH[] = {
     {"FM BASS", 16, 1138, 260, 180,   4, 6200,  178,  80, 0, 0},
     {"SLAP",    32,  975,  81,  60,   2, 5600,  128,  60, 0, 0},
     {"PIZZ",    16,  650,  65, 100,   2, 5900,   10, 120, 0, 0},
     {"SUB",     16,   97,  32, 200,   5, 7400,  230, 100, 0, 0},
-    {"BRASS",   16,  260, 1040,  90, 30, 2360,  217, 180, 1, 0},
-    {"STRINGS", 32,  227,  97, 600, 220, 1770,  230, 500, 1, 0},
+    {"BRASS",   16,  260, 1040,  90, 30, 2000,  217, 180, 1, 0,    0, 2},
+    {"STRINGS", 32,  227,  97, 600, 380, 1500,  230, 650, 1, 0,    0, 2},
     {"BELL",    56,  371,  28, 800,   2, 2060,   51, 800, 0, 0},
     {"ORGAN",   32,  162, 162, 100,  10, 1770,  255,  60, 0, 0},
     {"FLUTE",   16,  130,  65, 200,  60, 2360,  230, 150, 1, 0},
@@ -100,8 +104,70 @@ static const uint8_t VLO[NLANE] = {0, 5, 13, 17, 26}, VHI[NLANE] = {5, 13, 17, 2
 static uint32_t vage, noise_s = 22222u;
 
 /* ---- lane buses and effects state */
-static int32_t bus[NLANE][HALF_FRAMES];
-static int32_t f_low[NLANE], f_band[NLANE], crush_hold[NLANE], crush_n[NLANE];
+/* buses: one a lane, plus right-hand buses for the pad's and sfx's every other voice and the drums' hats and
+ * crash (a tracker spreads its channels left and right; this spreads the voices) */
+#define B_PADR NLANE
+#define B_SFXR (NLANE + 1u)
+#define B_HATS (NLANE + 2u)
+#define NBUS (NLANE + 3u)
+static const uint8_t BUS_LANE[NBUS] = {0, 1, 2, 3, 4, L_PAD, L_SFX, L_DRUMS};   /* whose effects a bus takes */
+static int32_t bus[NBUS][HALF_FRAMES];
+static int32_t sendb[HALF_FRAMES];                      /* the lanes' sends to the room */
+static volatile int32_t space = 35;                     /* 0..100: the room (MAIN) */
+/* where each lane sits (Q8 left, right) and how much of it goes to the room (Q8): lead a little right, pad and
+ * sfx mostly in the room, bass and drums in the middle and dry */
+static const uint16_t PAN_L[NBUS] = {150, 256, 256, 256, 256, 80, 90, 130}, PAN_R[NBUS] = {256, 80, 256, 256, 90, 256, 256, 256};
+static const uint16_t SEND[NBUS] = {90, 150, 8, 45, 160, 150, 160, 45};
+
+/* ---- the room: Schroeder / Moorer, at 22 kHz; comb and allpass lines in the pool */
+#define RV_C0 557u
+#define RV_C1 593u
+#define RV_C2 641u
+#define RV_C3 677u
+#define RV_AL0 113u
+#define RV_AL1 173u
+#define RV_AR0 127u
+#define RV_AR1 191u
+static int16_t rv_c[RV_C0 + RV_C1 + RV_C2 + RV_C3] __attribute__((section(".pool")));
+static int16_t rv_a[RV_AL0 + RV_AL1 + RV_AR0 + RV_AR1] __attribute__((section(".pool")));
+static uint32_t rv_ci[4], rv_ai[4];
+static int32_t rv_lp[4];
+static int32_t rv_sat(int32_t v) { return v > 32767 ? 32767 : v < -32767 ? -32767 : v; }
+static int32_t rv_comb(uint32_t k, int32_t x)
+{
+    static const uint16_t LEN[4] = {RV_C0, RV_C1, RV_C2, RV_C3}, OFF[4] = {0, RV_C0, RV_C0 + RV_C1, RV_C0 + RV_C1 + RV_C2};
+    int16_t *b = rv_c + OFF[k];
+    int32_t y = b[rv_ci[k]];
+    rv_lp[k] += ((y - rv_lp[k]) * 22000) >> 15;                        /* the damping: highs die first */
+    b[rv_ci[k]] = (int16_t)rv_sat(x + ((rv_lp[k] * 27500) >> 15));    /* feedback 0.84 */
+    if (++rv_ci[k] >= LEN[k]) rv_ci[k] = 0;
+    return y;
+}
+static int32_t rv_allpass(uint32_t k, int32_t x)
+{
+    static const uint16_t LEN[4] = {RV_AL0, RV_AL1, RV_AR0, RV_AR1}, OFF[4] = {0, RV_AL0, RV_AL0 + RV_AL1, RV_AL0 + RV_AL1 + RV_AR0};
+    int16_t *b = rv_a + OFF[k];
+    int32_t d = b[rv_ai[k]], y = d - x;
+    b[rv_ai[k]] = (int16_t)rv_sat(x + (d >> 1));
+    if (++rv_ai[k] >= LEN[k]) rv_ai[k] = 0;
+    return y;
+}
+static void room(int32_t *out, uint32_t n)
+{
+    uint32_t k;
+    int32_t g = space * 3;                                              /* Q8 wet level: 100 -> 1.2 */
+    if (space <= 0) return;
+    for (k = 0; k + 1u < n; k += 2u) {
+        int32_t x = (sendb[k] + sendb[k + 1u]) >> 3, c, l, r;            /* half rate; headroom */
+        c = rv_comb(0, x) + rv_comb(1, x) + rv_comb(2, x) + rv_comb(3, x);
+        c >>= 1;
+        l = rv_allpass(1, rv_allpass(0, c));
+        r = rv_allpass(3, rv_allpass(2, c));
+        l = (l * g) >> 8; r = (r * g) >> 8;
+        out[2u * k] += l; out[2u * k + 1u] += r; out[2u * k + 2u] += l; out[2u * k + 3u] += r;
+    }
+}
+static int32_t f_low[NBUS], f_band[NBUS], crush_hold[NBUS], crush_n[NBUS];
 static uint32_t wob_ph[NLANE];
 static uint32_t lane_last_inc[NLANE][3];
 static volatile uint32_t lane_hit_ms[NLANE];
@@ -313,9 +379,10 @@ static void trigger(uint32_t lane, const ev_t *e, uint32_t kind)
     uint32_t reps = rt ? total / (seg ? seg : 1u) : 1u, dur = rt ? seg * 7u / 10u : total * 95u / 100u, k, c;
     if (reps > 16u) reps = 16u;
     if (!reps) reps = 1;
+    uint32_t base = e->flags & EV_ACC2 ? 112u : e->flags & EV_ACC1 ? 176u : 256u;   /* the accent */
     for (c = 0; c < 3u; c++) {                                       /* the note, then two echo copies */
-        uint32_t lvl = c == 0 ? 256u : c == 1 ? (uint32_t)fx[lane].echo * 141u / 100u
-                                              : (uint32_t)(fx[lane].echo * fx[lane].echo) * 77u / 10000u;
+        uint32_t lvl = c == 0 ? base : c == 1 ? (uint32_t)fx[lane].echo * 141u / 100u * base >> 8
+                                              : (uint32_t)(fx[lane].echo * fx[lane].echo) * 77u / 10000u * base >> 8;
         uint32_t at = smp + c * 3u * step;
         if (c && fx[lane].echo <= 0) break;
         if (!lvl) continue;
@@ -358,7 +425,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                     int32_t d = (int32_t)(v->target - v->inc);
                     v->inc += (uint32_t)(int32_t)(((int64_t)d * v->glide_k) >> 15);
                 }
-                if (v->chaos) {
+                if (v->chaos == 1u) {
                     int32_t to = v->stage == 2u ? 0 : v->peak;
                     v->pamp += (int32_t)(((int64_t)(to - v->pamp) * (to > v->pamp ? 68 : 34)) >> 15);   /* per 32 samples: tau 350 ms in, 700 ms out */
                 }
@@ -398,7 +465,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                     if (v->midi) { mo_push(0x80u | v->midi_ch, v->midi, 0); v->midi = 0; }
                 }
             }
-            if (v->amp < 4 && (v->stage == 2u || (v->kind != V_FM && v->kind < V_WASH)) && (!v->chaos || v->pamp < 4)) {
+            if (v->amp < 4 && (v->stage == 2u || (v->kind != V_FM && v->kind < V_WASH)) && (v->chaos != 1u || v->pamp < 4)) {
                 if (v->midi) { mo_push((v->kind == V_FM ? 0x80u | v->midi_ch : 0x89u), v->midi, 0); v->midi = 0; }
                 v->kind = V_OFF; return;
             }
@@ -416,7 +483,14 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
             s = SIN[(v->ph + off) >> 22];
             if (v->square) s = s >= 0 ? 26000 : -26000;
             s = (s * v->amp) >> 15;
-            if (v->chaos) {                                             /* the light lead under a heavy pad and noise */
+            if (v->chaos == 2u) {                                       /* an ensemble: two more players, a little out */
+                int32_t e;
+                v->pph1 += inc + (inc >> 8);
+                v->pph2 += inc - (inc >> 8) - (inc >> 10);
+                e = SIN[(v->pph1 + ((uint32_t)(int32_t)SIN[v->pph1 >> 22] << 14)) >> 22]
+                  + SIN[(v->pph2 + ((uint32_t)(int32_t)SIN[v->pph2 >> 22] << 14)) >> 22];
+                s = ((s * 5) >> 3) + ((((e * 3) >> 3) * v->amp) >> 15);
+            } else if (v->chaos) {                                      /* the light lead under a heavy pad and noise */
                 int32_t pad, br;
                 v->pph1 += inc - (inc >> 8);                            /* 7 cents flat */
                 v->pph2 += (inc >> 1) + (inc >> 9);                     /* an octave down, 3 cents sharp */
@@ -488,8 +562,9 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
 }
 
 /* the lane's effects on its bus, once per block (parameters per block, filter per sample) */
-static void lane_fx(uint32_t l, int32_t *b, uint32_t n)
+static void lane_fx(uint32_t slot, int32_t *b, uint32_t n)        /* the effects of bus slot (its lane's settings) */
 {
+    uint32_t l = BUS_LANE[slot];
     const lanefx_t *F = &fx[l];
     uint32_t i;
     int32_t drive = F->drive, filt = F->filt, wob = F->wob, crush = F->crush;
@@ -511,7 +586,7 @@ static void lane_fx(uint32_t l, int32_t *b, uint32_t n)
         else if (filt > 0) note16 = (16 * 16) + filt * (88 * 16) / 100;   /* 100 -> note 104 (~5.3 kHz) */
         else note16 = 82 * 16;                                            /* centred with wobble: ~1.8 kHz */
         if (wob > 0) {
-            wob_ph[l] += (uint32_t)(((uint64_t)WOBF_Q8[wob] * (uint32_t)seq_bpm * n * 1623u) >> 8);   /* 2^32/(60*44100) = 1623.1 */
+            if (slot == l) wob_ph[l] += (uint32_t)(((uint64_t)WOBF_Q8[wob] * (uint32_t)seq_bpm * n * 1623u) >> 8);   /* 2^32/(60*44100) = 1623.1; the right bus follows */
             note16 += (SIN[wob_ph[l] >> 22] * (24 * 16)) >> 15;
         }
         if (lp && note16 >= 128 * 16) goto skip_filter;
@@ -524,7 +599,7 @@ static void lane_fx(uint32_t l, int32_t *b, uint32_t n)
         damp = 65536 - F->res * 590;                                      /* 2 .. 0.2 (Q15) */
         if (damp < 6553) damp = 6553;
         {
-            int32_t lo = f_low[l], bd = f_band[l];
+            int32_t lo = f_low[slot], bd = f_band[slot];
             for (i = 0; i < n; i++) {
                 int32_t hp;
                 int32_t x = b[i];                                 /* 32-bit products: states kept within 17 bits */
@@ -537,15 +612,15 @@ static void lane_fx(uint32_t l, int32_t *b, uint32_t n)
                 if (lo > 65535) lo = 65535; else if (lo < -65535) lo = -65535;
                 b[i] = lp ? lo : hp;
             }
-            f_low[l] = lo; f_band[l] = bd;
+            f_low[slot] = lo; f_band[slot] = bd;
         }
     }
 skip_filter:
     if (crush > 0) {
         int32_t sh = crush * 12 / 100, hold = 1 + crush * crush * 15 / 10000;
         for (i = 0; i < n; i++) {
-            if (--crush_n[l] <= 0) { crush_n[l] = hold; crush_hold[l] = (b[i] >> sh) << sh; }
-            b[i] = crush_hold[l];
+            if (--crush_n[slot] <= 0) { crush_n[slot] = hold; crush_hold[slot] = (b[i] >> sh) << sh; }
+            b[i] = crush_hold[slot];
         }
     }
 }
@@ -553,8 +628,14 @@ skip_filter:
 static void render_span(uint32_t from, uint32_t n)
 {
     uint32_t v;
-    for (v = 0; v < NVOICE; v++)
-        if (vc[v].kind != V_OFF) render_voice(&vc[v], &bus[vc[v].lane][from], n);
+    for (v = 0; v < NVOICE; v++) {
+        const voice_t *x = &vc[v];
+        uint32_t b = x->lane;
+        if (x->kind == V_OFF) continue;
+        if ((b == L_PAD || b == L_SFX) && (v & 1u)) b = b == L_PAD ? B_PADR : B_SFXR;   /* every other voice: right */
+        else if (x->kind == V_HAT || x->kind == V_CRASH) b = B_HATS;
+        render_voice(&vc[v], &bus[b][from], n);
+    }
 }
 
 static void all_off(void)
@@ -616,7 +697,7 @@ static void audition(uint32_t lane, uint32_t note, uint32_t kind)
 static void app_audio(int32_t *out, uint32_t n)
 {
     uint32_t t0 = fm1_ticks(), i = 0, l, k;
-    for (l = 0; l < NLANE; l++)
+    for (l = 0; l < NBUS; l++)
         for (k = 0; k < n; k++) bus[l][k] = 0;
     if (aud_req) { uint8_t nt[3] = {(uint8_t)aud_note, (uint8_t)(62 + key_off), 0}; fire(aud_lane, nt, 1, 0, aud_lane == L_SFX ? 33075u : 9000u, 256, aud_kind, 0); aud_req = 0; }
     live_run();
@@ -653,15 +734,18 @@ static void app_audio(int32_t *out, uint32_t n)
             step_fire(seq_step);
         }
     }
-    for (l = 0; l < NLANE; l++) {
-        int32_t lv = fx[l].level * 480 / 100;                                /* Q8: 80 -> 1.5 */
+    for (k = 0; k < n; k++) sendb[k] = 0;
+    for (l = 0; l < NBUS; l++) {
+        int32_t lv = fx[BUS_LANE[l]].level * 480 / 100, pl = PAN_L[l], pr = PAN_R[l], sd = SEND[l];   /* Q8: 80 -> 1.5 */
         lane_fx(l, bus[l], n);
         for (k = 0; k < n; k++) {
             int32_t s = (bus[l][k] * lv) >> 8;
-            out[2u * k] += s;
-            out[2u * k + 1u] += s;
+            out[2u * k] += (s * pl) >> 8;
+            out[2u * k + 1u] += (s * pr) >> 8;
+            sendb[k] += (s * sd) >> 8;
         }
     }
+    room(out, n);
     for (k = 0; k < 2u * n; k++) {                                           /* a soft knee above -3 dB */
         int32_t s = out[k];
         if (s > 23000) s = 23000 + ((s - 23000) >> 2); else if (s < -23000) s = -23000 + ((s + 23000) >> 2);

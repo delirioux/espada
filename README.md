@@ -22,7 +22,7 @@ steps from the overview to each channel.
 
 <table>
 <tr>
-<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="MAIN"><br><b>MAIN</b>: all five lanes. The knobs: the next profile, blend, energy (density for all) and the arc.</td>
+<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="MAIN"><br><b>MAIN</b>: all five lanes. The knobs: the next profile, blend, energy (density for all) and space (the room).</td>
 <td align="center" width="33%"><img src="docs/screens/channel.png" width="240" alt="LEAD"><br><b>A channel</b>: its lane large. The knobs: profile, density, octave, level; PRESETS its sound.</td>
 <td align="center" width="33%"><img src="docs/screens/fx.png" width="240" alt="PAD FX"><br><b>FX</b>: filter, resonance, wobble and drive (FX again: brightness, crush, vary). The screen darkens what the filter cuts.</td>
 </tr>
@@ -70,6 +70,8 @@ steps from the overview to each channel.
 - **DROP.** Tap REC for a break (the channel in view plays alone) that drops on the next phrase with a crash and
   an impact, or hold it and let go when you want the drop. ENERGY on MAIN turns every lane's density up or down at
   once.
+- **Stereo and a room.** The voices spread left and right as a tracker's channels do, strings and brass play as
+  sections, and a stereo reverb (SPACE) puts it all in a hall.
 - **The arc** (off until you turn it on): starts with a few drum hits and builds bass, pad and lead in as the
   energy rises, breaks, drops and builds again.
 - **Your own parts.** On the EDIT page you enter notes step by step, tracker style: white keys are scale steps
