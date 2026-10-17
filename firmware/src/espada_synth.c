@@ -162,10 +162,12 @@ static voice_t *alloc_voice(uint32_t lane)
 }
 
 /* start one FM voice: lvl Q8, dur in samples; from_inc: slide start (0 = none) */
+static voice_t *last_voice;                             /* the voice start_fm just started (the keys hold it) */
 static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur, uint32_t lvl, uint32_t from_inc,
                      const uint32_t *arp, uint32_t arp_n, uint32_t midi)
 {
     voice_t *v = alloc_voice(lane);
+    last_voice = v;
     int32_t bright = fx[lane].bright, mult = 64 + bright * 768 / 100;   /* Q8: 25 -> 1.0 */
     uint32_t a = (uint32_t)P->a_ms * 441u / 10u, i;
     v->kind = V_FM; v->lane = (uint8_t)lane; v->stage = 0; v->square = P->square;
@@ -565,6 +567,43 @@ static void all_off(void)
     npend = 0;
 }
 
+/* the keys, played live: the main loop queues key down / up, the interrupt starts and releases (only it touches
+ * the voices). A melodic note sounds until its key comes up; drums and sfx are hits. */
+typedef struct { uint8_t lane, note, key, on, inst; } live_t;
+static volatile live_t live_q[16];
+static volatile uint32_t live_w, live_r;
+static voice_t *live_v[27];
+static uint32_t live_age[27];
+static void live_push(uint32_t lane, uint32_t note, uint32_t key, uint32_t on, uint32_t inst)
+{
+    live_t *e;
+    if (live_w - live_r >= 16u) return;
+    e = (live_t *)&live_q[live_w % 16u];
+    e->lane = (uint8_t)lane; e->note = (uint8_t)note; e->key = (uint8_t)key; e->on = (uint8_t)on; e->inst = (uint8_t)inst;
+    RING_PUBLISH();
+    live_w++;
+}
+static void live_run(void)
+{
+    while (live_r != live_w) {
+        const live_t *e = (const live_t *)&live_q[live_r % 16u];
+        uint32_t k = e->key < 27u ? e->key : 0u;
+        if (e->on) {
+            if (e->lane == L_DRUMS) start_drum(e->note, 230, e->inst, 0);
+            else if (e->lane == L_SFX) start_sfx(e->note, (uint32_t)(62 + key_off), 44100, 230);
+            else {
+                start_fm(e->lane, &PATCH[e->inst < NPATCH ? e->inst : 0], note_inc(e->note), 0xFFFFFFF0u, 230, 0, 0, 0, e->note);
+                live_v[k] = last_voice; live_age[k] = last_voice->age;
+            }
+            lane_hit_ms[e->lane] = fm1_ms;
+        } else if (live_v[k] && live_v[k]->age == live_age[k] && live_v[k]->kind == V_FM && live_v[k]->stage != 2u) {
+            live_v[k]->gate = 1;                                    /* released on the next control tick */
+            live_v[k] = 0;
+        }
+        live_r++;
+    }
+}
+
 /* hearing a note while editing: the main loop asks, the interrupt plays it (only it touches the voices) */
 static volatile uint32_t aud_req, aud_lane, aud_note, aud_kind;
 static void audition(uint32_t lane, uint32_t note, uint32_t kind)
@@ -580,6 +619,7 @@ static void app_audio(int32_t *out, uint32_t n)
     for (l = 0; l < NLANE; l++)
         for (k = 0; k < n; k++) bus[l][k] = 0;
     if (aud_req) { uint8_t nt[3] = {(uint8_t)aud_note, (uint8_t)(62 + key_off), 0}; fire(aud_lane, nt, 1, 0, aud_lane == L_SFX ? 33075u : 9000u, 256, aud_kind, 0); aud_req = 0; }
+    live_run();
     if (seq_stop_req) { seq_stop_req = 0; seq_playing = 0; all_off(); }
     if (seq_start_req) {
         seq_start_req = 0; seq_playing = 1; seq_step = (uint32_t)seq_start_step; seq_acc_q8 = 0; npend = 0;

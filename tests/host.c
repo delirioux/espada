@@ -36,6 +36,7 @@ static int32_t fm1_enc_take(uint32_t e) { int32_t d = e < 7u ? host_enc[e] : 0; 
 #define FM1_TICKS_PER_US 24u
 static uint32_t fm1_ticks(void) { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return (uint32_t)(ts.tv_sec * 24000000ull + (uint64_t)ts.tv_nsec * 24u / 1000u); }
 static void fm1_led_key(uint32_t id, int on) { (void)id; (void)on; }
+static void fm1_glow_all(void) { }
 
 /* the screen: 240 x 240 RGB565, as the ST7789 gets it (gfx.c sends the bytes swapped) */
 static uint16_t fb[240 * 240];

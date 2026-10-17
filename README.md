@@ -17,32 +17,35 @@ echo. An arc builds the piece up from the drums to a drop, and DROP lets you cal
 
 ## The screens
 
+Laid out as Tuna is: four cards on top for the four knobs in a row, the music under them, and HOME (or ALGORITHM)
+steps from the overview to each channel.
+
 <table>
 <tr>
-<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="MAIN view"><br><b>MAIN</b>: all five lanes. The riser on the SFX lane climbs into the drop; the footer counts down to it.</td>
-<td align="center" width="33%"><img src="docs/screens/channel.png" width="240" alt="BASS channel view"><br><b>A channel</b> (HOME steps through them): its lane large, its six encoder values written out. The knob just turned is framed.</td>
-<td align="center" width="33%"><img src="docs/screens/fx.png" width="240" alt="BASS FX page"><br><b>FX</b>: a low-pass with resonance and drive on the bass. The screen darkens what the filter cuts away.</td>
+<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="MAIN"><br><b>MAIN</b>: all five lanes. The knobs: the next profile, blend, energy (density for all) and the arc.</td>
+<td align="center" width="33%"><img src="docs/screens/channel.png" width="240" alt="LEAD"><br><b>A channel</b>: its lane large. The knobs: profile, density, octave, level; PRESETS its sound.</td>
+<td align="center" width="33%"><img src="docs/screens/fx.png" width="240" alt="PAD FX"><br><b>FX</b>: filter, resonance, wobble and drive (FX again: brightness, crush, vary). The screen darkens what the filter cuts.</td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screens/sfx.png" width="240" alt="SFX channel view"><br><b>SFX</b>: noise effects. On AUTO a riser fills the bar before each drop and the impact lands on it.</td>
-<td align="center"><img src="docs/screens/edit.png" width="240" alt="LEAD EDIT page"><br><b>EDIT</b>: your own part, step by step, in scale steps from the chord root, so it follows the chords.</td>
-<td align="center"><img src="docs/screens/song.png" width="240" alt="SONG page"><br><b>SONG</b>: key, scale and a suggested progression, with the chords as they play.</td>
+<td align="center"><img src="docs/screens/sfx.png" width="240" alt="SFX"><br><b>SFX</b>: noise effects. A riser grows into the drop; the impact lands on it.</td>
+<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT"><br><b>EDIT</b>: your own part, step by step, in scale steps from the chord root, so it follows the chords.</td>
+<td align="center"><img src="docs/screens/song.png" width="240" alt="SONG"><br><b>SONG</b>: key, scale and a suggested progression, the chord playing lit.</td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screens/legend.png" width="240" alt="The encoder legend"><br><b>The legend</b>: what each encoder does here, and its value. Tap SEL to show or hide it.</td>
+<td align="center"><img src="docs/screens/arc.png" width="240" alt="ARC"><br><b>ARC</b> (off until you turn it on): the energy over the coming bars, build, break, peak and down.</td>
 <td colspan="2">
 
-| Button | Does |
+| Control | Does |
 | --- | --- |
-| HOME | the next view: MAIN, LEAD, PAD, BASS, DRUMS, SFX (SEL + HOME: MAIN) |
-| FX / ARP / EDIT | the channel's effects, tracker effects, step editor |
-| GLO | the SONG page |
-| PLAY | start / stop |
-| SEQ | launch the queued profile on the next phrase |
-| REC | DROP: tap for a break and a drop on the phrase, or hold |
-| ENV | lock the lane's profile |
-| LFO | generate a pattern (a variation; SEL + LFO: a fresh one) |
-| SAVE | keep settings and patterns |
+| SELECT | tempo |
+| ALGORITHM, HOME | the channel: MAIN, LEAD, PAD, BASS, DRUMS, SFX |
+| PRESETS | the sound (MAIN: the next profile) |
+| KNOB 1-4 | the four cards |
+| FX / ARP / EDIT / GLO | effects (twice: FX 2), tracker effects, steps, song (twice: the arc) |
+| PLAY / SEQ / REC | start-stop, launch on the phrase, DROP (tap or hold) |
+| ENV / LFO / SAVE | lock, generate a pattern, save |
+| OCT- / OCT+ | the keys' octave |
+| Keys | play the channel live; on EDIT they enter steps |
 
 </td>
 </tr>
@@ -52,7 +55,7 @@ echo. An arc builds the piece up from the drums to a drop, and DROP lets you cal
 
 - **Lanes.** Notes scroll from right to left past a fixed "now" line. Solid blocks are what a lane plays; outlined
   blocks are a preview of the queued profile. HOME steps from the overview (MAIN) to each lane on its own, large,
-  with its values written out, and back. The keys only play notes and steps; every setting is on an encoder.
+  with its values on the cards above it, and back. The keys play the channel live; every setting is on a knob.
 - **SFX.** The fifth lane: a noise riser into every drop, the impact on it, washes, laser zaps, crackle and 8-bit
   noise, following the arc and the profile.
 - **Profiles.** EPIC (orchestral minor), HYPERSPACE (techno minor with power chords), FUSION (melodic major with a
@@ -64,9 +67,11 @@ echo. An arc builds the piece up from the drums to a drop, and DROP lets you cal
   answered and closed. VARY gives each phrase a different character (echo, slide, bite, filter, stutter).
 - **Density.** 50 % is the part as the profile writes it. Lower thins it out; higher adds notes inside the chord and
   its scale, 16th hats, ghost snares and fills.
-- **The arc.** Starts with a few drum hits and builds: bass, pad and lead come in as the energy rises. When it tops
-  out, one lane plays alone for a bar and then everything drops back in with a crash. After the peak it falls back
-  and builds again. DROP: tap for a break that ends on the next phrase, or hold it and let go when you want the drop.
+- **DROP.** Tap REC for a break (the channel in view plays alone) that drops on the next phrase with a crash and
+  an impact, or hold it and let go when you want the drop. ENERGY on MAIN turns every lane's density up or down at
+  once.
+- **The arc** (off until you turn it on): starts with a few drum hits and builds bass, pad and lead in as the
+  energy rises, breaks, drops and builds again.
 - **Your own parts.** On the EDIT page you enter notes step by step, tracker style: white keys are scale steps
   counted from the chord root, so a melody follows the chords and stays in key. GENERATE writes a fitting pattern or
   a variation of yours, and never the same one twice.
@@ -117,7 +122,7 @@ firmware/src/platform.c       Dinghy's wiring of the FM-1 platform (boot, USB, u
 ```
 
 The chip's rules ([docs/RULES.md](docs/RULES.md)): integers only, no 64-bit division, the audio interrupt well
-under 5.8 ms. SEL + SAVE shows the interrupt's worst time on the screen.
+under 5.8 ms. SEL + SAVE shows the interrupt's worst time in the header.
 
 ## Licence and credits
 

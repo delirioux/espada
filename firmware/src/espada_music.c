@@ -172,7 +172,9 @@ static void harm_at(int32_t b, harm_t *H)
 enum { A_OFF, A_BUILD, A_BREAK, A_PEAK, A_DOWN };
 typedef struct { int32_t mode, from, e0, until, lane; } seg_t;
 typedef struct { int32_t mode, e, lane, until, drop; } arc_t;
-static int32_t arc_on = 1, build_ph = 6, peak_ph = 4, auto_drop = 1;
+static int32_t arc_on = 0, build_ph = 6, peak_ph = 4, auto_drop = 1;   /* the arc is off until you turn it on */
+static int32_t energy;                                          /* -50..50: added to every lane's density (MAIN) */
+static int32_t brk_from = -1, brk_until = -1, brk_lane;        /* DROP without the arc: a break, then the drop */
 static seg_t segs[16] = {{A_BUILD, 0, 0, -1, L_PAD}};
 static int32_t nsegs = 1;
 static const int32_t ENTER[NLANE] = {159, 108, 56, 0, 0};       /* lead, pad, bass, drums (sfx: always on) */
@@ -193,7 +195,11 @@ static arc_t arc_at(int32_t b)
     arc_t a = {A_OFF, 154, 0, -1, 0};
     seg_t s, nx;
     int32_t i, k;
-    if (!arc_on) return a;
+    if (!arc_on) {                                              /* only the breaks DROP makes */
+        if (brk_from >= 0 && b >= brk_from && (brk_until < 0 || b < brk_until)) { a.mode = A_BREAK; a.lane = brk_lane; a.until = brk_until; }
+        else if (brk_from >= 0 && b == brk_until) a.drop = 1;
+        return a;
+    }
     s = segs[0];
     for (i = 0; i < nsegs; i++) if (segs[i].from <= b) s = segs[i];
     if (s.from > b) { a.mode = A_BUILD; a.e = 0; return a; }
@@ -546,7 +552,10 @@ static void gen_bar(int32_t b, bar_t *B)
         if (ln[l].up.on) user_bar(l, &G, &T, b);
         else if (l == L_SFX) gen_sfx(&G, &r, &T, b, p, dens, &A, next_drop);
         else generate(PROF[p].st[l], &G, &r, &T, b, p);
-        if (A.mode != A_OFF) { dens += (A.e - 154) * 80 / 256; if (dens < 0) dens = 0; if (dens > 100) dens = 100; }
+        if (A.mode != A_OFF) dens += (A.e - 154) * 80 / 256;
+        dens += energy;
+        if (dens < 0) dens = 0;
+        if (dens > 100) dens = 100;
         if (l != L_SFX) densify(l, &G, &r, &T, b, dens);
         if (A.drop && l == L_DRUMS) {
             int has_c = 0, has_k = 0;
@@ -620,7 +629,7 @@ static void drop_press(int32_t lane)
 {
     int32_t nb = cur_bar() + 1, i, j;
     arc_t A = arc_at(cur_bar());
-    if (!arc_on) return;
+    if (!arc_on) { brk_from = nb; brk_until = -1; brk_lane = lane; drop_seg = 0; drop_down_ms = (int32_t)fm1_ms; invalidate(); return; }
     for (i = 0, j = 0; i < nsegs; i++) if (segs[i].from < nb) segs[j++] = segs[i];
     nsegs = j;
     if (nsegs >= 16) nsegs = 15;
@@ -633,6 +642,12 @@ static void drop_release(void)
 {
     seg_t *s;
     if (drop_seg < 0) return;
+    if (!arc_on) {
+        if ((int32_t)fm1_ms - drop_down_ms < 350) brk_until = (brk_from + 1 + 3) / 4 * 4;             /* tap */
+        else { int32_t nb = cur_bar() + 1; brk_until = nb > brk_from + 1 ? nb : brk_from + 1; }   /* hold */
+        drop_seg = -1; invalidate();
+        return;
+    }
     s = &segs[drop_seg];
     if ((int32_t)fm1_ms - drop_down_ms < 350) s->until = (s->from + 1 + 3) / 4 * 4;          /* tap */
     else { int32_t nb = cur_bar() + 1; s->until = nb > s->from + 1 ? nb : s->from + 1; }      /* hold */
