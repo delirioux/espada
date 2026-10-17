@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/logo.png" width="160" alt="Espada"></p>
+<p align="center"><img src="assets/logo.png" width="480" alt="Espada"></p>
 
 # Espada
 
