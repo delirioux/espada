@@ -84,6 +84,8 @@ The full guide to the panel is in [docs/MANUAL.md](docs/MANUAL.md).
 
 ## Try it in the browser
 
+<p align="center"><a href="https://delirioux.github.io/espada/try/"><img src="docs/screens/browser.png" width="560" alt="Espada in the browser: the FM-1's panel with Espada's screen"></a></p>
+
 **[Espada in the browser](https://delirioux.github.io/espada/try/)**: the same code the FM-1 runs, compiled to
 WebAssembly, on Felucca's browser FM-1 (knobs, buttons, keys; your computer's keyboard plays it too, a MIDI
 controller turns the knobs). Chrome, Edge, Firefox or Safari.
