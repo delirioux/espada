@@ -1,0 +1,504 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Espada's sound: runs in the audio interrupt (44.1 kHz, 256 frames a call). Integers only.
+ *
+ *   FM voices     two operators (a modulator into a carrier's phase), an index envelope, an amplitude
+ *                 envelope, slide, vibrato, the tracker arpeggio (a chord cycled every 42 ms), square option
+ *   drum voices   kick and kettle drum (a swept sine), snare (band-passed noise + a tone), hat, crash
+ *   lanes         each lane renders into its own bus: drive, a state-variable filter (low- or high-pass)
+ *                 with a tempo-synced wobble, the bit crusher, the level; then the mix
+ *   the clock     16ths at the tempo, sample-accurate; each step fires the events of the bar cache; retrigger
+ *                 repeats and echo copies wait in a small queue with their sample time */
+
+/* ---- tables (filled at boot) */
+static int16_t SIN[1024];
+static int32_t sine_q15(uint32_t ph)            /* Dinghy's parabola sine, for the table */
+{
+    int32_t x = (int32_t)ph >> 16, ax = x < 0 ? -x : x, y, ay;
+    y = (x * (32768 - ax)) >> 13;
+    ay = y < 0 ? -y : y;
+    y += ((((y * ay) >> 15) - y) * 7373) >> 15;
+    return y > 32767 ? 32767 : y < -32767 ? -32767 : y;
+}
+static const uint32_t INC_C9[12] = {            /* MIDI 120..131; lower octaves shift right */
+    815363807u, 863847862u, 915214929u, 969636441u, 1027294024u, 1088380105u,
+    1153098554u, 1221665363u, 1294309365u, 1371273005u, 1452813141u, 1539201906u};
+static uint32_t note_inc(int32_t n)             /* phase step per sample of MIDI note n */
+{
+    if (n < 0) n = 0;
+    if (n > 119) n = 119;
+    return INC_C9[n % 12] >> (10 - n / 12);
+}
+#define HZ_INC(hz) ((uint32_t)(hz) * 97392u)    /* 2^32 / 44100 per Hz */
+
+/* ---- FM patches: index Q8 (phase modulation, already divided by the ratio), amp Q15 for one voice */
+typedef struct {
+    const char *name;
+    uint8_t ratio16;            /* modulator frequency / carrier, x16 */
+    uint16_t i0, i1, it_ms;     /* index from i0 to i1 over it_ms */
+    uint16_t a_ms, amp;         /* attack, peak level */
+    uint8_t sus;                /* sustain, of 255 */
+    uint16_t r_ms;              /* release */
+    uint8_t vib, square;
+} patch_t;
+static const patch_t PATCH[] = {
+    {"FM BASS", 16, 1138, 260, 180,   4, 6200,  178,  80, 0, 0},
+    {"SLAP",    32,  975,  81,  60,   2, 5600,  128,  60, 0, 0},
+    {"PIZZ",    16,  650,  65, 100,   2, 5900,   10, 120, 0, 0},
+    {"SUB",     16,   97,  32, 200,   5, 7400,  230, 100, 0, 0},
+    {"BRASS",   16,  260, 1040,  90, 30, 2360,  217, 180, 1, 0},
+    {"STRINGS", 32,  227,  97, 600, 220, 1770,  230, 500, 1, 0},
+    {"BELL",    56,  371,  28, 800,   2, 2060,   51, 800, 0, 0},
+    {"ORGAN",   32,  162, 162, 100,  10, 1770,  255,  60, 0, 0},
+    {"FLUTE",   16,  130,  65, 200,  60, 2360,  230, 150, 1, 0},
+    {"CHIP",    16,    0,   0, 100,   3, 1180,  230,  50, 1, 1},
+};
+#define NPATCH (sizeof PATCH / sizeof PATCH[0])
+
+typedef struct { const char *name; uint16_t kh, kl, kd, sf, sd, hf, hd; } kit_t;   /* Hz and ms */
+static const kit_t KITS[] = {
+    {"STANDARD", 150, 45, 320, 1900, 170, 8000, 40},
+    {"TRACKER",  220, 60, 180, 2600, 120, 6000, 70},
+    {"ELECTRO",  120, 38, 600, 1200, 220, 10000, 25},
+};
+#define NKIT (sizeof KITS / sizeof KITS[0])
+
+/* ---- voices */
+#define CTRL 32u                                /* control rate: envelopes every 32 samples */
+enum { V_OFF = 0, V_FM, V_KICK, V_SNARE, V_HAT, V_CRASH, V_KETTLE };
+typedef struct {
+    uint8_t kind, lane, stage, square;          /* stage: 0 attack, 1 decay/sustain, 2 release */
+    uint8_t midi, midi_ch, arp_n, arp_i;
+    uint32_t ph, mph, inc, target, ratio16;     /* carrier phase / step, modulator phase */
+    int32_t amp, peak, sus, att, rel_k, dec_k;  /* Q15 levels, per-tick steps and factors (Q15) */
+    int32_t idx, idx_end, idx_step;             /* FM index Q8 */
+    uint32_t gate, age, ctr, arp_t;             /* samples until release, ticks alive */
+    int32_t glide_k, vib;                       /* glide factor Q15 (0 = none), vibrato on */
+    uint32_t vph, inc_lo, inc_k;                /* vibrato phase; drum sweep target and factor */
+    uint32_t arp[3];
+    int32_t s1, s2, s3;                         /* filter states (snare, hat) */
+    int32_t tone_amp; uint32_t tph;             /* the snare's tone */
+} voice_t;
+#define NVOICE 26u
+static voice_t vc[NVOICE];
+static const uint8_t VLO[NLANE] = {0, 5, 13, 17}, VHI[NLANE] = {5, 13, 17, 26};   /* voices per lane */
+static uint32_t vage, noise_s = 22222u;
+
+/* ---- lane buses and effects state */
+static int32_t bus[NLANE][HALF_FRAMES];
+static int32_t f_low[NLANE], f_band[NLANE], crush_hold[NLANE], crush_n[NLANE];
+static uint32_t wob_ph[NLANE];
+static uint32_t lane_last_inc[NLANE][3];
+static volatile uint32_t lane_hit_ms[NLANE];
+
+/* ---- the clock */
+static volatile int32_t seq_playing, seq_start_req, seq_stop_req, seq_start_step;
+static volatile uint32_t seq_step_len_q8 = (661500u * 256u) / 125u;   /* samples per 16th, Q8 */
+static volatile int32_t seq_bpm = 125;
+static volatile uint32_t vis_step, vis_frac;    /* where the play head is (frac: 0..65535 of a step) */
+static volatile uint32_t isr_us_max, isr_us_last, isr_us_sum, isr_n;
+static uint32_t seq_step, seq_acc_q8, smp;      /* the step playing, samples into it (Q8), samples since boot */
+
+/* ---- retrigger repeats and echo copies: voice starts that wait for their sample time */
+typedef struct { uint32_t when, dur; uint8_t lane, n, flags, lvl, kind, slide; uint8_t note[3]; } pend_t;
+#define NPEND 64u
+static pend_t pend[NPEND];
+static uint32_t npend;
+
+/* ---- MIDI out (the interrupt queues, the main loop sends) */
+static volatile uint32_t mo_q[64];
+static volatile uint32_t mo_w, mo_r;
+static void mo_push(uint32_t st, uint32_t d1, uint32_t d2)
+{
+    if (mo_w - mo_r < 64u) { mo_q[mo_w % 64u] = st | d1 << 8 | d2 << 16; mo_w++; }
+}
+static const uint8_t GM_DRUM[NDK] = {36, 38, 42, 47, 49};
+
+static void synth_init(void)
+{
+    uint32_t i;
+    for (i = 0; i < 1024u; i++) SIN[i] = (int16_t)sine_q15(i << 22);
+    for (i = 0; i < NLANE; i++) { fx[i].level = 80; fx[i].bright = 25; fx[i].rtg_rate = 1; fx[i].inst = -1; fx[i].res = 30; }
+}
+
+static inline int32_t noise(void) { noise_s = noise_s * 1664525u + 1013904223u; return (int32_t)noise_s >> 17; }
+static int32_t tau_k(uint32_t ms)               /* per-tick factor (Q15) of a decay with time constant ms */
+{
+    uint32_t smp_tau = ms * 441u / 10u;
+    if (smp_tau < CTRL * 2u) smp_tau = CTRL * 2u;
+    return 32768 - (int32_t)((CTRL * 32768u) / smp_tau);
+}
+
+static voice_t *alloc_voice(uint32_t lane)
+{
+    uint32_t v, pick = VLO[lane], best = 0xFFFFFFFFu;
+    for (v = VLO[lane]; v < VHI[lane]; v++) {
+        /* a free voice, else the quietest one in its release, else the oldest */
+        uint32_t score = vc[v].kind == V_OFF ? 0u
+                       : vc[v].stage == 2u || vc[v].kind != V_FM ? 1u + (uint32_t)vc[v].amp
+                       : 0x40000000u + (vc[v].age & 0x3FFFFFFFu);
+        if (score < best) { best = score; pick = v; }
+    }
+    if (vc[pick].kind != V_OFF && vc[pick].midi) mo_push(0x80u | vc[pick].midi_ch, vc[pick].midi, 0);
+    return &vc[pick];
+}
+
+/* start one FM voice: lvl Q8, dur in samples; from_inc: slide start (0 = none) */
+static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur, uint32_t lvl, uint32_t from_inc,
+                     const uint32_t *arp, uint32_t arp_n, uint32_t midi)
+{
+    voice_t *v = alloc_voice(lane);
+    int32_t bright = fx[lane].bright, mult = 64 + bright * 768 / 100;   /* Q8: 25 -> 1.0 */
+    uint32_t a = (uint32_t)P->a_ms * 441u / 10u, i;
+    v->kind = V_FM; v->lane = (uint8_t)lane; v->stage = 0; v->square = P->square;
+    v->target = inc; v->inc = from_inc ? from_inc : inc; v->ratio16 = P->ratio16;
+    v->ph = 0; v->mph = 0;
+    v->peak = (int32_t)((P->amp * lvl) >> 8);
+    v->sus = (v->peak * P->sus) >> 8;
+    v->amp = 0;
+    v->att = (int32_t)((uint32_t)v->peak * CTRL / (a < CTRL ? CTRL : a));
+    if (v->att < 1) v->att = 1;
+    v->dec_k = tau_k(80);
+    v->rel_k = tau_k(P->r_ms / 3u + 1u);
+    v->idx = (P->i0 * mult) >> 8; v->idx_end = (P->i1 * mult) >> 8;
+    v->idx_step = (v->idx_end - v->idx) * (int32_t)CTRL / (int32_t)((uint32_t)P->it_ms * 441u / 10u + 1u);
+    v->gate = dur; v->age = ++vage; v->ctr = 0;
+    v->glide_k = 0;
+    if (from_inc && fx[lane].slide > 0) {
+        uint32_t g = (uint32_t)fx[lane].slide * 132u;               /* up to 0.3 s, in samples / 100 */
+        v->glide_k = (int32_t)((CTRL * 32768u) / (g + CTRL));
+    }
+    v->vib = P->vib; v->vph = 0;
+    v->arp_n = (uint8_t)arp_n; v->arp_i = 0; v->arp_t = 0;
+    for (i = 0; i < arp_n && i < 3u; i++) v->arp[i] = arp[i];
+    v->midi = (uint8_t)midi; v->midi_ch = (uint8_t)lane;
+    if (midi) mo_push(0x90u | lane, midi, 100);
+}
+
+static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_orig)
+{
+    voice_t *v = alloc_voice(L_DRUMS);
+    const kit_t *K = &KITS[kit < NKIT ? kit : 0];
+    v->lane = L_DRUMS; v->stage = 1; v->ph = 0; v->ctr = 0; v->age = ++vage; v->s1 = v->s2 = v->s3 = 0;
+    v->gate = 0xFFFFFFFFu; v->midi = 0;
+    switch (kind) {
+    case DK_KICK: case DK_KETTLE: {
+        uint32_t lo = kind == DK_KETTLE ? note_inc(38 + key_off) : HZ_INC(K->kl);
+        v->kind = kind == DK_KETTLE ? V_KETTLE : V_KICK;
+        v->inc_lo = lo; v->inc = kind == DK_KETTLE ? lo + (lo * 3u >> 2) : HZ_INC(K->kh);
+        v->inc_k = (uint32_t)tau_k(kind == DK_KETTLE ? 20u : 30u);
+        v->amp = (int32_t)(((kind == DK_KETTLE ? 10300u : 14000u) * lvl) >> 8);
+        v->dec_k = tau_k((kind == DK_KETTLE ? 900u : K->kd) * 10u / 69u);
+        break; }
+    case DK_SNARE:
+        v->kind = V_SNARE; v->amp = (int32_t)((6600u * lvl) >> 8); v->dec_k = tau_k(K->sd * 10u / 69u);
+        v->tone_amp = (int32_t)((3700u * lvl) >> 8); v->tph = 0;
+        v->inc = (uint32_t)K->sf;                /* the band's centre, Hz */
+        break;
+    case DK_HAT:
+        v->kind = V_HAT; v->amp = (int32_t)((2400u * lvl) >> 8); v->dec_k = tau_k(K->hd * 10u / 69u);
+        break;
+    default:
+        v->kind = V_CRASH; v->amp = (int32_t)((2950u * lvl) >> 8); v->dec_k = tau_k(900u * 10u / 69u);
+        break;
+    }
+    v->peak = v->amp;
+    if (is_orig) { v->midi = GM_DRUM[kind < NDK ? kind : 0]; v->midi_ch = 9; mo_push(0x99u, v->midi, 100); }
+}
+
+/* a voice start (now): melodic notes or a drum hit, with the lane's slide memory */
+static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags, uint32_t dur, uint32_t lvl,
+                 uint32_t kind_or_inst, int32_t original)
+{
+    uint32_t i;
+    lane_hit_ms[lane] = fm1_ms;
+    if (lane == L_DRUMS) { start_drum(note[0], lvl, kind_or_inst, original); return; }
+    {
+        const patch_t *P = &PATCH[kind_or_inst < NPATCH ? kind_or_inst : 0];
+        int32_t chord = n > 1u && !(flags & EV_ARP);
+        uint32_t l2 = chord ? (lvl * 115u) >> 8 : lvl;                    /* chords: quieter per voice */
+        if (flags & EV_ARP) {
+            uint32_t a[3];
+            for (i = 0; i < n && i < 3u; i++) a[i] = note_inc(note[i]);
+            start_fm(lane, P, a[0], dur, l2, 0, a, n, original ? note[0] : 0);
+            return;
+        }
+        for (i = 0; i < n && i < 3u; i++) {
+            uint32_t inc = note_inc(note[i]), from = original ? lane_last_inc[lane][i] : 0;
+            start_fm(lane, P, inc, dur, l2, fx[lane].slide > 0 ? from : 0, 0, 0, original ? note[i] : 0);
+            if (original) lane_last_inc[lane][i] = inc;
+        }
+    }
+}
+
+static void pend_add(uint32_t when, uint32_t lane, const ev_t *e, uint32_t dur, uint32_t lvl, uint32_t kind)
+{
+    pend_t *p;
+    if (npend >= NPEND) return;
+    p = &pend[npend++];
+    p->when = when; p->dur = dur; p->lane = (uint8_t)lane; p->n = e->n; p->flags = e->flags; p->lvl = (uint8_t)(lvl > 255u ? 255u : lvl);
+    p->kind = (uint8_t)kind; p->note[0] = e->note[0]; p->note[1] = e->note[1]; p->note[2] = e->note[2];
+}
+
+/* an event at its step: the note now, its stutter repeats, its echo copies */
+static void trigger(uint32_t lane, const ev_t *e, uint32_t kind)
+{
+    uint32_t step = seq_step_len_q8 >> 8, total = lane == L_DRUMS ? step : e->len * step;
+    int32_t rt = fx[lane].retrig > 0 && (int32_t)(e->rv * 100u >> 8) < fx[lane].retrig;
+    uint32_t seg = rt ? step / (uint32_t)(fx[lane].rtg_rate < 1 ? 1 : fx[lane].rtg_rate) : total;
+    uint32_t reps = rt ? total / (seg ? seg : 1u) : 1u, dur = rt ? seg * 7u / 10u : total * 95u / 100u, k, c;
+    if (reps > 16u) reps = 16u;
+    if (!reps) reps = 1;
+    for (c = 0; c < 3u; c++) {                                       /* the note, then two echo copies */
+        uint32_t lvl = c == 0 ? 256u : c == 1 ? (uint32_t)fx[lane].echo * 141u / 100u
+                                              : (uint32_t)(fx[lane].echo * fx[lane].echo) * 77u / 10000u;
+        uint32_t at = smp + c * 3u * step;
+        if (c && fx[lane].echo <= 0) break;
+        if (!lvl) continue;
+        for (k = 0; k < reps; k++) {
+            if (c == 0 && k == 0) fire(lane, e->note, e->n, e->flags, dur, lvl, kind, 1);
+            else pend_add(at + k * seg, lane, e, dur, lvl, kind);
+        }
+    }
+}
+
+/* ---- the step clock: fire the events of this step from the bar cache */
+static void step_fire(uint32_t s)
+{
+    uint32_t b = s >> 4, st = s & 15u, slot = b % NSLOT, l, i;
+    const bar_t *B = &bars[slot][bar_sel[slot]];
+    if (B->num != (int32_t)b) return;            /* not generated (yet): a silent step */
+    for (l = 0; l < NLANE; l++) {
+        if (B->muted[l]) continue;
+        for (i = 0; i < B->cnt[l]; i++)
+            if (B->ev[l][i].st == st) {
+                uint32_t kind = fx[l].inst >= 0 ? (uint32_t)fx[l].inst : B->inst[l];
+                trigger(l, &B->ev[l][i], kind);
+            }
+    }
+}
+
+/* ---- rendering */
+static void render_voice(voice_t *v, int32_t *out, uint32_t n)
+{
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        int32_t s;
+        if (v->ctr++ % CTRL == 0u) {                                     /* control tick */
+            if (v->kind == V_FM) {
+                if (v->stage == 0u) { v->amp += v->att; if (v->amp >= v->peak) { v->amp = v->peak; v->stage = 1; } }
+                else if (v->stage == 1u) v->amp = v->sus + (((v->amp - v->sus) * v->dec_k) >> 15);
+                else v->amp = (v->amp * v->rel_k) >> 15;
+                if ((v->idx_step > 0 && v->idx < v->idx_end) || (v->idx_step < 0 && v->idx > v->idx_end)) v->idx += v->idx_step;
+                if (v->glide_k) {
+                    int32_t d = (int32_t)(v->target - v->inc);
+                    v->inc += (uint32_t)(int32_t)(((int64_t)d * v->glide_k) >> 15);
+                }
+                if (v->arp_n > 1u && (v->arp_t += CTRL) >= 1852u) { v->arp_t = 0; v->arp_i = (uint8_t)((v->arp_i + 1u) % v->arp_n); v->inc = v->target = v->arp[v->arp_i]; }
+            } else {
+                v->amp = (v->amp * v->dec_k) >> 15;
+                if (v->kind == V_KICK || v->kind == V_KETTLE)
+                    v->inc = v->inc_lo + (uint32_t)(((uint64_t)(v->inc - v->inc_lo) * v->inc_k) >> 15);
+                if (v->kind == V_SNARE) v->tone_amp = (v->tone_amp * 31000) >> 15;
+            }
+            if (v->gate != 0xFFFFFFFFu) {
+                if (v->gate > CTRL) v->gate -= CTRL;
+                else if (v->stage != 2u) {
+                    v->gate = 0; v->stage = 2;
+                    if (v->midi) { mo_push(0x80u | v->midi_ch, v->midi, 0); v->midi = 0; }
+                }
+            }
+            if (v->amp < 4 && (v->stage == 2u || v->kind != V_FM)) {
+                if (v->midi) { mo_push((v->kind == V_FM ? 0x80u | v->midi_ch : 0x89u), v->midi, 0); v->midi = 0; }
+                v->kind = V_OFF; return;
+            }
+        }
+        switch (v->kind) {
+        case V_FM: {
+            uint32_t inc = v->inc, off;
+            if (v->vib && v->ctr > 15435u) {                            /* vibrato after 0.35 s: 5.6 Hz, 0.7 % */
+                v->vph += 545400u;
+                inc += (uint32_t)(((int32_t)(inc >> 16) * SIN[v->vph >> 22]) >> 6);
+            }
+            v->mph += (inc >> 4) * v->ratio16;
+            off = (uint32_t)(SIN[v->mph >> 22] * v->idx) << 6;
+            v->ph += inc;
+            s = SIN[(v->ph + off) >> 22];
+            if (v->square) s = s >= 0 ? 26000 : -26000;
+            s = (s * v->amp) >> 15;
+            break; }
+        case V_KICK: case V_KETTLE:
+            v->ph += v->inc;
+            s = (SIN[v->ph >> 22] * v->amp) >> 15;
+            break;
+        case V_SNARE: {
+            /* band-pass noise (state variable, f = 2 sin(pi fc / fs) ~ fc * 4.67 in Q15), plus a 190 Hz triangle */
+            int32_t f = (int32_t)v->inc * 467 / 100, x = noise(), hp;
+            v->s1 += (f * v->s2) >> 15;                 /* low */
+            hp = x - v->s1 - ((40960 * v->s2) >> 15);
+            v->s2 += (f * hp) >> 15;                    /* band */
+            v->tph += HZ_INC(190);
+            {
+                int32_t tri = (int32_t)(v->tph >> 16) - 32768;
+                tri = (tri < 0 ? -tri : tri) * 2 - 32768;
+                s = ((v->s2 * v->amp) >> 15) + ((tri * v->tone_amp) >> 15);
+            }
+            break; }
+        case V_HAT: case V_CRASH: {
+            int32_t x = noise(), hp = x - v->s1;            /* one-pole high-pass */
+            v->s1 += ((x - v->s1) * (v->kind == V_HAT ? 6000 : 12000)) >> 15;
+            s = (hp * v->amp) >> 15;
+            break; }
+        default: return;
+        }
+        out[i] += s;
+    }
+}
+
+/* the lane's effects on its bus, once per block (parameters per block, filter per sample) */
+static void lane_fx(uint32_t l, int32_t *b, uint32_t n)
+{
+    const lanefx_t *F = &fx[l];
+    uint32_t i;
+    int32_t drive = F->drive, filt = F->filt, wob = F->wob, crush = F->crush;
+    if (drive > 0) {
+        int32_t g = 256 + drive * 20, mk = 256 - drive * 90 / 100;
+        for (i = 0; i < n; i++) {
+            int32_t v = (b[i] * g) >> 8, v3;
+            if (v > 32767) v = 32767; else if (v < -32767) v = -32767;
+            v3 = (((v * v) >> 15) * v) >> 15;
+            b[i] = ((v - v3 / 3) * mk) >> 8;
+        }
+    }
+    if (filt != 0 || wob > 0) {
+        /* cutoff as a note (Q4 sixteenths), wobble +-24 semitones, then f = 2 pi fc / fs from the phase step */
+        static const uint32_t WOBF_Q8[6] = {0, 64, 128, 256, 512, 1024};   /* cycles per beat, Q8 */
+        int32_t note16, lp = filt <= 0, f, damp;
+        uint32_t inc;
+        if (filt < 0) note16 = (130 * 16) + filt * (95 * 16) / 100;       /* -100 -> note 35 (~60 Hz) */
+        else if (filt > 0) note16 = (16 * 16) + filt * (88 * 16) / 100;   /* 100 -> note 104 (~5.3 kHz) */
+        else note16 = 82 * 16;                                            /* centred with wobble: ~1.8 kHz */
+        if (wob > 0) {
+            wob_ph[l] += (uint32_t)(((uint64_t)WOBF_Q8[wob] * (uint32_t)seq_bpm * n * 1623u) >> 8);   /* 2^32/(60*44100) = 1623.1 */
+            note16 += (SIN[wob_ph[l] >> 22] * (24 * 16)) >> 15;
+        }
+        if (lp && note16 >= 128 * 16) goto skip_filter;
+        if (note16 < 16 * 16) note16 = 16 * 16;
+        if (note16 > 118 * 16) note16 = 118 * 16;
+        inc = note_inc(note16 >> 4);
+        inc += (uint32_t)(((uint64_t)(note_inc((note16 >> 4) + 1) - inc) * (uint32_t)(note16 & 15)) >> 4);
+        f = (int32_t)(((uint64_t)inc * 205887u) >> 32);
+        if (f > 26000) f = 26000;
+        damp = 65536 - F->res * 590;                                      /* 2 .. 0.2 (Q15) */
+        if (damp < 6553) damp = 6553;
+        {
+            int32_t lo = f_low[l], bd = f_band[l];
+            for (i = 0; i < n; i++) {
+                int32_t hp;
+                int32_t x = b[i];                                 /* 32-bit products: states kept within 17 bits */
+                if (x > 65535) x = 65535; else if (x < -65535) x = -65535;
+                lo += (f * bd) >> 15;
+                hp = x - lo - ((damp >> 1) * bd >> 14);
+                if (hp > 65535) hp = 65535; else if (hp < -65535) hp = -65535;
+                bd += (f * hp) >> 15;
+                if (bd > 65535) bd = 65535; else if (bd < -65535) bd = -65535;
+                if (lo > 65535) lo = 65535; else if (lo < -65535) lo = -65535;
+                b[i] = lp ? lo : hp;
+            }
+            f_low[l] = lo; f_band[l] = bd;
+        }
+    }
+skip_filter:
+    if (crush > 0) {
+        int32_t sh = crush * 12 / 100, hold = 1 + crush * crush * 15 / 10000;
+        for (i = 0; i < n; i++) {
+            if (--crush_n[l] <= 0) { crush_n[l] = hold; crush_hold[l] = (b[i] >> sh) << sh; }
+            b[i] = crush_hold[l];
+        }
+    }
+}
+
+static void render_span(uint32_t from, uint32_t n)
+{
+    uint32_t v;
+    for (v = 0; v < NVOICE; v++)
+        if (vc[v].kind != V_OFF) render_voice(&vc[v], &bus[vc[v].lane][from], n);
+}
+
+static void all_off(void)
+{
+    uint32_t v;
+    for (v = 0; v < NVOICE; v++) {
+        if (vc[v].kind != V_OFF && vc[v].midi) mo_push(vc[v].kind == V_FM ? 0x80u | vc[v].midi_ch : 0x89u, vc[v].midi, 0);
+        if (vc[v].kind == V_FM) { vc[v].stage = 2; vc[v].gate = 0; vc[v].midi = 0; }
+    }
+    npend = 0;
+}
+
+/* hearing a note while editing: the main loop asks, the interrupt plays it (only it touches the voices) */
+static volatile uint32_t aud_req, aud_lane, aud_note, aud_kind;
+static void audition(uint32_t lane, uint32_t note, uint32_t kind)
+{
+    aud_lane = lane; aud_note = note; aud_kind = kind;
+    RING_PUBLISH();
+    aud_req = 1;
+}
+
+static void app_audio(int32_t *out, uint32_t n)
+{
+    uint32_t t0 = fm1_ticks(), i = 0, l, k;
+    for (l = 0; l < NLANE; l++)
+        for (k = 0; k < n; k++) bus[l][k] = 0;
+    if (aud_req) { uint8_t nt = (uint8_t)aud_note; fire(aud_lane, &nt, 1, 0, 9000, 256, aud_kind, 0); aud_req = 0; }
+    if (seq_stop_req) { seq_stop_req = 0; seq_playing = 0; all_off(); }
+    if (seq_start_req) {
+        seq_start_req = 0; seq_playing = 1; seq_step = (uint32_t)seq_start_step; seq_acc_q8 = 0; npend = 0;
+        step_fire(seq_step);
+    }
+    while (i < n) {
+        uint32_t span = n - i, p;
+        if (seq_playing) {
+            uint32_t left = (seq_step_len_q8 - seq_acc_q8 + 255u) >> 8;   /* samples to the next step */
+            if (left < span) span = left ? left : 1u;
+        }
+        for (p = 0; p < npend; p++) {                                       /* a waiting repeat comes due */
+            uint32_t d = pend[p].when - smp;
+            if ((int32_t)d <= 0) { span = 0; break; }
+            if (d < span) span = d;
+        }
+        if (span) {
+            render_span(i, span);
+            i += span; smp += span;
+            if (seq_playing) seq_acc_q8 += span << 8;
+        }
+        for (p = 0; p < npend;) {                                           /* fire what is due */
+            if ((int32_t)(pend[p].when - smp) <= 0) {
+                fire(pend[p].lane, pend[p].note, pend[p].n, pend[p].flags, pend[p].dur, pend[p].lvl, pend[p].kind, 0);
+                pend[p] = pend[--npend];
+            } else p++;
+        }
+        if (seq_playing && seq_acc_q8 >= seq_step_len_q8) {
+            seq_acc_q8 -= seq_step_len_q8;
+            seq_step++;
+            step_fire(seq_step);
+        }
+    }
+    for (l = 0; l < NLANE; l++) {
+        int32_t lv = fx[l].level * 480 / 100;                                /* Q8: 80 -> 1.5 */
+        lane_fx(l, bus[l], n);
+        for (k = 0; k < n; k++) {
+            int32_t s = (bus[l][k] * lv) >> 8;
+            out[2u * k] += s;
+            out[2u * k + 1u] += s;
+        }
+    }
+    for (k = 0; k < 2u * n; k++) {                                           /* a soft knee above -3 dB */
+        int32_t s = out[k];
+        if (s > 23000) s = 23000 + ((s - 23000) >> 2); else if (s < -23000) s = -23000 + ((s + 23000) >> 2);
+        out[k] = s;
+    }
+    vis_step = seq_step;
+    vis_frac = seq_step_len_q8 ? (seq_acc_q8 >> 8) * 65536u / (seq_step_len_q8 >> 8 ? seq_step_len_q8 >> 8 : 1u) : 0u;
+    isr_us_last = (fm1_ticks() - t0) / FM1_TICKS_PER_US;
+    if (isr_us_last > isr_us_max) isr_us_max = isr_us_last;
+    isr_us_sum += isr_us_last; isr_n++;
+}

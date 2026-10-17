@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* A fake FM-1 on a computer: the app (firmware/src/dinghy.c) runs unchanged on it. platform.c includes
+/* A fake FM-1 on a computer: the app (firmware/src/espada.c) runs unchanged on it. platform.c includes
  * this file instead of the hardware when DINGHY_HOST is set. A script presses keys over time; out come
  * the screen (PPM, at the times SHOT asks) and the sound (WAV, as the FM-1 sends it over USB).
  *
  *   mkdir -p build/host
- *   cc -O2 -Wall -DDINGHY_HOST -Ifirmware/src -Ifirmware/gen -o build/host/dinghy firmware/src/dinghy.c
- *   build/host/dinghy build/host/dinghy        (-> build/host/dinghy.wav, build/host/dinghy-<ms>.ppm)
- *   build/host/dinghy OUT script.txt [FPS]    (your own script; with FPS: OUT-NNNNN.ppm, a frame every 1/FPS s:
+ *   cc -O2 -Wall -DDINGHY_HOST -Ifirmware/src -Ifirmware/gen -o build/host/espada firmware/src/espada.c
+ *   build/host/espada build/host/espada        (-> build/host/espada.wav, build/host/espada-<ms>.ppm)
+ *   build/host/espada OUT script.txt [FPS]    (your own script; with FPS: OUT-NNNNN.ppm, a frame every 1/FPS s:
  *                                             a film of your firmware, e.g. ffmpeg -r 30 -i OUT-%05d.ppm ...)
  *
  * Change SCRIPT below to try your own app. */
@@ -16,20 +16,25 @@
 #include <string.h>
 
 #ifndef APP_NAME
-#define APP_NAME "DINGHY"
+#define APP_NAME "ESPADA"
 #endif
 #ifndef APP_VER
 #define APP_VER "0.0"
 #endif
 #define FS 44100u
+#define RING_PUBLISH() __asm__ volatile("" ::: "memory")
 #define HALF_FRAMES 256u
 
 static volatile uint32_t fm1_ms;
 static struct { uint32_t notes, buttons; } fm1_in;
-static uint32_t host_edges;
-static uint32_t fm1_input_edges(uint32_t *released) { uint32_t b = host_edges; host_edges = 0; *released = 0; return b; }
-static uint32_t fm1_input_note_edges(void) { return 0; }   /* (the script sets fm1_in.notes) */
-static int32_t fm1_enc_take(uint32_t e) { (void)e; return 0; }
+static uint32_t host_edges, host_rel, host_notes_prev;
+static int32_t host_enc[7];
+static uint32_t fm1_input_edges(uint32_t *released) { uint32_t b = host_edges; host_edges = 0; *released = host_rel; host_rel = 0; return b; }
+static uint32_t fm1_input_note_edges(void) { uint32_t d = fm1_in.notes & ~host_notes_prev; host_notes_prev = fm1_in.notes; return d; }
+static int32_t fm1_enc_take(uint32_t e) { int32_t d = e < 7u ? host_enc[e] : 0; if (e < 7u) host_enc[e] = 0; return d; }
+#include <time.h>
+#define FM1_TICKS_PER_US 24u
+static uint32_t fm1_ticks(void) { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return (uint32_t)(ts.tv_sec * 24000000ull + (uint64_t)ts.tv_nsec * 24u / 1000u); }
 static void fm1_led_key(uint32_t id, int on) { (void)id; (void)on; }
 
 /* the screen: 240 x 240 RGB565, as the ST7789 gets it (gfx.c sends the bytes swapped) */
@@ -79,27 +84,38 @@ static int midi_get(uint8_t *st, uint8_t *d1, uint8_t *d2)
     mq_r++;
     return 1;
 }
-static void midi_send(uint32_t st, uint32_t d1, uint32_t d2) { printf("%6u ms  MIDI out %02X %u %u\n", fm1_ms, st, d1, d2); }
+static uint32_t host_midi_out;
+static void midi_send(uint32_t st, uint32_t d1, uint32_t d2) { (void)st; (void)d1; (void)d2; host_midi_out++; }
+static uint8_t host_pat[1024 + 4];
+static int patterns_load(void *p, uint32_t n) { if (host_pat[0] != 1 || n > 1024u) return -1; memcpy(p, host_pat + 4, n); return 0; }
+static int patterns_save(const void *p, uint32_t n) { host_pat[0] = 1; memcpy(host_pat + 4, p, n); printf("%6u ms  patterns saved (%u B)\n", fm1_ms, n); return 0; }
 
 static void app_audio(int32_t *out, uint32_t n);
 static void app_main(void);
 
 /* the script: at t ms, keys down (bit k = key k, 0 = F3), a button edge, a MIDI message. A script file (the second
- * argument) replaces it, a line each: "T keys MASK" (hex or decimal), "T btn ID", "T midi ST D1 D2", "T end" */
-typedef struct { uint32_t t, keys; int btn; uint8_t st, d1, d2; } host_ev_t;
+ * argument) replaces it, a line each: "T keys MASK" (hex or decimal), "T btn ID" (pressed), "T rel ID"
+ * (released), "T enc ID DELTA" (an encoder turned), "T midi ST D1 D2", "T shot" (a screenshot), "T end" */
+typedef struct { uint32_t t, keys; int btn; uint8_t st, d1, d2; int enc, delta, rel; } host_ev_t;
+/* Espada's default script: play from the top, let the arc build, change a few things, a drop */
+#define B_(t, id) {t, 0, id, 0, 0, 0, 0, 0, 0}
+#define R_(t, id) {t, 0, id, 0, 0, 0, 0, 0, 1}
+#define E_(t, e, d) {t, 0, -1, 0, 0, 0, (e) + 1, d, 0}
 static const host_ev_t SCRIPT0[] = {
-    {200, 1u << 7, -1, 0, 0, 0},                                /* C4 */
-    {700, 1u << 7 | 1u << 11 | 1u << 14, -1, 0, 0, 0},          /* + E4 G4: a chord */
-    {1500, 0, -1, 0, 0, 0},
-    {1700, 0, -1, 0x90, 81, 120},                               /* MIDI in: A5 */
-    {2300, 0, -1, 0x80, 81, 0},
-    {2500, 0, BTN_OCT_UP, 0, 0, 0},
-    {2700, 1u << 2 | 1u << 9, -1, 0, 0, 0},                     /* G4 + D5, an octave up */
-    {3400, 0, -1, 0, 0, 0},
+    B_(1200, BTN_PLAY),
+    E_(4000, 1, 1),                                             /* queue HYPERSPACE */
+    E_(4200, 2, 2),                                             /* blend 50 % */
+    B_(9000, BTN_FX), E_(9200, 1, -40), E_(9300, 3, 3),         /* bass: low-pass, wobble 1/4 */
+    B_(12000, BTN_ARP), E_(12200, 2, 30), E_(12300, 5, 40),     /* retrig 30 %, echo 40 % */
+    B_(15000, BTN_HOME),
+    B_(18000, BTN_REC), R_(18100, BTN_REC),                     /* a drop on the next phrase */
 };
+#undef B_
+#undef R_
+#undef E_
 static const host_ev_t *script = SCRIPT0;
-static uint32_t script_n = sizeof SCRIPT0 / sizeof SCRIPT0[0], end_ms = 6500, frame_fps;
-static const uint32_t SHOT[] = {1000, 3000};
+static uint32_t script_n = sizeof SCRIPT0 / sizeof SCRIPT0[0], end_ms = 26000, frame_fps, no_shots;
+static const uint32_t SHOT[] = {600, 3000, 8000, 11000, 14000, 17000, 21000, 25000};
 
 static void read_script(const char *path)
 {
@@ -109,12 +125,15 @@ static void read_script(const char *path)
     uint32_t n = 0;
     if (!f) { perror(path); exit(1); }
     while (fgets(line, sizeof line, f) && n < 4096u) {
-        host_ev_t e = {0, 0, -1, 0, 0, 0};
+        host_ev_t e = {0, 0, -1, 0, 0, 0, 0, 0, 0};   /* enc: 0 none, k = encoder k-1, -2 a screenshot */
         unsigned a = 0, b = 0, c = 0;
         if (line[0] == '#' || sscanf(line, "%u %15s", &e.t, what) != 2) continue;
         if (!strcmp(what, "end")) { end_ms = e.t; continue; }
         if (!strcmp(what, "keys")) { sscanf(line, "%*u %*s %i", (int *)&e.keys); }
         else if (!strcmp(what, "btn")) { sscanf(line, "%*u %*s %d", &e.btn); }
+        else if (!strcmp(what, "rel")) { sscanf(line, "%*u %*s %d", &e.btn); e.rel = 1; }
+        else if (!strcmp(what, "enc")) { sscanf(line, "%*u %*s %d %d", &e.enc, &e.delta); e.enc++; }
+        else if (!strcmp(what, "shot")) { e.enc = -2; }
         else if (!strcmp(what, "midi")) { sscanf(line, "%*u %*s %i %u %u", (int *)&a, &b, &c); e.st = (uint8_t)a; e.d1 = (uint8_t)b; e.d2 = (uint8_t)c; }
         else continue;
         ev[n++] = e;
@@ -122,9 +141,10 @@ static void read_script(const char *path)
     fclose(f);
     script = ev;
     script_n = n;
+    no_shots = 1;                               /* a script takes its own screenshots ("T shot") */
 }
 
-static const char *host_out = "build/host/dinghy";
+static const char *host_out = "build/host/espada";
 static int16_t *wav;
 static uint32_t wav_n;
 
@@ -171,11 +191,16 @@ static void platform_poll(void)                 /* one call = one millisecond */
     static int32_t blk[2u * HALF_FRAMES];
     fm1_ms++;
     while (step < script_n && script[step].t <= fm1_ms) {
-        if (script[step].st) {
+        if (script[step].enc == -2) write_ppm(fm1_ms);
+        else if (script[step].enc > 0) host_enc[script[step].enc - 1] += script[step].delta;
+        else if (script[step].st) {
             mq[mq_w % 64u][0] = script[step].st; mq[mq_w % 64u][1] = script[step].d1; mq[mq_w % 64u][2] = script[step].d2;
             mq_w++;
-        } else if (script[step].btn >= 0)
-            host_edges |= 1u << script[step].btn;
+        } else if (script[step].btn >= 0 && script[step].rel) {
+            host_rel |= 1u << script[step].btn; fm1_in.buttons &= ~(1u << script[step].btn);
+        } else if (script[step].btn >= 0) {
+            host_edges |= 1u << script[step].btn; fm1_in.buttons |= 1u << script[step].btn;
+        }
         else
             fm1_in.notes = script[step].keys;
         step++;
@@ -199,9 +224,12 @@ static void platform_poll(void)                 /* one call = one millisecond */
             snprintf(name, sizeof name, "%s-%05u.ppm", host_out, frame++);
             write_ppm_as(name);
         }
-    } else if (shot < sizeof SHOT / sizeof SHOT[0] && fm1_ms == SHOT[shot])
+    } else if (!no_shots && shot < sizeof SHOT / sizeof SHOT[0] && fm1_ms == SHOT[shot])
         write_ppm(SHOT[shot++]);
     if (fm1_ms >= end_ms) {
+#ifdef HOST_STATS_HOOK
+        HOST_STATS_HOOK();
+#endif
         write_wav();
         exit(0);
     }

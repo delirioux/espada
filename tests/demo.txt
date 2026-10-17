@@ -1,0 +1,38 @@
+# A tour of Espada in host mode: build/host/espada build/host/demo tests/demo.txt
+# buttons: 2 FX, 3 SEL, 4 ENV, 5 LFO, 6 EDIT, 7 GLO, 8 HOME, 9 SAVE, 10 ARP, 11 SEQ, 12 PLAY, 13 REC
+# encoders: 0 SELECT, 1 ALGORITHM, 2..5 KNOB1..4, 6 PRESETS; keys: bit 0 = F3 .. bit 26 = G5
+1200 btn 12
+# the SONG page: D dorian, the third suggestion, 2 bars a chord
+2500 btn 7
+2600 enc 1 1
+2650 enc 1 1
+2700 enc 1 1
+2800 enc 2 1
+2850 enc 2 1
+2900 enc 3 1
+3500 shot
+# the EDIT page on the lead: type a phrase on the white keys (C4 = the root), then GENERATE a variation
+4000 btn 6
+4100 enc 0 -1
+4100 enc 0 -1
+4200 keys 0x80
+4250 keys 0
+4300 keys 0x800
+4350 keys 0
+4400 keys 0x4000
+4450 keys 0
+4500 keys 0x800
+4550 keys 0
+4600 keys 0x10000
+4650 keys 0
+5200 shot
+5300 btn 5
+6000 shot
+# back to the lanes: drop with the drums alone
+6500 btn 8
+6600 enc 0 1
+6700 btn 13
+6800 rel 13
+9000 shot
+14000 shot
+16000 end

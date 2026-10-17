@@ -1,128 +1,88 @@
-<p align="center"><img src="assets/logo.svg" width="96" alt="Dinghy"></p>
+<p align="center"><img src="assets/logo.png" width="160" alt="Espada"></p>
 
-# Dinghy
+# Espada
 
-**The smallest firmware for the M-VAVE FM-1 to build your own on.**
+**A generative groovebox for the M-VAVE FM-1, in the style of early-90s PC tracker music.**
 
-Dinghy plays a sine wave on the keys, and that is all it does. Under it is everything an FM-1 firmware needs
-before it can be any fun: the update path, the USB rescue, USB-MIDI, USB audio, the keys, knobs and LEDs, the
-screen and a place to keep settings. It all works, so you start with the part you actually want to write.
+Four lanes (lead, pad, bass, drums) play parts that are composed live from a profile: chords, bass lines,
+melodies and drum patterns in the manner of the S3M scene. You do not program steps; you mix styles. Queue the next
+profile, blend it in lane by lane from the bottom up, or launch it on the next phrase. Shape each lane with a
+filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, retrigger, a bit crusher and
+echo. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
+
+<p align="center"><img src="docs/screen.png" width="240" alt="Espada's screen: four lanes of notes scrolling past a fixed play line"></p>
+
+> **Status: 0.1, first version.** Runs in host mode (screen and sound on a computer). Not yet confirmed on an FM-1:
+> install it over the official firmware and keep the USB rescue in mind (below).
+
+## How it plays
+
+- **Lanes.** Notes scroll from right to left past a fixed "now" line. Solid blocks are what a lane plays; outlined
+  blocks are a preview of the queued profile.
+- **Profiles.** EPIC (orchestral minor), HYPERSPACE (techno minor with power chords), FUSION (melodic major with a
+  chromatic turn and a riff that follows the chords), OLDSKOOL (the 4-channel sound with arpeggio chords).
+- **Mixing.** BLEND moves lanes to the queued profile one at a time: drums, then bass, pad, lead. LAUNCH moves every
+  unlocked lane at the next 4-bar phrase. LOCK keeps a lane where it is. The bass lane's profile sets the chords
+  for everyone, so a half-blended mix stays in key.
+- **Density.** 50 % is the part as the profile writes it. Lower thins it out; higher adds notes inside the chord and
+  its scale, 16th hats, ghost snares and fills.
+- **The arc.** Starts with a few drum hits and builds: bass, pad and lead come in as the energy rises. When it tops
+  out, one lane plays alone for a bar and then everything drops back in with a crash. After the peak it falls back
+  and builds again. DROP: tap for a break that ends on the next phrase, or hold it and let go when you want the drop.
+- **Your own parts.** On the EDIT page you enter notes step by step, tracker style: white keys are scale steps
+  counted from the chord root, so a melody follows the chords and stays in key. GENERATE writes a fitting pattern or
+  a variation of yours, and never the same one twice.
+- **Song.** Key, scale (major, minor, the church modes, harmonic and melodic minor, pentatonics, blues), a list of
+  suggested progressions, bars per chord, and the arc's lengths.
+
+The full guide to the panel is in [docs/MANUAL.md](docs/MANUAL.md).
+
+## Install
+
+Use the [FM-1 Firmware Hub](https://fm1.designburgapps.com) or a web installer in Chrome or Edge, or from the command
+line (once: `pip3 install mido python-rtmidi`):
 
 ```
-firmware/src/dinghy.c     <- your firmware: ~200 lines, a 4-voice sine. Start here.
-firmware/src/platform.c   <- the plumbing (boot, USB, updates, audio ISR, settings). Done; read it, don't fight it.
-firmware/src/*.c, hal/    <- Felucca's platform, as SLOOP carries it, unchanged
+python3 tools/fm1_install.py espada-0.1.fwsc
 ```
 
-Dinghy is based on [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton Instruments), with its
-platform as [SLOOP](https://github.com/isod89/sloop-fm1) (isod89) carries it: it keeps that platform and throws away the
-rest. The smallest boat of the family, after the felucca and the sloop.
+Install over M-VAVE's official firmware. If anything goes wrong: hold **OCT-** while switching on for the USB rescue,
+where the installers still reach the FM-1. Installing firmware is at your own risk.
 
-<p align="center"><img src="docs/screen.png" width="240" alt="Dinghy's screen: the name, the note played, a keyboard with the keys that sound"></p>
+## Build
 
-> **Status: 0.3, runs on the FM-1.** Tested on the device: the install, MIDI in (pitch exact, 4 voices), USB audio
-> at 44.1 / 48 kHz, the keys, the screen, the octave kept in flash, and back to another firmware through the hub.
+You need Linux on x86-64 (or macOS / Windows with Docker or WSL), Python 3 with Pillow, JieLi's toolchain and three
+files of the JieLi AC79 SDK:
 
-## What you get
-
-| | |
-| --- | --- |
-| **Updates that always work** | `tools/fm1_install.py`, the web installers and the [FM-1 Firmware Hub](https://fm1.designburgapps.com) reach your firmware over USB, so you (and your users) can always install the next build, or go back to the official firmware. |
-| **USB rescue** | Hold **OCT-** while switching on: no sound, only the updater. If your firmware crashes twice at boot, the FM-1 goes there by itself. |
-| **USB-MIDI** | In and out, class compliant: `midi_get()`, `midi_send()`. |
-| **USB audio** | The FM-1 shows up as a 16-bit stereo audio input (44.1 or 48 kHz): record it into any DAW or phone. Nothing to do. |
-| **Panel** | 27 keys, 14 buttons, 7 encoders, the MASTER knob, the LEDs, by name (`BTN_PLAY`, `ENC_KNOB1`, ...). |
-| **Screen** | 240 x 240, text in two sizes, rectangles, lines, pixels. |
-| **Settings** | `settings_load()` / `settings_save()`: up to 256 bytes with a CRC in their own flash sector. |
-| **A crash screen** | A fault shows where it happened (the PC), then the FM-1 restarts. |
-| **Host mode** | The same `dinghy.c` on your computer: the screen as an image, the sound as a WAV. No FM-1 needed to try an idea. |
-| **Checks** | The build fails on what bricks or breaks an FM-1 firmware: a 64-bit division, a call into the chip ROM, too much RAM, a register touched outside `hal/`. |
-
-## Build your own
-
-From nothing to your own firmware on the FM-1, step by step. Each step works before you go to the next.
-
-### 1. Copy it
-
-On GitHub: **Use this template** (top right on this page) or fork it, then clone your copy. Rename nothing yet:
-first make sure the unchanged Dinghy builds on your machine.
-
-### 2. Set up once
-
-You need Linux on x86-64 (or macOS / Windows with Docker or WSL), Python 3 with Pillow, the JieLi toolchain
-and three files of the JieLi AC79 SDK:
-
-```sh
-pip3 install Pillow mido python-rtmidi
-tools/get_toolchain.sh                      # JieLi's clang for the chip, to ~/.jieli/toolchain
+```
+pip3 install Pillow
+tools/get_toolchain.sh
 git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
     https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK
+./build.sh                         # -> build/espada.fwsc
+./build.sh --release 0.1           # -> build/espada-0.1.fwsc, identity FM-1_961
 ```
 
-On macOS the build runs the toolchain in a `linux/amd64` Docker container by itself (have Docker running).
-`JIELI_TOOLCHAIN` and `AC79_SDK` point elsewhere if your copies live somewhere else.
+GitHub Actions builds the package on every push (the run's artifact `espada-firmware`).
 
-### 3. Hear it without an FM-1
+**Host mode** runs the same code on a computer: `tests/run_host.sh` writes the screens as PNG and the sound as a WAV.
+`build/host/espada OUT tests/demo.txt` plays a scripted tour (buttons, encoders, keys over time).
 
-```sh
-tests/run_host.sh                           # -> build/host/dinghy.wav and screen PNGs
+```
+firmware/src/espada.c         the app: shared state, includes the parts below
+firmware/src/espada_synth.c   the audio interrupt: FM and drum voices, lane effects, the step clock
+firmware/src/espada_music.c   harmony, profiles, generators, density, the arc, your patterns, the bar cache
+firmware/src/espada_ui.c      the screen, the pages, the panel, saving
+firmware/src/platform.c       Dinghy's wiring of the FM-1 platform (boot, USB, updates, panel, screen, settings)
 ```
 
-Host mode runs the same `dinghy.c` on your computer: the sound as a WAV, the screen as images. Most ideas can be
-tried here first, in seconds.
+The chip's rules ([docs/RULES.md](docs/RULES.md)): integers only, no 64-bit division, the audio interrupt well
+under 5.8 ms. SEL + SAVE shows the interrupt's worst time on the screen.
 
-### 4. Your first change
+## Licence and credits
 
-Open [firmware/src/dinghy.c](firmware/src/dinghy.c) (~200 lines). The sound is `app_audio()`: it gets an empty
-buffer of stereo frames and adds to it. Make the sine a square:
+GPL-3.0-only. Espada is built on [Dinghy](https://github.com/zvenson/dinghy) (zvenson), which carries the platform of
+[Felucca](https://github.com/hugelton/Felucca) (Leo Kuroshita, Hügelton Instruments) as
+[SLOOP](https://github.com/isod89/sloop-fm1) (isod89) has it. Details in [LICENSING.md](LICENSING.md).
 
-```c
-s = ((int32_t)ph < 0 ? 8000 : -8000) * amp >> 15;     /* instead of s = (sine(ph) * amp) >> 15; */
-```
-
-Run `tests/run_host.sh` again and listen to `build/host/dinghy.wav`. The screen is drawn in `app_main()`, the keys
-are read there too: change the text, add a knob ([docs/API.md](docs/API.md) has every call).
-
-### 5. Onto the FM-1
-
-```sh
-./build.sh                                       # -> build/dinghy.fwsc (fails on what would brick the FM-1)
-python3 tools/fm1_install.py build/dinghy.fwsc   # over USB; asks before it writes, restarts into your build
-python3 tools/fm1_install.py --info              # what runs on the connected FM-1
-```
-
-That is the whole loop: change, hear it on the host, build, install. Back to another firmware, or to the official
-one, with the [FM-1 Firmware Hub](https://fm1.designburgapps.com) in Chrome or Edge: Dinghy (and every copy of it)
-answers the hub's updater like every firmware there. Installing firmware is at your own risk.
-
-### 6. When it goes wrong
-
-- **It crashes:** the screen shows where (the PC), then the FM-1 restarts. Twice at boot and it goes to the
-  USB rescue by itself.
-- **It won't start at all:** hold **OCT-** while switching on: the USB rescue, no sound, only the updater. Install
-  a working build (or another firmware from the hub) from there.
-- **The build refuses:** it checks for a 64-bit division, a call into the chip ROM, too much RAM, a register touched
-  outside `hal/`. [docs/RULES.md](docs/RULES.md) says why each one matters; read it before your first crash.
-
-### 7. Make it yours, release it, get into the hub
-
-Your name and logo, your own package identity (so the FM-1 and the installers tell your firmware from Dinghy),
-a GitHub release with the `.fwsc`, and how to get listed next to the others in the
-[FM-1 Firmware Hub](https://fm1.designburgapps.com): **[docs/MAKE-IT-YOURS.md](docs/MAKE-IT-YOURS.md)**.
-
-## Where to go next
-
-- **[docs/API.md](docs/API.md)**: everything `platform.c` gives you, with the panel's ids, the screen calls, the
-  audio contract, MIDI, settings, the flash map, timing.
-- **[docs/MAKE-IT-YOURS.md](docs/MAKE-IT-YOURS.md)**: turn Dinghy into your firmware: the name, the package
-  identity, releases, getting into the FM-1 Firmware Hub.
-- **[docs/RULES.md](docs/RULES.md)**: the chip's rules (no FPU, no libgcc, the audio ISR's budget) and what the build
-  checks for you. Read it before your first crash, not after.
-
-## License
-
-GPL-3.0-only, as Felucca and SLOOP: you may change and share it, and whoever gets your firmware gets its source.
-Details, credits and third-party parts in [LICENSING.md](LICENSING.md).
-
-The platform is Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments, with SLOOP's changes (isod89).
-Dinghy (the app, the host mode, the docs) by zvenson.
+"M-VAVE" and "FM-1" belong to their owners. Espada is not made or endorsed by them.
