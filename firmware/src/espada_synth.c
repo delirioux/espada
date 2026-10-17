@@ -42,6 +42,7 @@ typedef struct {
     uint8_t sus;                /* sustain, of 255 */
     uint16_t r_ms;              /* release */
     uint8_t vib, square;
+    uint16_t d_ms;              /* decay toward the sustain (0 = 80 ms); with sus 0 a long one rings out, as a piano */
 } patch_t;
 static const patch_t PATCH[] = {
     {"FM BASS", 16, 1138, 260, 180,   4, 6200,  178,  80, 0, 0},
@@ -54,6 +55,10 @@ static const patch_t PATCH[] = {
     {"ORGAN",   32,  162, 162, 100,  10, 1770,  255,  60, 0, 0},
     {"FLUTE",   16,  130,  65, 200,  60, 2360,  230, 150, 1, 0},
     {"CHIP",    16,    0,   0, 100,   3, 1180,  230,  50, 1, 1},
+    {"RAZOR",   16,  980, 560, 350,   3, 2300,  215, 110, 1, 0},   /* 1:1, a high index: saw-like, cutting */
+    {"PULSE",   32,  420, 150, 250,   2, 1500,  210,  90, 1, 1},   /* 2:1 through the square: a hollow pulse */
+    {"PIANO",   16,  700,  90, 450,   1, 2600,    0, 260, 0, 0, 1100},   /* 1:1, the hammer's brightness fades, rings out */
+    {"E.PIANO", 224, 120,   0, 160,   1, 2500,    0, 300, 0, 0, 1500},   /* 14:1 tine on the attack, then a sine */
 };
 #define NPATCH (sizeof PATCH / sizeof PATCH[0])
 
@@ -164,7 +169,7 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
     v->amp = 0;
     v->att = (int32_t)((uint32_t)v->peak * CTRL / (a < CTRL ? CTRL : a));
     if (v->att < 1) v->att = 1;
-    v->dec_k = tau_k(80);
+    v->dec_k = tau_k(P->d_ms ? P->d_ms : 80u);
     v->rel_k = tau_k(P->r_ms / 3u + 1u);
     v->idx = (P->i0 * mult) >> 8; v->idx_end = (P->i1 * mult) >> 8;
     v->idx_step = (v->idx_end - v->idx) * (int32_t)CTRL / (int32_t)((uint32_t)P->it_ms * 441u / 10u + 1u);

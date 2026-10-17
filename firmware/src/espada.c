@@ -39,8 +39,10 @@ typedef struct {                /* written by the main loop, read by the audio i
     volatile int32_t echo;      /* 0..100: two delayed copies, a dotted 8th apart */
     volatile int32_t level;     /* 0..100 */
     volatile int32_t inst;      /* -1 = AUTO (the profile's), else a patch (melodic), a kit (drums), one sound (sfx) */
+    volatile int32_t vary;      /* 0..100: how far each phrase's character moves the effects (VARY) */
 } lanefx_t;
-static lanefx_t fx[NLANE];
+static lanefx_t fx[NLANE];      /* what plays: your settings plus the phrase's character (the audio interrupt reads it) */
+static lanefx_t fxu[NLANE];     /* your settings (the encoders) */
 
 /* one generated event: a note or chord (melodic lanes) or a drum hit */
 typedef struct {

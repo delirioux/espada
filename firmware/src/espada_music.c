@@ -100,11 +100,11 @@ typedef struct {
  * the 4-channel sound with arpeggio chords */
 static const prof_t PROF[] = {
     {"EPIC", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}},
-     {S_EPIC, S_STRINGS, S_DRIVE, S_DEPIC}, {4, 5, 2, 1}},
+     {S_EPIC, S_STRINGS, S_DRIVE, S_DEPIC}, {10, 5, 2, 1}},
     {"HYPERSPACE", AEO, {{0, Q_5}, {0, Q_5}, {10, Q_5}, {5, Q_5}, {7, Q_5}, {5, Q_5}, {3, Q_5}, {10, Q_5}},
-     {S_STAB, S_SUS, S_DRIVE, S_DTECH}, {4, 7, 0, 2}},
+     {S_STAB, S_SUS, S_DRIVE, S_DTECH}, {11, 7, 0, 2}},
     {"FUSION", ION, {{0, Q_MAJ}, {9, Q_MIN}, {0, Q_MAJ}, {9, Q_MIN}, {9, Q_MAJ}, {1, Q_MAJ}, {9, Q_MAJ}, {5, Q_MAJ}},
-     {S_RIFF, S_LUSH, S_PEDAL, S_DFUSION}, {9, 5, 1, 0}},
+     {S_RIFF, S_LUSH, S_PEDAL, S_DFUSION}, {9, 13, 1, 0}},
     {"OLDSKOOL", AEO, {{5, Q_MIN}, {3, Q_MAJ}, {1, Q_MAJ}, {5, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {0, Q_MIN}, {3, Q_MAJ}},
      {S_MELODY, S_ARP, S_OCTAVE, S_DOLD}, {8, 9, 0, 1}},
 };
@@ -248,6 +248,45 @@ static void hits(gen_t *G, rng_t *r, int32_t k, const int8_t *pct)    /* a drum 
     for (s = 0; s < 16; s++) if (pct[s] && chance(r, pct[s])) DRUM(G, s, k);
 }
 
+/* a lead line that stays on the harmony: one motif a 4-bar phrase (rhythm + a contour of chord tones), heard,
+ * answered (the same, or a chord tone higher), varied at its end, and closed on the root or third. Every beat
+ * (steps 0 4 8 12) is a chord tone of the bar's chord; a note between beats is a passing or neighbour tone, one
+ * scale step from the chord tone it leads into, so it always resolves. long: EPIC's slower rhythms. */
+static void lead_line(gen_t *G, const tools_t *T, int32_t b, int32_t p, int long_)
+{
+    static const int8_t RL[4][6] = {{0, 6, 8, 12, -1, -1}, {0, 4, 8, 14, -1, -1}, {0, 8, 10, 12, -1, -1}, {0, 3, 6, 8, 12, -1}};
+    static const int8_t RS[4][10] = {{0, 2, 4, 6, 8, 10, 12, 14, -1, -1}, {0, 2, 3, 4, 6, 8, 10, 11, 12, 14},
+                                     {0, 3, 6, 8, 10, 12, 14, -1, -1, -1}, {0, 2, 4, 7, 8, 10, 12, -1, -1, -1}};
+    rng_t m = {hash3(b / 4, 31, p)}, v = {hash3(b, 37, p)};      /* m: the phrase's motif; v: this bar's touch */
+    int32_t on[10], c[10], n = 0, i, pos = b % 4, lift = 0, prev = -1000, cap = long_ ? 8 : 4;
+    const int8_t *rh = long_ ? RL[(rnd(&m) >> 16) * 4u >> 16] : RS[(rnd(&m) >> 16) * 4u >> 16];
+    for (i = 0; i < (long_ ? 6 : 10) && rh[i] >= 0; i++) on[n++] = rh[i];
+    c[0] = PICK(&m, 2, 3, 3, 4);                                    /* the contour, in chord tones (0 root, 3 octave) */
+    for (i = 1; i < n; i++) { c[i] = c[i - 1] + PICK(&m, -1, -1, 1, 1, 0, 2, -2); if (c[i] < 1) c[i] = 1; if (c[i] > 4) c[i] = 4; }
+    if (pos == 1 && chance(&m, 50)) lift = 1;                       /* the answer: a chord tone higher */
+    if (pos == 2) for (i = n - 2; i < n; i++) if (i > 0) c[i] = c[i] + PICK(&v, -1, 1);   /* varied at its end */
+    if (pos == 3) {                                                 /* the close: the first half, then a long landing */
+        int32_t land = chance(&m, 60) ? 8 : 12, k = 0;
+        for (i = 0; i < n && on[i] < land; i++) k++;
+        n = k;
+        on[n] = land; c[n] = PICK(&m, 0, 1, 3); n++;
+    }
+    for (i = 0; i < n; i++) {
+        int32_t note, st = on[i];
+        if (st % 4 == 0 || i == 0) note = ct(T, c[i] + lift);      /* on the beat: a chord tone */
+        else {                                                      /* between: a scale run into the next beat's tone */
+            int32_t j = i + 1, k;
+            while (j < n && on[j] % 4) j++;                         /* the next note on a beat */
+            k = j - i;                                              /* steps away from it */
+            if (j < n) { int32_t nx = ct(T, c[j] + lift); note = move(T, nx, prev > nx ? k : -k); }
+            else note = move(T, prev, PICK(&v, -1, 1));             /* none left: a neighbour */
+        }
+        NOTE(G, st, 1, note);
+        prev = note;
+    }
+    g_lens(G, pos == 3 ? 16 : cap);
+}
+
 static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p)
 {
     int32_t s, i;
@@ -270,16 +309,9 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
     case S_OCTAVE:              /* octave-jumping 8ths */
         for (i = 0; i < 8; i++) NOTE(G, i * 2, 2, i == 6 && chance(r, 30) ? ct(T, 1) : ct(T, 0) + (i % 2 ? 12 : 0));
         break;
-    case S_EPIC: {              /* long stepwise lines, chord tones on the strong beats */
-        static const int8_t RH[4][5] = {{0, 4, 6, 8, -1}, {0, 8, 12, -1, -1}, {0, 6, 8, 14, -1}, {0, 4, 8, 12, -1}};
-        const int8_t *rh = RH[(rnd(r) >> 16) * 4u >> 16];
-        int32_t n = ct(T, PICK(r, 2, 3, 4));
-        for (i = 0; i < 5 && rh[i] >= 0; i++) {
-            if (i) { n = move(T, n, PICK(r, -1, -1, 1, 1, -2, 2)); if (rh[i] % 8 == 0) n = snap(T, n); }
-            NOTE(G, rh[i], 1, n);
-        }
-        g_lens(G, 16);
-        break; }
+    case S_EPIC:                /* long lines on the chords */
+        lead_line(G, T, b, p, 1);
+        break;
     case S_STAB: {              /* syncopated chord stabs */
         static const int8_t PT[3][6] = {{0, 3, 6, 10, -1, -1}, {2, 6, 11, 14, -1, -1}, {0, 3, 8, 11, 14, -1}};
         const int8_t *pt = PT[(rnd(r) >> 16) * 3u >> 16];
@@ -296,20 +328,13 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
         for (h = 0; h < 16; h += 8)
             for (i = 0; i < nm; i++) {
                 int32_t nx = i + 1 < nm ? ms[i + 1] : 8, k = mk[i] + (h && i == nm - 1 && chance(r, 30) ? 1 : 0);
-                NOTE(G, h + ms[i], (nx - ms[i]) > 2 ? 2 : nx - ms[i], stp(T, k));
+                int32_t st = h + ms[i], note = stp(T, k);
+                NOTE(G, st, (nx - ms[i]) > 2 ? 2 : nx - ms[i], st % 4 == 0 ? snap(T, note) : note);   /* beats on the chord */
             }
         break; }
-    case S_MELODY: {            /* 8ths with 16th fills */
-        static const int8_t POS[9] = {0, 2, 4, 6, 7, 8, 10, 12, 14};
-        int32_t n = ct(T, PICK(r, 0, 1, 2)), first = 1;
-        for (i = 0; i < 9; i++) {
-            if (POS[i] % 4 != 0 && !chance(r, 70)) continue;
-            if (!first) { n = move(T, n, PICK(r, -2, -1, -1, 1, 1, 2)); if (POS[i] % 4 == 0) n = snap(T, n); }
-            first = 0;
-            NOTE(G, POS[i], 1, n);
-        }
-        g_lens(G, 16);
-        break; }
+    case S_MELODY:              /* 8ths and 16ths on the chords */
+        lead_line(G, T, b, p, 0);
+        break;
     case S_STRINGS:
         if (chance(r, 40)) { g_add(G, 0, 8, 3, ct(T, 0), ct(T, 1), ct(T, 2), 0); g_add(G, 8, 8, 3, ct(T, 0), ct(T, 1), ct(T, 2), 0); }
         else g_add(G, 0, 16, 3, ct(T, 0), ct(T, 1), ct(T, 2), 0);
@@ -358,7 +383,7 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
 static void gen_sfx(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, int32_t dens, const arc_t *A, int next_drop)
 {
     static const int8_t OFF[4] = {2, 6, 10, 14};
-    int32_t only = fx[L_SFX].inst, root = ct(T, 0), x = dens * 2, i, s;
+    int32_t only = fxu[L_SFX].inst, root = ct(T, 0), x = dens * 2, i, s;
     G->n = 0;
     if (only < 0) {
         int32_t e = A->mode == A_OFF ? 154 : A->e;
@@ -420,8 +445,8 @@ static void densify(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t b, 
 {
     int32_t x = (dens - 50) * 2, s;
     uint32_t i, j;
-    if (x < 0) {
-        for (i = 0, j = 0; i < G->n; i++) if (G->ev[i].st == 0 || chance(r, 100 + x)) G->ev[j++] = G->ev[i];
+    if (x < 0) {                                    /* thin: notes between the beats go first */
+        for (i = 0, j = 0; i < G->n; i++) if (G->ev[i].st == 0 || chance(r, G->ev[i].st % 4 == 0 ? 100 + x / 2 : 100 + x)) G->ev[j++] = G->ev[i];
         G->n = j;
         return;
     }
@@ -452,7 +477,22 @@ static void densify(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t b, 
         *G = O;
         return;
     }
-    {                                                                                /* bass and lead */
+    if (l == L_LEAD) {                                  /* more: a 16th leading into a beat note, never a changed note */
+        uint32_t on = 0, n0 = G->n;
+        for (i = 0; i < n0; i++) on |= 1u << G->ev[i].st;
+        for (i = 0; i < n0; i++) {
+            ev_t *e = &G->ev[i];
+            int32_t s0 = e->st - 1, up = 0, pst = -1;
+            uint32_t k;
+            if (e->st % 4 || s0 < 0 || on >> s0 & 1u || !chance(r, x * 60 / 100)) continue;
+            for (k = 0; k < n0; k++) if (G->ev[k].st < s0 && G->ev[k].st > pst) { pst = G->ev[k].st; up = G->ev[k].note[0] > e->note[0]; }
+            if (G->n < MAXEV) { NOTE(G, s0, 1, move(T, e->note[0], up ? 1 : -1)); on |= 1u << s0; }   /* from the side it comes from */
+        }
+        g_sort(G);                                      /* a note ends where the next begins, no later */
+        for (i = 0; i + 1 < G->n; i++) if (G->ev[i + 1].st > G->ev[i].st && G->ev[i].st + G->ev[i].len > G->ev[i + 1].st) G->ev[i].len = (uint8_t)(G->ev[i + 1].st - G->ev[i].st);
+        return;
+    }
+    {                                                                                /* bass */
         uint32_t on = 0;
         for (i = 0; i < G->n; i++) {
             ev_t *e = &G->ev[i];
@@ -598,6 +638,37 @@ static void drop_release(void)
     else { int32_t nb = cur_bar() + 1; s->until = nb > s->from + 1 ? nb : s->from + 1; }      /* hold */
     drop_seg = -1;
     invalidate();
+}
+
+/* ---- VARY: each 4-bar phrase gives a lane a character on top of your settings (as far as its VARY reaches):
+ * clean, echo, slide, bite (brightness and drive), filter (a low-pass with resonance), stutter (retrigger) */
+static const char *const VARYN[6] = {"CLEAN", "ECHO", "SLIDE", "BITE", "FILTER", "STUTTER"};
+static int32_t vary_char[NLANE];
+static int32_t clamp100(int32_t v) { return v < 0 ? 0 : v > 100 ? 100 : v; }
+static void fx_apply(void)
+{
+    int32_t l, ph = cur_bar() / 4;
+    for (l = 0; l < (int32_t)NLANE; l++) {
+        const lanefx_t *U = &fxu[l];
+        lanefx_t *F = &fx[l];
+        int32_t v = U->vary, c = v ? (int32_t)((hash3(ph, l, 4242) >> 8) % 6u) : 0;
+        int32_t filt = U->filt, res = U->res, wob = U->wob, bright = U->bright, drive = U->drive, slide = U->slide;
+        int32_t retrig = U->retrig, rate = U->rtg_rate, echo = U->echo;
+        if (HITS(l) && (c == 2 || c == 3)) c = 1;                   /* no slide or brightness on hits: echo instead */
+        switch (c) {
+        case 1: echo += 60 * v / 100; break;
+        case 2: slide += 50 * v / 100; break;
+        case 3: bright += 40 * v / 100; drive += 45 * v / 100; break;
+        case 4: if (filt == 0) filt = -(20 + 40 * v / 100); res += 40 * v / 100; if (!wob && v >= 50) wob = 3; break;
+        case 5: retrig += 45 * v / 100; if (rate < 2) rate = 2; break;
+        default: break;
+        }
+        F->filt = filt < -100 ? -100 : filt > 100 ? 100 : filt; F->res = clamp100(res); F->wob = wob;
+        F->bright = clamp100(bright); F->drive = clamp100(drive); F->slide = clamp100(slide);
+        F->retrig = clamp100(retrig); F->rtg_rate = rate; F->crush = U->crush; F->echo = clamp100(echo);
+        F->level = U->level; F->inst = U->inst; F->vary = v;
+        vary_char[l] = c;
+    }
 }
 
 /* ---- your patterns: GENERATE writes one that fits (empty lane) or varies the one there (15..30 %);

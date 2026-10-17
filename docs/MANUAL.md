@@ -48,7 +48,7 @@ it back; moving to another view hides it.
 | Page | SELECT | ALGORITHM | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 | PRESETS |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | MAIN | view | profile (queue) | blend | | | | tempo |
-| a channel: PLAY | view | its profile (SFX: its sound) | density | octave | instrument | level | tempo |
+| a channel: PLAY | view | its profile (SFX: its sound) | density | octave | instrument | level | vary |
 | FX | view | filter | resonance | wobble | brightness | drive | level |
 | TRK | view | slide | retrigger | retrigger rate | crush | echo | level |
 | EDIT | view | step | length | bars | pattern on/off | | |
@@ -56,8 +56,13 @@ it back; moving to another view hides it.
 
 - **Blend** moves lanes to the queued profile from the bottom up: drums, then bass, pad, lead (the D B P L boxes).
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.
-- **Instrument:** AUTO (A:) follows the profile; or one of ten FM patches (FM BASS, SLAP, PIZZ, SUB, BRASS, STRINGS,
-  BELL, ORGAN, FLUTE, CHIP), or one of three drum kits (STANDARD, TRACKER, ELECTRO).
+- **Instrument:** AUTO (A:) follows the profile; or one of fourteen FM patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
+  STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO), or one of three drum kits (STANDARD, TRACKER,
+  ELECTRO). RAZOR is a cutting, saw-like lead; PULSE a hollow one; PIANO and E.PIANO ring out.
+- **Vary:** each 4-bar phrase gives the lane a character on top of your effects: CLEAN, ECHO, SLIDE, BITE
+  (brightness and drive), FILTER (a low-pass with resonance) or STUTTER (retrigger). VARY sets how far it reaches;
+  the value shows the phrase's character. The lead starts at 40 %, the other lanes at 0. Your own settings stay as
+  you set them; the lane on screen shows what plays.
 - **Filter:** one knob, left = low-pass, right = high-pass, centre = off. **Wobble** moves the cutoff in time with the
   tempo (1/1 to 1/16). On screen the filter darkens what it cuts away.
 - **Brightness** raises the FM modulation: from a soft sine toward a buzzy saw. **Drive** saturates.
@@ -65,6 +70,9 @@ it back; moving to another view hides it.
   notes, so it stays a pattern); the rate sets 1 to 3 repeats per 16th. **Crush** lowers the bits and the sample rate.
   **Echo** plays two quieter copies a dotted 8th apart.
 - **A channel's profile** sets that lane alone (MAIN's profile is the one blend and launch move to).
+- **The lead** follows the chords: every beat is a chord tone, the notes between lead into the next one by scale
+  steps, and each 4-bar phrase states a motif, answers it, varies it and lands on the root or third. Density adds a
+  16th into a beat, never a stray note.
 - Profile, blend, density, octave and the SONG page change on the next bar; the FX and TRK pages act at once.
 
 ## SFX

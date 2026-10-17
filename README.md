@@ -60,6 +60,8 @@ echo. An arc builds the piece up from the drums to a drop, and DROP lets you cal
 - **Mixing.** BLEND moves lanes to the queued profile one at a time: drums, then bass, pad, lead. LAUNCH moves every
   unlocked lane at the next 4-bar phrase. LOCK keeps a lane where it is. The bass lane's profile sets the chords
   for everyone, so a half-blended mix stays in key.
+- **The lead** stays on the harmony: chord tones on every beat, scale runs into them, a motif per phrase that is
+  answered and closed. VARY gives each phrase a different character (echo, slide, bite, filter, stutter).
 - **Density.** 50 % is the part as the profile writes it. Lower thins it out; higher adds notes inside the chord and
   its scale, 16th hats, ghost snares and fills.
 - **The arc.** Starts with a few drum hits and builds: bass, pad and lead come in as the energy rises. When it tops
