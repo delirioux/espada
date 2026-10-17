@@ -19,6 +19,7 @@ static void espada_host_stats(void);
 #endif
 #include "platform.c"
 #include "espada_font5x7.h"
+#include "espada_logo.h"
 
 /* ---- shared between the main loop and the audio interrupt (one writer each) */
 #define NLANE 4u

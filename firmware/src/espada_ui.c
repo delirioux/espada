@@ -735,19 +735,20 @@ static void leds(void)
     if (km != lastk) { for (k = 0; k < 27u; k++) fm1_led_key(KEY_LED(k), km >> k & 1u); lastk = km; }
 }
 
-/* ---- the splash */
+/* ---- the splash: the logo (4 bits a pixel, a 16-colour palette), the version in a corner */
 static void splash(void)
 {
-    lcd_fill(0, 0, 240, 240, C_BG);
-    {
-        int32_t y;
-        for (y = 60; y < 180; y += STRIP_H) {
-            cs_begin(y, STRIP_H, C_BG);
-            textc(120, 96, "ESPADA", C_CYAN, 4);
-            textc(120, 136, "TRACKER-STYLE GENERATIVE GROOVEBOX", C_MUTE, 1);
-            textc(120, 152, "V" APP_VER, C_DIMG, 1);
-            cs_end();
+    int32_t y, x;
+    for (y = 0; y < 240; y += (int32_t)STRIP_H) {
+        int32_t h = 240 - y < (int32_t)STRIP_H ? 240 - y : (int32_t)STRIP_H, r;
+        cs_begin(y, h, C_BG);
+        for (r = 0; r < h; r++) {
+            const uint8_t *src = LOGO_PX + (y + r) * 120;
+            uint16_t *dst = cvp + r * 240;
+            for (x = 0; x < 120; x++) { dst[2 * x] = SW(LOGO_PAL[src[x] >> 4]); dst[2 * x + 1] = SW(LOGO_PAL[src[x] & 15]); }
         }
+        textr(236, 230, "v" APP_VER, C_DIMG, 1);
+        cs_end();
     }
 }
 
@@ -761,7 +762,7 @@ static void app_main(void)
     do_load();
     splash();
     t_splash = fm1_ms;
-    while (fm1_ms - t_splash < 900u) platform_poll();
+    while (fm1_ms - t_splash < 1500u) platform_poll();
     lcd_fill(0, 0, 240, 240, C_BG);
     legend_until = (int32_t)fm1_ms + 2500;
     for (;;) {
