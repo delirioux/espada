@@ -1,26 +1,39 @@
 # Playing Espada
 
+## Views
+
+**HOME** steps through the views: MAIN, LEAD, PAD, BASS, DRUMS, SFX, and back to MAIN. The SELECT encoder does the
+same in both directions; **SEL + HOME** goes straight back to MAIN.
+
+- **MAIN:** all five lanes, small. Its encoders are global: the queued profile, blend and the tempo.
+- **A channel** (LEAD .. SFX): that one lane on most of the screen, its notes large, and under it the six values of
+  its encoders written out (the one you just turned gets a frame). **FX**, **ARP** and **EDIT** switch the channel
+  to its effects, its tracker effects and its step editor; the same button again takes it back. From MAIN these
+  buttons open the channel you were on last. HOME keeps the page as it moves on: from BASS FX to DRUMS FX.
+- **SONG** (GLO, from anywhere): key, scale, chords and the arc, for the whole piece. GLO or HOME takes you back.
+
 ## The screen
 
-- **Header:** the page, the profile that sets the chords, the arc's phase (BUILD, BREAK, PEAK, DOWN), phrase.bar
-  and the tempo. The thin strip under it is the arc's energy along the timeline.
-- **Lanes:** LEAD, PAD, BASS, DRUMS from top to bottom. Notes scroll past the white "now" line; the past is dimmed.
-  Solid blocks play now; outlined blocks show what the queued profile will play. Each lane's label shows its profile
-  (or USR for your own pattern), LCK when locked and FX when an effect is on. The selected lane has a frame.
-- **Footer:** the page's values; changes and messages show here for a moment.
+- **Header:** where you are (MAIN, BASS, BASS FX, SONG ...), the profile (on MAIN the bass lane's, which sets the
+  chords; on a channel its own), the arc's phase (BUILD, BREAK, PEAK, DOWN), phrase.bar and the tempo. The thin strip
+  under it is the arc's energy along the timeline.
+- **Lanes:** notes scroll past the white "now" line; the past is dimmed. Solid blocks play now; outlined blocks show
+  what the queued profile will play. Each lane's label shows its profile (USR for your own pattern; inverted when
+  the lane is locked) and FX when an effect is on.
+- **Footer:** the queued profile and the blend (D B P L), launches and breaks, and messages.
 
-The **legend** (a panel with what each encoder does on this page, and its value) is up when Espada starts. Tap **SEL**
-to hide it, tap again to bring it back; it follows you from page to page.
+The **legend** (what each encoder does here, and its value) is up when Espada starts. Tap **SEL** to hide it or bring
+it back; moving to another view hides it.
 
 ## Buttons
 
 | Button | Does |
 | --- | --- |
 | PLAY | start / stop. SEL + PLAY: from the top, with a fresh arc |
-| HOME | the PLAY page |
-| FX | the FX page (again: back to PLAY) |
-| ARP | the TRK page (tracker effects) |
-| EDIT | the EDIT page (your own parts) |
+| HOME | the next view: MAIN, LEAD, PAD, BASS, DRUMS, SFX. SEL + HOME: MAIN |
+| FX | the channel's FX page (again: back) |
+| ARP | the channel's TRK page (tracker effects) |
+| EDIT | the channel's EDIT page (your own parts) |
 | GLO | the SONG page (key, scale, chords, the arc) |
 | SEQ | LAUNCH: every unlocked lane moves to the queued profile on the next phrase (again: cancel) |
 | REC | DROP: tap = a break from the next bar, the drop on the next phrase; hold = a break while held, the drop on the bar after you let go. The selected lane plays alone in the break. On the EDIT page: GRAB (what the lane plays now becomes its pattern); SEL + REC: clear the pattern |
@@ -34,10 +47,11 @@ to hide it, tap again to bring it back; it follows you from page to page.
 
 | Page | SELECT | ALGORITHM | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 | PRESETS |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PLAY | lane | profile (queue) | blend | density | octave | instrument | tempo |
-| FX | lane | filter | resonance | wobble | brightness | drive | level |
-| TRK | lane | slide | retrigger | retrigger rate | crush | echo | level |
-| EDIT | lane | step | length | bars | pattern on/off | | |
+| MAIN | view | profile (queue) | blend | | | | tempo |
+| a channel: PLAY | view | its profile (SFX: its sound) | density | octave | instrument | level | tempo |
+| FX | view | filter | resonance | wobble | brightness | drive | level |
+| TRK | view | slide | retrigger | retrigger rate | crush | echo | level |
+| EDIT | view | step | length | bars | pattern on/off | | |
 | SONG | key | scale | chords (the progression) | bars per chord | build (OFF = no arc) | peak | auto drop |
 
 - **Blend** moves lanes to the queued profile from the bottom up: drums, then bass, pad, lead (the D B P L boxes).
@@ -50,11 +64,27 @@ to hide it, tap again to bring it back; it follows you from page to page.
 - **Slide** glides each note in from the last one. **Retrigger** makes a share of the notes stutter (always the same
   notes, so it stays a pattern); the rate sets 1 to 3 repeats per 16th. **Crush** lowers the bits and the sample rate.
   **Echo** plays two quieter copies a dotted 8th apart.
+- **A channel's profile** sets that lane alone (MAIN's profile is the one blend and launch move to).
 - Profile, blend, density, octave and the SONG page change on the next bar; the FX and TRK pages act at once.
+
+## SFX
+
+The fifth channel plays noise, no notes. Its sounds: **WASH** (filtered white noise with a slow sweep), **RISER**
+(noise opening up under a tone that climbs four octaves), **IMPACT** (a falling sub and a noise burst), **ZAP** (a
+laser: a sine falling fast), **CRACKLE** (vinyl clicks and hiss) and **BITS** (1-bit periodic noise, the metallic
+8-bit kind, on the chord's root).
+
+On **AUTO** (the default) it follows the arc: a riser fills the bar before each drop, the impact lands on it, and in
+between it plays what fits the profile: washes for EPIC and FUSION, zaps and bits for HYPERSPACE, crackle and bits
+for OLDSKOOL, more as the energy and the density rise. With the arc off: a riser every 8th bar, an impact after it.
+Turn **SOUND** to one of the six to hear only that one, in its own pattern. Its FX and TRK pages work as on any
+lane (a filter sweep over a wash, echo on the zaps). On its EDIT page the first six white keys (F3 .. D4) switch
+WASH, RISER, IMPACT, ZAP, CRACKLE and BITS at the cursor.
 
 ## Keys
 
-- On every page but EDIT a key sets the key of the music (from the next bar). The keys of the tonic are lit.
+- The keys only play: they enter steps on the EDIT page and change nothing else (the key of the music is on the
+  SONG page). Elsewhere the keys of the tonic are lit.
 - On the EDIT page the white keys are scale steps counted from the chord root: C4 is the root, D4 the next step, and
   so on (OCT- / OCT+ shift by a scale octave). A note goes in at the cursor with the set length, and the cursor moves
   on. Black keys: a rest; SEL + a black key: tie. On the DRUMS lane the first five white keys (F3 G3 A3 B3 C4) switch

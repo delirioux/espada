@@ -4,6 +4,9 @@
  *   FM voices     two operators (a modulator into a carrier's phase), an index envelope, an amplitude
  *                 envelope, slide, vibrato, the tracker arpeggio (a chord cycled every 42 ms), square option
  *   drum voices   kick and kettle drum (a swept sine), snare (band-passed noise + a tone), hat, crash
+ *   sfx voices    wash (filtered noise, a slow sweep), riser (noise opening up + a tone climbing four octaves),
+ *                 impact (a falling sub + a noise burst), zap (a sine falling fast), crackle (clicks + hiss),
+ *                 bits (1-bit periodic noise, the 8-bit metallic kind)
  *   lanes         each lane renders into its own bus: drive, a state-variable filter (low- or high-pass)
  *                 with a tempo-synced wobble, the bit crusher, the level; then the mix
  *   the clock     16ths at the tempo, sample-accurate; each step fires the events of the bar cache; retrigger
@@ -64,7 +67,8 @@ static const kit_t KITS[] = {
 
 /* ---- voices */
 #define CTRL 32u                                /* control rate: envelopes every 32 samples */
-enum { V_OFF = 0, V_FM, V_KICK, V_SNARE, V_HAT, V_CRASH, V_KETTLE };
+enum { V_OFF = 0, V_FM, V_KICK, V_SNARE, V_HAT, V_CRASH, V_KETTLE,
+       V_WASH, V_RISER, V_IMPACT, V_ZAP, V_CRACKLE, V_BITS };          /* V_WASH + SX_x = the sfx voices */
 typedef struct {
     uint8_t kind, lane, stage, square;          /* stage: 0 attack, 1 decay/sustain, 2 release */
     uint8_t midi, midi_ch, arp_n, arp_i;
@@ -78,9 +82,9 @@ typedef struct {
     int32_t s1, s2, s3;                         /* filter states (snare, hat) */
     int32_t tone_amp; uint32_t tph;             /* the snare's tone */
 } voice_t;
-#define NVOICE 26u
+#define NVOICE 30u
 static voice_t vc[NVOICE];
-static const uint8_t VLO[NLANE] = {0, 5, 13, 17}, VHI[NLANE] = {5, 13, 17, 26};   /* voices per lane */
+static const uint8_t VLO[NLANE] = {0, 5, 13, 17, 26}, VHI[NLANE] = {5, 13, 17, 26, 30};   /* voices per lane */
 static uint32_t vage, noise_s = 22222u;
 
 /* ---- lane buses and effects state */
@@ -120,6 +124,7 @@ static void synth_init(void)
     uint32_t i;
     for (i = 0; i < 1024u; i++) SIN[i] = (int16_t)sine_q15(i << 22);
     for (i = 0; i < NLANE; i++) { fx[i].level = 80; fx[i].bright = 25; fx[i].rtg_rate = 1; fx[i].inst = -1; fx[i].res = 30; }
+    fx[L_SFX].level = 60;
 }
 
 static inline int32_t noise(void) { noise_s = noise_s * 1664525u + 1013904223u; return (int32_t)noise_s >> 17; }
@@ -136,7 +141,7 @@ static voice_t *alloc_voice(uint32_t lane)
     for (v = VLO[lane]; v < VHI[lane]; v++) {
         /* a free voice, else the quietest one in its release, else the oldest */
         uint32_t score = vc[v].kind == V_OFF ? 0u
-                       : vc[v].stage == 2u || vc[v].kind != V_FM ? 1u + (uint32_t)vc[v].amp
+                       : vc[v].stage == 2u || (vc[v].kind != V_FM && vc[v].kind < V_WASH) ? 1u + (uint32_t)vc[v].amp
                        : 0x40000000u + (vc[v].age & 0x3FFFFFFFu);
         if (score < best) { best = score; pick = v; }
     }
@@ -207,6 +212,48 @@ static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_ori
     if (is_orig) { v->midi = GM_DRUM[kind < NDK ? kind : 0]; v->midi_ch = 9; mo_push(0x99u, v->midi, 100); }
 }
 
+/* an sfx sound: kind SX_x, pitch a MIDI note (riser start, bits), dur in samples (wash, riser, crackle) */
+static void start_sfx(uint32_t kind, uint32_t pitch, uint32_t dur, uint32_t lvl)
+{
+    voice_t *v = alloc_voice(L_SFX);
+    if (dur < CTRL * 4u) dur = CTRL * 4u;
+    v->lane = L_SFX; v->kind = (uint8_t)(V_WASH + (kind < NSX ? kind : 0)); v->ph = 0; v->ctr = 0; v->age = ++vage;
+    v->s1 = v->s2 = v->s3 = 0; v->tph = 0; v->tone_amp = 0; v->midi = 0; v->gate = 0xFFFFFFFFu; v->stage = 2; v->peak = 0;
+    switch (v->kind) {
+    case V_WASH:                                    /* in over a third of its time, out over 0.6 s */
+        v->peak = (int32_t)((15000u * lvl) >> 8); v->amp = 0; v->stage = 0;
+        v->att = (int32_t)((uint32_t)v->peak * CTRL / (dur / 3u + CTRL)); if (v->att < 1) v->att = 1;
+        v->gate = dur; v->rel_k = tau_k(600);
+        break;
+    case V_RISER:                                   /* climbs over its whole time, then stops dead */
+        v->peak = (int32_t)((11000u * lvl) >> 8); v->amp = 0; v->stage = 0;
+        v->att = (int32_t)((uint32_t)v->peak * CTRL / dur); if (v->att < 1) v->att = 1;
+        v->inc = note_inc((int32_t)pitch);
+        v->idx = (int32_t)(181700u * CTRL / dur);       /* ln 16 x 65536 per tick: four octaves over dur */
+        v->gate = dur; v->rel_k = tau_k(15);
+        break;
+    case V_IMPACT:
+        v->amp = (int32_t)((16000u * lvl) >> 8); v->dec_k = tau_k(700);
+        v->tone_amp = (int32_t)((9000u * lvl) >> 8);
+        v->inc = HZ_INC(110); v->inc_lo = HZ_INC(30); v->inc_k = (uint32_t)tau_k(120);
+        break;
+    case V_ZAP:
+        v->amp = (int32_t)((8000u * lvl) >> 8); v->dec_k = tau_k(110);
+        v->inc = note_inc((int32_t)pitch + 24); v->inc_lo = HZ_INC(60); v->inc_k = (uint32_t)tau_k(35);
+        break;
+    case V_CRACKLE:
+        v->peak = (int32_t)((16000u * lvl) >> 8); v->amp = 0; v->stage = 0;
+        v->att = v->peak * (int32_t)CTRL / 900; if (v->att < 1) v->att = 1;
+        v->gate = dur; v->rel_k = tau_k(150);
+        break;
+    default:                                        /* V_BITS */
+        v->amp = (int32_t)((7000u * lvl) >> 8); v->dec_k = tau_k(160);
+        v->inc = note_inc((int32_t)pitch + 12); v->s1 = 0x7FFF;
+        break;
+    }
+    v->peak = v->peak ? v->peak : v->amp;
+}
+
 /* a voice start (now): melodic notes or a drum hit, with the lane's slide memory */
 static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags, uint32_t dur, uint32_t lvl,
                  uint32_t kind_or_inst, int32_t original)
@@ -214,6 +261,7 @@ static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags,
     uint32_t i;
     lane_hit_ms[lane] = fm1_ms;
     if (lane == L_DRUMS) { start_drum(note[0], lvl, kind_or_inst, original); return; }
+    if (lane == L_SFX) { start_sfx(note[0], note[1], dur, lvl); return; }
     {
         const patch_t *P = &PATCH[kind_or_inst < NPATCH ? kind_or_inst : 0];
         int32_t chord = n > 1u && !(flags & EV_ARP);
@@ -296,6 +344,28 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                     v->inc += (uint32_t)(int32_t)(((int64_t)d * v->glide_k) >> 15);
                 }
                 if (v->arp_n > 1u && (v->arp_t += CTRL) >= 1852u) { v->arp_t = 0; v->arp_i = (uint8_t)((v->arp_i + 1u) % v->arp_n); v->inc = v->target = v->arp[v->arp_i]; }
+            } else if (v->kind >= V_WASH) {                               /* sfx */
+                switch (v->kind) {
+                case V_WASH: case V_CRACKLE: case V_RISER:
+                    if (v->stage == 0u) { v->amp += v->att; if (v->amp >= v->peak) { v->amp = v->peak; v->stage = 1; } }
+                    else if (v->stage == 2u) v->amp = (v->amp * v->rel_k) >> 15;
+                    if (v->kind == V_WASH) v->tph += 3000u * CTRL;                         /* the sweep: 0.03 Hz.. */
+                    if (v->kind == V_RISER) {
+                        v->inc += (v->inc >> 16) * (uint32_t)v->idx;
+                        if (v->inc > 400000000u) v->inc = 400000000u;
+                        v->s3 = 800 + (int32_t)((uint32_t)v->amp * 20000u / (uint32_t)(v->peak ? v->peak : 1));   /* the noise opens up */
+                    }
+                    break;
+                case V_IMPACT:
+                    v->amp = (v->amp * v->dec_k) >> 15; v->tone_amp = (v->tone_amp * 29500) >> 15;
+                    v->inc = v->inc_lo + (uint32_t)(((uint64_t)(v->inc - v->inc_lo) * v->inc_k) >> 15);
+                    break;
+                case V_ZAP:
+                    v->amp = (v->amp * v->dec_k) >> 15;
+                    v->inc = v->inc_lo + (uint32_t)(((uint64_t)(v->inc - v->inc_lo) * v->inc_k) >> 15);
+                    break;
+                default: v->amp = (v->amp * v->dec_k) >> 15; break;
+                }
             } else {
                 v->amp = (v->amp * v->dec_k) >> 15;
                 if (v->kind == V_KICK || v->kind == V_KETTLE)
@@ -309,7 +379,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                     if (v->midi) { mo_push(0x80u | v->midi_ch, v->midi, 0); v->midi = 0; }
                 }
             }
-            if (v->amp < 4 && (v->stage == 2u || v->kind != V_FM)) {
+            if (v->amp < 4 && (v->stage == 2u || (v->kind != V_FM && v->kind < V_WASH))) {
                 if (v->midi) { mo_push((v->kind == V_FM ? 0x80u | v->midi_ch : 0x89u), v->midi, 0); v->midi = 0; }
                 v->kind = V_OFF; return;
             }
@@ -349,6 +419,38 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
             int32_t x = noise(), hp = x - v->s1;            /* one-pole high-pass */
             v->s1 += ((x - v->s1) * (v->kind == V_HAT ? 6000 : 12000)) >> 15;
             s = (hp * v->amp) >> 15;
+            break; }
+        case V_WASH: {                                                  /* two-pole low-pass noise, swept */
+            int32_t c = 1200 + (((int32_t)SIN[v->tph >> 22] + 32768) * 5000 >> 16), x = noise();
+            v->s1 += ((x - v->s1) * c) >> 15;
+            v->s2 += ((v->s1 - v->s2) * c) >> 15;
+            s = (v->s2 * 2 * v->amp) >> 15;
+            break; }
+        case V_RISER: {
+            int32_t x = noise();
+            v->s1 += ((x - v->s1) * v->s3) >> 15;
+            v->ph += v->inc;
+            s = ((v->s1 + (SIN[v->ph >> 22] >> 1)) * v->amp) >> 15;
+            break; }
+        case V_IMPACT:
+            v->ph += v->inc;
+            s = (SIN[v->ph >> 22] * v->amp + noise() * v->tone_amp) >> 15;
+            break;
+        case V_ZAP:
+            v->ph += v->inc;
+            s = (SIN[v->ph >> 22] * v->amp) >> 15;
+            break;
+        case V_CRACKLE: {
+            int32_t x = noise();
+            if (((noise_s >> 9) & 1023u) == 0u) v->s1 = x * 2;         /* a click, ~43 a second */
+            v->s1 = (v->s1 * 26000) >> 15;
+            s = ((v->s1 + (x >> 5)) * v->amp) >> 15;
+            break; }
+        case V_BITS: {
+            uint32_t was = v->ph;
+            v->ph += v->inc;
+            if (v->ph < was) { uint32_t bit = ((uint32_t)v->s1 ^ ((uint32_t)v->s1 >> 6)) & 1u; v->s1 = (int32_t)(((uint32_t)v->s1 >> 1) | bit << 14); }
+            s = ((v->s1 & 1) ? v->amp : -v->amp);
             break; }
         default: return;
         }
@@ -450,7 +552,7 @@ static void app_audio(int32_t *out, uint32_t n)
     uint32_t t0 = fm1_ticks(), i = 0, l, k;
     for (l = 0; l < NLANE; l++)
         for (k = 0; k < n; k++) bus[l][k] = 0;
-    if (aud_req) { uint8_t nt = (uint8_t)aud_note; fire(aud_lane, &nt, 1, 0, 9000, 256, aud_kind, 0); aud_req = 0; }
+    if (aud_req) { uint8_t nt[3] = {(uint8_t)aud_note, (uint8_t)(62 + key_off), 0}; fire(aud_lane, nt, 1, 0, aud_lane == L_SFX ? 33075u : 9000u, 256, aud_kind, 0); aud_req = 0; }
     if (seq_stop_req) { seq_stop_req = 0; seq_playing = 0; all_off(); }
     if (seq_start_req) {
         seq_start_req = 0; seq_playing = 1; seq_step = (uint32_t)seq_start_step; seq_acc_q8 = 0; npend = 0;

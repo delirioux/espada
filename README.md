@@ -4,13 +4,13 @@
 
 **A generative groovebox for the M-VAVE FM-1, in the style of early-90s PC tracker music.**
 
-Four lanes (lead, pad, bass, drums) play parts that are composed live from a profile: chords, bass lines,
-melodies and drum patterns in the manner of the S3M scene. You do not program steps; you mix styles. Queue the next
+Five lanes (lead, pad, bass, drums and sfx) play parts that are composed live from a profile: chords, bass lines,
+melodies, drum patterns and noise in the manner of the S3M scene. You do not program steps; you mix styles. Queue the next
 profile, blend it in lane by lane from the bottom up, or launch it on the next phrase. Shape each lane with a
 filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, retrigger, a bit crusher and
 echo. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
 
-<p align="center"><img src="docs/screen.png" width="240" alt="Espada's screen: four lanes of notes scrolling past a fixed play line"></p>
+<p align="center"><img src="docs/screen.png" width="240" alt="Espada's screen: five lanes of notes scrolling past a fixed play line"></p>
 
 > **Status: 0.1, first version.** Runs in host mode (screen and sound on a computer). Not yet confirmed on an FM-1:
 > install it over the official firmware and keep the USB rescue in mind (below).
@@ -18,7 +18,10 @@ echo. An arc builds the piece up from the drums to a drop, and DROP lets you cal
 ## How it plays
 
 - **Lanes.** Notes scroll from right to left past a fixed "now" line. Solid blocks are what a lane plays; outlined
-  blocks are a preview of the queued profile.
+  blocks are a preview of the queued profile. HOME steps from the overview (MAIN) to each lane on its own, large,
+  with its values written out, and back.
+- **SFX.** The fifth lane: a noise riser into every drop, the impact on it, washes, laser zaps, crackle and 8-bit
+  noise, following the arc and the profile.
 - **Profiles.** EPIC (orchestral minor), HYPERSPACE (techno minor with power chords), FUSION (melodic major with a
   chromatic turn and a riff that follows the chords), OLDSKOOL (the 4-channel sound with arpeggio chords).
 - **Mixing.** BLEND moves lanes to the queued profile one at a time: drums, then bass, pad, lead. LAUNCH moves every

@@ -1,6 +1,6 @@
 Espada 0.1: the first version of a generative groovebox for the M-VAVE FM-1 in the style of early-90s PC tracker music.
 
-- Four lanes (lead, pad, bass, drums) with FM voices and a synthesized drum kit; notes scroll past a fixed play line.
+- Five lanes (lead, pad, bass, drums, sfx) with FM voices, a synthesized drum kit and noise effects; notes scroll past a fixed play line. HOME steps from the overview to each lane on its own.
 - Four profiles: EPIC, HYPERSPACE, FUSION, OLDSKOOL. Queue, blend lane by lane, launch on the phrase, lock a lane.
 - Density from sparse to busy, inside the chord and its scale.
 - Per lane: filter with a tempo-synced wobble, FM brightness, drive, level; slide, retrigger, crush, echo.

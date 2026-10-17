@@ -10,6 +10,7 @@
  *   density     50 = the part as designed; lower thins, higher adds notes inside the chord and its scale
  *   the arc     energy over time: BUILD from the drums up, a BREAK with one lane alone, the drop (PEAK),
  *               DOWN, and a new build
+ *   sfx         follows the arc: a riser into the drop, the impact on it, washes, zaps, crackle, bits
  *   patterns    your own parts (scale steps from the chord root, so they follow the chords), GENERATE
  *   the cache   bars are generated ahead into double-buffered slots the audio interrupt reads */
 
@@ -92,8 +93,8 @@ typedef struct {
     const char *name;
     const int8_t *scale;
     int8_t prog[8][2];          /* root above the tonic, quality */
-    uint8_t st[NLANE];          /* style per lane (LEAD, PAD, BASS, DRUMS) */
-    uint8_t inst[NLANE];        /* suggested patch per lane, kit for the drums */
+    uint8_t st[NLANE];          /* style per lane (LEAD, PAD, BASS, DRUMS; the sfx lane has its own generator) */
+    uint8_t inst[NLANE];        /* suggested patch per lane, kit for the drums (sfx: unused) */
 } prof_t;
 /* from a study of 90s tracker music: orchestral minor, techno minor, melodic major with a chromatic turn,
  * the 4-channel sound with arpeggio chords */
@@ -141,12 +142,13 @@ static void chord_of(int32_t s, int32_t deg, int32_t *root, int8_t *tones)
 typedef struct { int8_t k[32]; uint8_t len[32]; uint8_t kinds[32]; uint8_t on, bars; } upat_t;
 typedef struct { uint8_t prof, lock, dens; int8_t oct; upat_t up; } lane_t;
 static lane_t ln[NLANE];
-static const int32_t LBASE[NLANE] = {62, 50, 38, 0}, LLO[NLANE] = {58, 45, 24, 0}, LHI[NLANE] = {98, 86, 64, 0};
-static const int32_t LORDER[NLANE] = {3, 2, 1, 0};              /* blend order: drums first */
+static const int32_t LBASE[NLANE] = {62, 50, 38, 0, 62}, LLO[NLANE] = {58, 45, 24, 0, 0}, LHI[NLANE] = {98, 86, 64, 0, 0};
+static const int32_t LORDER[NLANE] = {3, 2, 1, 0, 4};           /* blend order: drums first; sfx follows the bass */
 static int32_t target = 1, blend = 0, launch_bar = -1;
 
 static int32_t eff_prof(int32_t l, int32_t b)
 {
+    if (l == L_SFX) l = L_BASS;                                     /* its flavour: the profile with the harmony */
     if (ln[l].lock) return ln[l].prof;
     if (launch_bar >= 0 && b >= launch_bar) return target;
     if (LORDER[l] < blend) return target;
@@ -173,7 +175,7 @@ typedef struct { int32_t mode, e, lane, until, drop; } arc_t;
 static int32_t arc_on = 1, build_ph = 6, peak_ph = 4, auto_drop = 1;
 static seg_t segs[16] = {{A_BUILD, 0, 0, -1, L_PAD}};
 static int32_t nsegs = 1;
-static const int32_t ENTER[NLANE] = {159, 108, 56, 0};          /* lead, pad, bass, drums */
+static const int32_t ENTER[NLANE] = {159, 108, 56, 0, 0};       /* lead, pad, bass, drums (sfx: always on) */
 static int next_implicit(const seg_t *s, seg_t *o)
 {
     o->until = -1; o->lane = L_PAD; o->e0 = 230;
@@ -205,7 +207,7 @@ static arc_t arc_at(int32_t b)
 }
 static int lane_active(const arc_t *A, int32_t l)
 {
-    if (A->mode == A_OFF) return 1;
+    if (A->mode == A_OFF || l == L_SFX) return 1;                  /* sfx: the riser plays in the break */
     if (A->mode == A_BREAK) return l == A->lane;
     return A->e >= ENTER[l];
 }
@@ -223,6 +225,7 @@ static ev_t *g_add(gen_t *G, int32_t st, int32_t len, int32_t n, int32_t a, int3
 }
 #define NOTE(G, st, len, n) g_add(G, st, len, 1, n, 0, 0, 0)
 #define DRUM(G, st, k) g_add(G, st, 1, 1, k, 0, 0, 0)
+#define SFX(G, st, len, k, pitch) g_add(G, st, len, 1, k, pitch, 0, 0)
 static void g_sort(gen_t *G)
 {
     uint32_t i, j;
@@ -351,6 +354,47 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
     }
 }
 
+/* the sfx lane: AUTO follows the arc and the profile; one chosen sound plays its own pattern. dens 50 = as designed */
+static void gen_sfx(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, int32_t dens, const arc_t *A, int next_drop)
+{
+    static const int8_t OFF[4] = {2, 6, 10, 14};
+    int32_t only = fx[L_SFX].inst, root = ct(T, 0), x = dens * 2, i, s;
+    G->n = 0;
+    if (only < 0) {
+        int32_t e = A->mode == A_OFF ? 154 : A->e;
+        int drop = A->drop || (A->mode == A_OFF && b > 0 && b % 8 == 0), pre = next_drop || (A->mode == A_OFF && b % 8 == 7);
+        if (drop) SFX(G, 0, 2, SX_IMPACT, root);
+        if (pre) { SFX(G, 0, 16, SX_RISER, root); return; }        /* the bar before the drop: the riser, alone */
+        switch (p) {
+        case 0:                                                     /* EPIC: washes, a few zaps at the top */
+            if (b % 4 == 0 && !drop && chance(r, x)) SFX(G, 0, 16, SX_WASH, root);
+            if (e > 200) for (i = 0; i < 4; i++) if (chance(r, x * 15 / 100)) SFX(G, OFF[i] + 1, 1, SX_ZAP, root + 12);
+            break;
+        case 1:                                                     /* HYPERSPACE: zaps, bits at the top */
+            for (i = 0; i < 4; i++) if (chance(r, x * e / 256 * 40 / 100)) SFX(G, OFF[i], 1, SX_ZAP, root + PICK(r, 0, 7, 12));
+            if (e > 200) for (s = 1; s < 16; s += 2) if (chance(r, x * 30 / 100)) SFX(G, s, 1, SX_BITS, root);
+            break;
+        case 2:                                                     /* FUSION: a soft wash a phrase */
+            if (b % 4 == 0 && !drop && chance(r, x * 80 / 100)) SFX(G, 0, 16, SX_WASH, root);
+            if (e > 200 && chance(r, x * 20 / 100)) SFX(G, 14, 1, SX_ZAP, root + 12);
+            break;
+        default:                                                    /* OLDSKOOL: crackle under everything, bits */
+            if (chance(r, x)) SFX(G, 0, 16, SX_CRACKLE, root);
+            for (i = 0; i < 4; i++) if (chance(r, x * e / 256 * 30 / 100)) SFX(G, OFF[i] + 1, 1, SX_BITS, root);
+            break;
+        }
+        g_sort(G);
+        return;
+    }
+    switch (only) {                                                 /* one sound */
+    case SX_WASH: case SX_CRACKLE: if (chance(r, x)) SFX(G, 0, 16, only, root); break;
+    case SX_RISER: if (next_drop || b % 4 == 3) SFX(G, 0, 16, SX_RISER, root); break;
+    case SX_IMPACT: if (A->drop || b % 4 == 0) SFX(G, 0, 2, SX_IMPACT, root); break;
+    case SX_ZAP: for (i = 0; i < 4; i++) if (chance(r, x * 45 / 100)) SFX(G, OFF[i], 1, SX_ZAP, root + PICK(r, 0, 7, 12)); break;
+    default: for (s = 0; s < 16; s++) if (chance(r, s % 2 ? x * 25 / 100 : x * 50 / 100)) SFX(G, s, 1, SX_BITS, root); break;
+    }
+}
+
 /* your own pattern for this bar, following the chord */
 static void user_bar(int32_t l, gen_t *G, const tools_t *T, int32_t b)
 {
@@ -359,6 +403,11 @@ static void user_bar(int32_t l, gen_t *G, const tools_t *T, int32_t b)
     G->n = 0;
     for (s = 0; s < 16; s++) {
         if (l == L_DRUMS) { for (k = 0; k < NDK; k++) if (U->kinds[off + s] >> k & 1u) DRUM(G, s, k); continue; }
+        if (l == L_SFX) {
+            for (k = 0; k < NSX; k++) if (U->kinds[off + s] >> k & 1u)
+                SFX(G, s, k == SX_WASH || k == SX_RISER || k == SX_CRACKLE ? 16 - s : 1, k, ct(T, 0));
+            continue;
+        }
         if (U->k[off + s] == EMPTY) continue;
         k = U->k[off + s];
         if (l == L_PAD) g_add(G, s, U->len[off + s] > 16 - s ? 16 - s : U->len[off + s], 3, stp(T, k), stp(T, k + 2), stp(T, k + 4), 0);
@@ -444,6 +493,7 @@ static void gen_bar(int32_t b, bar_t *B)
     int32_t l;
     harm_at(b, &H);
     B->crash_on_one = (uint8_t)A.drop;
+    int next_drop = arc_at(b + 1).drop;
     for (l = 0; l < (int32_t)NLANE; l++) {
         int32_t p = eff_prof(l, b), dens = ln[l].dens;
         rng_t r = {hash3(b, l, p)};
@@ -454,9 +504,10 @@ static void gen_bar(int32_t b, bar_t *B)
         B->muted[l] = (uint8_t)!lane_active(&A, l);
         if (B->muted[l]) continue;
         if (ln[l].up.on) user_bar(l, &G, &T, b);
+        else if (l == L_SFX) gen_sfx(&G, &r, &T, b, p, dens, &A, next_drop);
         else generate(PROF[p].st[l], &G, &r, &T, b, p);
         if (A.mode != A_OFF) { dens += (A.e - 154) * 80 / 256; if (dens < 0) dens = 0; if (dens > 100) dens = 100; }
-        densify(l, &G, &r, &T, b, dens);
+        if (l != L_SFX) densify(l, &G, &r, &T, b, dens);
         if (A.drop && l == L_DRUMS) {
             int has_c = 0, has_k = 0;
             for (i = 0; i < G.n; i++) if (G.ev[i].st == 0) { if (G.ev[i].note[0] == DK_CRASH) has_c = 1; if (G.ev[i].note[0] == DK_KICK) has_k = 1; }
@@ -580,10 +631,11 @@ static void pat_fresh(int32_t l)
         harm_t H; tools_t T; rng_t r = {seed + (uint32_t)bi * 7919u};
         harm_at(bi, &H);
         tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
-        generate(PROF[p].st[l], &G, &r, &T, bi, PROF[p].st[l] == S_RIFF ? (int32_t)(seed & 1023u) + 4 : p);
+        if (l == L_SFX) { arc_t A = arc_at(bi); gen_sfx(&G, &r, &T, bi, eff_prof(L_SFX, bi), ln[l].dens, &A, arc_at(bi + 1).drop); }
+        else generate(PROF[p].st[l], &G, &r, &T, bi, PROF[p].st[l] == S_RIFF ? (int32_t)(seed & 1023u) + 4 : p);
         for (i = 0; i < G.n; i++) {
             uint32_t s = (uint32_t)bi * 16u + G.ev[i].st;
-            if (l == L_DRUMS) U->kinds[s] |= (uint8_t)(1u << G.ev[i].note[0]);
+            if (HITS(l)) U->kinds[s] |= (uint8_t)(1u << G.ev[i].note[0]);
             else { U->k[s] = (int8_t)note_to_k(&T, G.ev[i].note[0]); U->len[s] = G.ev[i].len; }
         }
     }
@@ -597,10 +649,10 @@ static void pat_vary(int32_t l)
     if (changes < 1) changes = 1;
     for (c = 0; c < changes; c++) {
         int32_t s = (int32_t)((rnd(&ui_rng) >> 16) * (uint32_t)n >> 16), op = (int32_t)((rnd(&ui_rng) >> 16) * 100u >> 16);
-        if (l == L_DRUMS) {
-            static const int8_t K[6] = {DK_HAT, DK_HAT, DK_KICK, DK_SNARE, DK_SNARE, DK_KETTLE};
-            int32_t k = K[(rnd(&ui_rng) >> 16) * 6u >> 16];
-            if (s % 16 == 0 && k == DK_KICK) continue;              /* keep the kick on the one */
+        if (HITS(l)) {
+            static const int8_t K[6] = {DK_HAT, DK_HAT, DK_KICK, DK_SNARE, DK_SNARE, DK_KETTLE}, X[6] = {SX_ZAP, SX_ZAP, SX_BITS, SX_BITS, SX_CRACKLE, SX_IMPACT};
+            int32_t k = (l == L_SFX ? X : K)[(rnd(&ui_rng) >> 16) * 6u >> 16];
+            if (l == L_DRUMS && s % 16 == 0 && k == DK_KICK) continue;   /* keep the kick on the one */
             U->kinds[s] ^= (uint8_t)(1u << k);
             continue;
         }
@@ -647,7 +699,7 @@ static void pat_grab(int32_t l)                                 /* what the lane
     for (i = 0; i < 32; i++) { U->k[i] = EMPTY; U->len[i] = 1; U->kinds[i] = 0; }
     for (i = 0; i < B->cnt[l]; i++) {
         const ev_t *e = &B->ev[l][i];
-        if (l == L_DRUMS) U->kinds[e->st] |= (uint8_t)(1u << e->note[0]);
+        if (HITS(l)) U->kinds[e->st] |= (uint8_t)(1u << e->note[0]);
         else { U->k[e->st] = (int8_t)note_to_k(&T, e->note[0]); U->len[e->st] = e->len; }
     }
     U->bars = 1; U->on = 1;
