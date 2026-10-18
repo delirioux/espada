@@ -85,7 +85,8 @@ steps from the overview to each channel.
 - **Song.** Key, scale (major, minor, the church modes, harmonic and melodic minor, pentatonics, blues), a list of
   suggested progressions, bars per chord, and the arc's lengths.
 
-The full guide to the panel is in [docs/MANUAL.md](docs/MANUAL.md).
+The full guide to the panel is in [docs/MANUAL.md](docs/MANUAL.md). Where Espada is going, how it is built and
+why: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Try it in the browser
 
