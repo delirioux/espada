@@ -23,7 +23,7 @@ steps from the overview to each channel.
 <table>
 <tr>
 <td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="MAIN"><br><b>MAIN</b>: all five lanes. The knobs: the next profile, blend, energy (density for all) and space (the room).</td>
-<td align="center" width="33%"><img src="docs/screens/channel.png" width="240" alt="LEAD"><br><b>A channel</b>: its lane large. The knobs: profile, density, octave, level; PRESETS its sound.</td>
+<td align="center" width="33%"><img src="docs/screens/channel.png" width="240" alt="LEAD"><br><b>A channel</b>: its lane large. The knobs: melody, rhythm, pitch, change; PRESETS its sound (EDIT twice: profile, density, octave, level).</td>
 <td align="center" width="33%"><img src="docs/screens/fx.png" width="240" alt="PAD FX"><br><b>FX</b>: filter, resonance, wobble and drive (FX again: brightness, crush, vary). The screen darkens what the filter cuts.</td>
 </tr>
 <tr>
@@ -41,9 +41,9 @@ steps from the overview to each channel.
 | ALGORITHM, HOME | the channel: MAIN, LEAD, PAD, BASS, DRUMS, SFX |
 | PRESETS | the sound (MAIN: the next profile) |
 | KNOB 1-4 | the four cards |
-| FX / ARP / EDIT / GLO | effects (twice: FX 2), tracker effects, steps, song (twice: the arc) |
+| FX / ARP / EDIT / GLO | effects (twice: FX 2; on MAIN: the mixer), tracker effects, steps (twice: the part), song (twice: the arc) |
 | PLAY / SEQ / REC | start-stop, launch on the phrase, DROP (tap or hold) |
-| ENV / LFO / SAVE | lock, generate a pattern, save |
+| ENV / LFO / SAVE | fade the channel out and in (SEL+ENV: lock), a new idea, save |
 | OCT- / OCT+ | the keys' octave |
 | Keys | play the channel live; on EDIT they enter steps |
 
@@ -59,7 +59,12 @@ steps from the overview to each channel.
 - **SFX.** The fifth lane: a noise riser into every drop, the impact on it, washes, laser zaps, crackle and 8-bit
   noise, following the arc and the profile.
 - **Profiles.** EPIC (orchestral minor), HYPERSPACE (techno minor with power chords), FUSION (melodic major with a
-  chromatic turn and a riff that follows the chords), OLDSKOOL (the 4-channel sound with arpeggio chords).
+  chromatic turn and a riff that follows the chords), OLDSKOOL (the 4-channel sound with arpeggio chords), SYMPHONY
+  (the orchestra: strings, a violin line, cellos, timpani, two bars a chord).
+- **Four knobs a channel.** MELODY (which idea), RHYTHM, PITCH and CHANGE (how soon new material comes, from frozen
+  to every 16 bars), as Tuna's. LFO: a new idea now. ENV fades a channel out and in; MAIN's MIX page has the levels.
+- **Long arcs.** The lead plays 16-bar sections of two 8-bar periods: a motif stated, answered, sequenced, closed
+  open, then driven to its high point and closed on the root.
 - **Mixing.** BLEND moves lanes to the queued profile one at a time: drums, then bass, pad, lead. LAUNCH moves every
   unlocked lane at the next 4-bar phrase. LOCK keeps a lane where it is. The bass lane's profile sets the chords
   for everyone, so a half-blended mix stays in key.

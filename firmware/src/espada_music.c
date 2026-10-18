@@ -87,7 +87,8 @@ static int32_t snap(const tools_t *T, int32_t note)
 enum { S_DRIVE, S_PEDAL, S_OCTAVE,                       /* bass */
        S_EPIC, S_STAB, S_RIFF, S_MELODY,                 /* lead */
        S_STRINGS, S_SUS, S_LUSH, S_ARP, S_CHOP,          /* pad */
-       S_DEPIC, S_DTECH, S_DFUSION, S_DOLD };            /* drums */
+       S_DEPIC, S_DTECH, S_DFUSION, S_DOLD,              /* drums */
+       S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH };            /* the symphony: lead, strings, cellos, percussion */
 static const int8_t AEO[7] = {0, 2, 3, 5, 7, 8, 10}, ION[7] = {0, 2, 4, 5, 7, 9, 11}, DOR[7] = {0, 2, 3, 5, 7, 9, 10};
 typedef struct {
     const char *name;
@@ -95,6 +96,7 @@ typedef struct {
     int8_t prog[8][2];          /* root above the tonic, quality */
     uint8_t st[NLANE];          /* style per lane (LEAD, PAD, BASS, DRUMS; the sfx lane has its own generator) */
     uint8_t inst[NLANE];        /* suggested patch per lane, kit for the drums (sfx: unused) */
+    uint8_t hr;                 /* bars a chord (0 = 1) */
 } prof_t;
 /* from a study of 90s tracker music: orchestral minor, techno minor, melodic major with a chromatic turn,
  * the 4-channel sound with arpeggio chords */
@@ -107,6 +109,9 @@ static const prof_t PROF[] = {
      {S_RIFF, S_LUSH, S_PEDAL, S_DFUSION}, {9, 13, 1, 0}},
     {"OLDSKOOL", AEO, {{5, Q_MIN}, {3, Q_MAJ}, {1, Q_MAJ}, {5, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {0, Q_MIN}, {3, Q_MAJ}},
      {S_MELODY, S_ARP, S_OCTAVE, S_DOLD}, {8, 9, 0, 1}},
+    /* the orchestra: minor, two bars a chord, a dominant before the return */
+    {"SYMPHONY", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {5, Q_MIN}, {8, Q_MAJ}, {7, Q_MAJ}, {0, Q_MIN}},
+     {S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH}, {15, 5, 16, 0}, 2},
 };
 #define NPROF (int32_t)(sizeof PROF / sizeof PROF[0])
 
@@ -140,7 +145,11 @@ static void chord_of(int32_t s, int32_t deg, int32_t *root, int8_t *tones)
 /* ---- lanes and mixing */
 #define EMPTY (-128)
 typedef struct { int8_t k[32]; uint8_t len[32]; uint8_t kinds[32]; uint8_t on, bars; } upat_t;
-typedef struct { uint8_t prof, lock, dens; int8_t oct; upat_t up; } lane_t;
+typedef struct {
+    uint8_t prof, lock, dens; int8_t oct; upat_t up;
+    uint8_t mel, rhy, pit, chg;     /* MELODY 0..99 (which idea), RHYTHM, PITCH, CHANGE 0..100 */
+    uint8_t mute;                   /* ENV: faded out */
+} lane_t;
 static lane_t ln[NLANE];
 static const int32_t LBASE[NLANE] = {62, 50, 38, 0, 62}, LLO[NLANE] = {58, 45, 24, 0, 0}, LHI[NLANE] = {98, 86, 64, 0, 0};
 static const int32_t LORDER[NLANE] = {3, 2, 1, 0, 4};           /* blend order: drums first; sfx follows the bass */
@@ -154,6 +163,14 @@ static int32_t eff_prof(int32_t l, int32_t b)
     if (LORDER[l] < blend) return target;
     return ln[l].prof;
 }
+/* the profile's chord at bar b: its harmonic rhythm (bars a chord), and every other time round a B section (the
+ * progression's pairs swapped: 5 6 1 2 7 8 3 4), so 8 chords make a 16-chord form */
+static int32_t prof_chord(const prof_t *P, int32_t b)
+{
+    static const int8_t BSEC[8] = {4, 5, 0, 1, 6, 7, 2, 3};
+    int32_t hr = P->hr ? P->hr : 1, k = fdiv(b, hr), i = fmodp(k, 8);
+    return fmodp(fdiv(k, 8), 2) ? BSEC[i] : i;
+}
 static void harm_at(int32_t b, harm_t *H)
 {
     if (prog_sel > 0 && scale_sel > 0) {
@@ -163,7 +180,7 @@ static void harm_at(int32_t b, harm_t *H)
         harm_make(H, SCALES[scale_sel].pcs, SCALES[scale_sel].n, root, tones, 3);
     } else {
         const prof_t *P = &PROF[eff_prof(L_BASS, b)];
-        const int8_t *c = P->prog[fmodp(b, 8)];
+        const int8_t *c = P->prog[prof_chord(P, b)];
         harm_make(H, P->scale, 7, c[0], QUAL[(int)c[1]], QUAL_N[(int)c[1]]);
     }
 }
@@ -254,43 +271,73 @@ static void hits(gen_t *G, rng_t *r, int32_t k, const int8_t *pct)    /* a drum 
     for (s = 0; s < 16; s++) if (pct[s] && chance(r, pct[s])) DRUM(G, s, k);
 }
 
-/* a lead line that stays on the harmony: one motif a 4-bar phrase (rhythm + a contour of chord tones), heard,
- * answered (the same, or a chord tone higher), varied at its end, and closed on the root or third. Every beat
- * (steps 0 4 8 12) is a chord tone of the bar's chord; a note between beats is a passing or neighbour tone, one
- * scale step from the chord tone it leads into, so it always resolves. long: EPIC's slower rhythms. */
-static void lead_line(gen_t *G, const tools_t *T, int32_t b, int32_t p, int long_)
+/* ---- the generators' context: the lane's knobs and its bar keys (CHANGE folds the bar number: low, the material
+ * comes back soon; high, it keeps moving) */
+static const lane_t *GL;
+static int32_t g_style;                         /* the style generating now (densify asks) */
+static int32_t g_bk, g_ik;                      /* the bar key (all lanes), the idea key (the lead's motif) */
+static void keys_for(const lane_t *L, int32_t b)
 {
-    static const int8_t RL[4][6] = {{0, 6, 8, 12, -1, -1}, {0, 4, 8, 14, -1, -1}, {0, 8, 10, 12, -1, -1}, {0, 3, 6, 8, 12, -1}};
-    static const int8_t RS[4][10] = {{0, 2, 4, 6, 8, 10, 12, 14, -1, -1}, {0, 2, 3, 4, 6, 8, 10, 11, 12, 14},
-                                     {0, 3, 6, 8, 10, 12, 14, -1, -1, -1}, {0, 2, 4, 7, 8, 10, 12, -1, -1, -1}};
-    rng_t m = {hash3(b / 4, 31, p)}, v = {hash3(b, 37, p)};      /* m: the phrase's motif; v: this bar's touch */
-    int32_t on[10], c[10], n = 0, i, pos = b % 4, lift = 0, prev = -1000, cap = long_ ? 8 : 4;
-    const int8_t *rh = long_ ? RL[(rnd(&m) >> 16) * 4u >> 16] : RS[(rnd(&m) >> 16) * 4u >> 16];
-    for (i = 0; i < (long_ ? 6 : 10) && rh[i] >= 0; i++) on[n++] = rh[i];
-    c[0] = PICK(&m, 2, 3, 3, 4);                                    /* the contour, in chord tones (0 root, 3 octave) */
-    for (i = 1; i < n; i++) { c[i] = c[i - 1] + PICK(&m, -1, -1, 1, 1, 0, 2, -2); if (c[i] < 1) c[i] = 1; if (c[i] > 4) c[i] = 4; }
-    if (pos == 1 && chance(&m, 50)) lift = 1;                       /* the answer: a chord tone higher */
-    if (pos == 2) for (i = n - 2; i < n; i++) if (i > 0) c[i] = c[i] + PICK(&v, -1, 1);   /* varied at its end */
-    if (pos == 3) {                                                 /* the close: the first half, then a long landing */
-        int32_t land = chance(&m, 60) ? 8 : 12, k = 0;
+    int32_t c = L->chg;
+    g_bk = c < 10 ? b % 8 : c < 40 ? b % 16 : c < 70 ? b % 32 : b;
+    g_ik = c < 10 ? 0 : c < 40 ? b / 64 : c < 70 ? b / 32 : b / 16;
+}
+
+/* a lead in long arcs: a 16-bar section, two 8-bar periods. In a period the motif (one bar: a rhythm and a contour
+ * of chord tones) is stated (bar 1), answered upside down (2), sequenced a chord tone up (3) and closed open on the
+ * third or fifth (4, a half cadence, held); then stated again (5), driven to the period's highest notes (6, 7) and
+ * closed on the root (8, held). The second period climbs a step higher. Every beat is a chord tone; the notes between
+ * run by scale steps into the next beat's tone. RHYTHM picks slow, middle or busy rhythms (slow: a tier slower),
+ * PITCH the steps of the contour and the register, CHANGE how often the idea is new and how much a bar varies. */
+static void lead_long(gen_t *G, const tools_t *T, int32_t b, int32_t p, int slow)
+{
+    static const int8_t RH[3][4][10] = {
+        {{0, 8, -1}, {0, 6, 8, 12, -1}, {0, 4, 8, 12, -1}, {0, 8, 12, -1}},
+        {{0, 4, 6, 8, 12, -1}, {0, 3, 6, 8, 12, 14, -1}, {0, 4, 8, 10, 12, -1}, {0, 2, 4, 8, 12, -1}},
+        {{0, 2, 4, 6, 8, 10, 12, 14, -1}, {0, 2, 3, 4, 6, 8, 10, 11, 12, 14}, {0, 3, 6, 8, 10, 12, 14, -1}, {0, 1, 2, 4, 6, 8, 9, 10, 12, 14}}};
+    static const int8_t ARC[8] = {0, 0, 1, 0, 0, 1, 2, 0};          /* the period's shape: up to bar 7 */
+    const lane_t *L = GL;
+    rng_t m = {hash3(g_ik, 31 + L->mel * 7, p)}, v = {hash3(g_bk, 37 + L->mel, p)};
+    int32_t tier = (L->rhy < 34 ? 0 : L->rhy < 67 ? 1 : 2) - slow, pos = b % 8, per = (b / 8) % 2, i, n = 0, prev = -1000;
+    int32_t on[11], c[11], step = L->pit < 34 ? 1 : L->pit < 67 ? 2 : 3, reg = L->pit > 80 ? 1 : 0, lift;
+    const int8_t *rh;
+    if (tier < 0) tier = 0;
+    rh = RH[tier][(rnd(&m) >> 16) * 4u >> 16];
+    for (i = 0; i < 10 && rh[i] >= 0; i++) on[n++] = rh[i];
+    c[0] = PICK(&m, 2, 3, 3, 4) - 1;                                /* the motif's contour, in chord tones */
+    for (i = 1; i < n; i++) {
+        int32_t d = (int32_t)((rnd(&m) >> 16) * (uint32_t)(2 * step + 1) >> 16) - step;
+        c[i] = c[i - 1] + d;
+        if (c[i] < 0) c[i] = 0;
+        if (c[i] > 4) c[i] = 4;
+    }
+    lift = ARC[pos] + per + reg;
+    if (pos == 1 || pos == 5) for (i = 1; i < n; i++) c[i] = 2 * c[0] - c[i] < 0 ? 0 : 2 * c[0] - c[i];   /* the answer: upside down */
+    if (pos == 2 || pos == 6) for (i = 0; i < n; i++) c[i] += 1;    /* the sequence: a chord tone up */
+    if (pos != 3 && pos != 7 && n > 2 && chance(&v, L->chg / 3)) c[n - 1 - (int32_t)((rnd(&v) >> 16) * 2u >> 16)] += PICK(&v, -1, 1);
+    if (pos == 3 || pos == 7) {                                     /* the cadence: half the motif, then the landing */
+        int32_t land = slow || chance(&m, 50) ? 8 : 12, k = 0;
         for (i = 0; i < n && on[i] < land; i++) k++;
         n = k;
-        on[n] = land; c[n] = PICK(&m, 0, 1, 3); n++;
+        on[n] = land; c[n] = pos == 3 ? PICK(&m, 1, 2) : (chance(&m, 70) ? 0 : 3); n++;
+        lift = per + reg;
     }
     for (i = 0; i < n; i++) {
         int32_t note, st = on[i];
-        if (st % 4 == 0 || i == 0) note = ct(T, c[i] + lift);      /* on the beat: a chord tone */
+        if (pos == 7 && i == n - 1) note = ct(T, c[i] ? 3 : reg ? 3 : 0);   /* the close: the root (or its octave) */
+        else if (st % 4 == 0 || i == 0) note = ct(T, c[i] + lift);  /* on the beat: a chord tone */
         else {                                                      /* between: a scale run into the next beat's tone */
-            int32_t j = i + 1, k;
-            while (j < n && on[j] % 4) j++;                         /* the next note on a beat */
-            k = j - i;                                              /* steps away from it */
-            if (j < n) { int32_t nx = ct(T, c[j] + lift); note = move(T, nx, prev > nx ? k : -k); }
-            else note = move(T, prev, PICK(&v, -1, 1));             /* none left: a neighbour */
+            int32_t j = i + 1, k, nx;
+            while (j < n && on[j] % 4) j++;
+            k = j - i;
+            nx = j < n ? (pos == 7 && j == n - 1 ? ct(T, c[j] ? 3 : reg ? 3 : 0) : ct(T, c[j] + lift)) : 0;
+            if (j < n) note = move(T, nx, prev > nx ? k : -k);
+            else note = move(T, prev, PICK(&v, -1, 1));
         }
         NOTE(G, st, 1, note);
         prev = note;
     }
-    g_lens(G, pos == 3 ? 16 : cap);
+    g_lens(G, pos == 3 || pos == 7 ? 16 : slow ? 16 : 4);
 }
 
 static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p)
@@ -316,7 +363,7 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
         for (i = 0; i < 8; i++) NOTE(G, i * 2, 2, i == 6 && chance(r, 30) ? ct(T, 1) : ct(T, 0) + (i % 2 ? 12 : 0));
         break;
     case S_EPIC:                /* long lines on the chords */
-        lead_line(G, T, b, p, 1);
+        lead_long(G, T, b, p, 1);
         break;
     case S_STAB: {              /* syncopated chord stabs */
         static const int8_t PT[3][6] = {{0, 3, 6, 10, -1, -1}, {2, 6, 11, 14, -1, -1}, {0, 3, 8, 11, 14, -1}};
@@ -339,7 +386,7 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
             }
         break; }
     case S_MELODY:              /* 8ths and 16ths on the chords */
-        lead_line(G, T, b, p, 0);
+        lead_long(G, T, b, p, 0);
         break;
     case S_STRINGS:
         if (chance(r, 40)) { g_add(G, 0, 8, 3, ct(T, 0), ct(T, 1), ct(T, 2), 0); g_add(G, 8, 8, 3, ct(T, 0), ct(T, 1), ct(T, 2), 0); }
@@ -358,6 +405,34 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
         break;
     case S_ARP:
         g_add(G, 0, 16, 3, ct(T, 0), ct(T, 1), ct(T, 2), EV_ARP);
+        break;
+    case S_SYMLEAD:             /* the symphony's lead: long arcs, legato */
+        lead_long(G, T, b, p, 1);
+        break;
+    case S_ORCH: {              /* strings: open voicing (root, fifth, tenth); on a chord's first bar a suspension (the
+                                 * fourth) resolving half way; on its last the inner voice moves up a step; swells */
+        int32_t hr = PROF[p].hr ? PROF[p].hr : 1, first = b % hr == 0, last = b % hr == hr - 1;
+        int32_t third = T->H->nt == 3 && (T->H->tones[1] == 3 || T->H->tones[1] == 4), open = GL->pit >= 34;
+        int32_t lo = ct(T, 0), mid = open ? ct(T, 2) : ct(T, 1), hi = open ? ct(T, 4) : ct(T, 2);
+        uint32_t acc = b % 16 < 2 ? EV_ACC2 : b % 8 < 4 ? EV_ACC1 : 0;  /* softer as a section starts, full at its height */
+        if (first && third) { g_add(G, 0, 8, 3, lo, mid, open ? ct(T, 0) + 17 : ct(T, 0) + 5, acc); g_add(G, 8, 8, 3, lo, mid, hi, acc); }
+        else if (last && hr > 1) { g_add(G, 0, 8, 3, lo, mid, hi, acc); g_add(G, 8, 8, 3, lo, move(T, mid, 1), hi, acc); }
+        else g_add(G, 0, 16, 3, lo, mid, hi, acc);
+        break; }
+    case S_CELLO: {             /* cellos and basses: the root held (an octave under it when it is high enough); on a
+                                 * chord's last bar a walk down by step into the next; RHYTHM high: quarters in octaves */
+        int32_t hr = PROF[p].hr ? PROF[p].hr : 1, last = b % hr == hr - 1, root = ct(T, 0);
+        if (GL->rhy > 66) { for (s = 0; s < 16; s += 4) NOTE(G, s, 4, s % 8 ? root + 12 : root); break; }
+        if (last) { g_add(G, 0, 8, root - 12 >= 28 ? 2 : 1, root, root - 12, 0, 0); NOTE(G, 8, 4, move(T, root, -1)); NOTE(G, 12, 4, move(T, root, -2)); }
+        else g_add(G, 0, 16, root - 12 >= 28 ? 2 : 1, root, root - 12, 0, 0);
+        break; }
+    case S_DORCH:               /* orchestral percussion: timpani on the one, a roll into the phrase, the bass drum
+                                 * every other bar, a cymbal on the phrase; PITCH: timpani on three too */
+        DRUM(G, 0, DK_KETTLE);
+        if (GL->pit > 50 && b % 2) DRUM(G, 8, DK_KETTLE);
+        if (b % 2 == 0) { ev_t *e = DRUM(G, 0, DK_KICK); if (e) e->flags = EV_ACC1; }
+        if (b % 8 == 0) DRUM(G, 0, DK_CRASH);
+        if (b % 4 == 3) for (s = 12; s < 16; s++) { ev_t *e = DRUM(G, s, DK_KETTLE); if (e) e->flags = s == 15 ? 0 : s < 14 ? EV_ACC2 : EV_ACC1; }
         break;
     case S_CHOP: {              /* a chopped pad (a tracker re-strikes a long sample by offset): the chord every 16th, accented */
         static const uint8_t AC[3][16] = {{0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 1},
@@ -418,6 +493,9 @@ static void gen_sfx(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, 
             if (b % 4 == 0 && !drop && chance(r, x * 80 / 100)) SFX(G, 0, 16, SX_WASH, root);
             if (e > 200 && chance(r, x * 20 / 100)) SFX(G, 14, 1, SX_ZAP, root + 12);
             break;
+        case 4:                                                     /* SYMPHONY: a cymbal swell into each phrase */
+            if (b % 4 == 3 && !drop && chance(r, x)) SFX(G, 8, 8, SX_WASH, root);
+            break;
         default:                                                    /* OLDSKOOL: crackle under everything, bits */
             if (chance(r, x)) SFX(G, 0, 16, SX_CRACKLE, root);
             for (i = 0; i < 4; i++) if (chance(r, x * e / 256 * 30 / 100)) SFX(G, OFF[i] + 1, 1, SX_BITS, root);
@@ -466,6 +544,13 @@ static void densify(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t b, 
         return;
     }
     if (!x) return;
+    if (l == L_DRUMS && g_style == S_DORCH) {         /* more: a march snare, longer rolls */
+        if (x > 30) { DRUM(G, 4, DK_SNARE); DRUM(G, 12, DK_SNARE); if (chance(r, x)) DRUM(G, 14, DK_SNARE); }
+        if (b % 4 == 3) for (s = 8; s < 12; s++) if (chance(r, x)) { ev_t *e = DRUM(G, s, DK_KETTLE); if (e) e->flags = EV_ACC2; }
+        g_sort(G);
+        return;
+    }
+    if (l == L_PAD && g_style == S_ORCH) return;
     if (l == L_DRUMS) {
         uint32_t has[NDK] = {0};
         static const int8_t KS[7] = {2, 3, 6, 7, 10, 11, 14}, GS[6] = {1, 3, 5, 9, 11, 13};
@@ -539,6 +624,28 @@ static void densify(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t b, 
     }
 }
 
+/* PITCH on the other lanes: the bass jumps octaves more (or never), the pad's chords open up (the middle note an
+ * octave higher), the drums bring the timpani in on the off-beats */
+static void pitch_shape(int32_t l, gen_t *G, rng_t *r, const tools_t *T)
+{
+    int32_t pit = GL->pit, x = pit - 50;
+    uint32_t i;
+    if (l == L_BASS) {
+        for (i = 0; i < G->n; i++) {
+            ev_t *e = &G->ev[i];
+            if (e->n != 1 || e->st == 0) continue;
+            if (x > 10 && chance(r, x)) e->note[0] = (uint8_t)(e->note[0] + 12 > 70 ? e->note[0] : e->note[0] + 12);
+            else if (x < -10 && e->note[0] >= (uint8_t)(ct(T, 0) + 12)) e->note[0] = (uint8_t)(e->note[0] - 12);
+        }
+    } else if (l == L_PAD && g_style != S_ORCH && pit >= 67) {
+        for (i = 0; i < G->n; i++) if (G->ev[i].n == 3 && !(G->ev[i].flags & EV_ARP)) G->ev[i].note[1] = (uint8_t)(G->ev[i].note[1] + 12);
+    } else if (l == L_DRUMS && x > 10) {
+        static const int8_t OFF[4] = {3, 7, 11, 14};
+        for (i = 0; i < 4u; i++) if (chance(r, x)) { ev_t *e = DRUM(G, OFF[i], DK_KETTLE); if (e) e->flags = EV_ACC1; }
+        g_sort(G);
+    }
+}
+
 /* ---- one bar, all lanes */
 static void gen_bar(int32_t b, bar_t *B)
 {
@@ -551,21 +658,27 @@ static void gen_bar(int32_t b, bar_t *B)
     int next_drop = arc_at(b + 1).drop;
     for (l = 0; l < (int32_t)NLANE; l++) {
         int32_t p = eff_prof(l, b), dens = ln[l].dens;
-        rng_t r = {hash3(b, l, p)};
+        rng_t r;
         tools_t T;
         uint32_t i;
+        GL = &ln[l];
+        keys_for(GL, b);
+        g_style = -1;
+        r.a = hash3(g_bk, l, p) ^ ((uint32_t)GL->mel * 2654435761u);
         tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
         B->prof[l] = (uint8_t)p; B->inst[l] = PROF[p].inst[l]; B->user[l] = ln[l].up.on; B->cnt[l] = 0;
         B->muted[l] = (uint8_t)!lane_active(&A, l);
         if (B->muted[l]) continue;
         if (ln[l].up.on) user_bar(l, &G, &T, b);
         else if (l == L_SFX) gen_sfx(&G, &r, &T, b, p, dens, &A, next_drop);
-        else generate(PROF[p].st[l], &G, &r, &T, b, p);
+        else { g_style = PROF[p].st[l]; generate(g_style, &G, &r, &T, b, p); }
         if (A.mode != A_OFF) dens += (A.e - 154) * 80 / 256;
         dens += energy;
+        if (l != L_LEAD) dens += (GL->rhy - 50) * 4 / 5;            /* RHYTHM: busier or sparser (the lead: its rhythms) */
         if (dens < 0) dens = 0;
         if (dens > 100) dens = 100;
         if (l != L_SFX) densify(l, &G, &r, &T, b, dens);
+        if (!ln[l].up.on) pitch_shape(l, &G, &r, &T);
         if (A.drop && l == L_DRUMS) {
             int has_c = 0, has_k = 0;
             for (i = 0; i < G.n; i++) if (G.ev[i].st == 0) { if (G.ev[i].note[0] == DK_CRASH) has_c = 1; if (G.ev[i].note[0] == DK_KICK) has_k = 1; }
@@ -619,6 +732,7 @@ static void music_init(void)
     for (s = 0; s < NSLOT; s++) { bars[s][0].num = -1; bars[s][1].num = -1; }
     for (l = 0; l < NLANE; l++) {
         ln[l].prof = 0; ln[l].lock = 0; ln[l].dens = 50; ln[l].oct = 0;
+        ln[l].mel = 0; ln[l].rhy = 50; ln[l].pit = 50; ln[l].chg = 40; ln[l].mute = 0;
         ln[l].up.on = 0; ln[l].up.bars = 1;
         for (i = 0; i < 32u; i++) { ln[l].up.k[i] = EMPTY; ln[l].up.len[i] = 1; ln[l].up.kinds[i] = 0; }
     }
@@ -669,9 +783,13 @@ static void drop_release(void)
 static const char *const VARYN[6] = {"CLEAN", "ECHO", "SLIDE", "BITE", "FILTER", "STUTTER"};
 static int32_t vary_char[NLANE];
 static int32_t clamp100(int32_t v) { return v < 0 ? 0 : v > 100 ? 100 : v; }
+static int32_t fade_q8[NLANE] = {256, 256, 256, 256, 256};    /* ENV: each lane's fade, out or in over a bar */
+static uint32_t fade_ms;
 static void fx_apply(void)
 {
-    int32_t l, ph = cur_bar() / 4;
+    int32_t l, ph = cur_bar() / 4, dt = (int32_t)(fm1_ms - fade_ms), bar_ms = 240000 / (seq_bpm > 0 ? seq_bpm : 120);
+    fade_ms = fm1_ms;
+    if (dt > 100) dt = 100;
     for (l = 0; l < (int32_t)NLANE; l++) {
         const lanefx_t *U = &fxu[l];
         lanefx_t *F = &fx[l];
@@ -690,7 +808,11 @@ static void fx_apply(void)
         F->filt = filt < -100 ? -100 : filt > 100 ? 100 : filt; F->res = clamp100(res); F->wob = wob;
         F->bright = clamp100(bright); F->drive = clamp100(drive); F->slide = clamp100(slide);
         F->retrig = clamp100(retrig); F->rtg_rate = rate; F->crush = U->crush; F->echo = clamp100(echo);
-        F->level = U->level; F->inst = U->inst; F->vary = v;
+        {
+            int32_t to = ln[l].mute ? 0 : 256, st = dt * 256 / bar_ms + 1;
+            fade_q8[l] = fade_q8[l] < to ? (fade_q8[l] + st > to ? to : fade_q8[l] + st) : (fade_q8[l] - st < to ? to : fade_q8[l] - st);
+        }
+        F->level = U->level * fade_q8[l] >> 8; F->inst = U->inst; F->vary = v;
         vary_char[l] = c;
     }
 }
@@ -726,6 +848,7 @@ static void pat_fresh(int32_t l)
         harm_t H; tools_t T; rng_t r = {seed + (uint32_t)bi * 7919u};
         harm_at(bi, &H);
         tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
+        GL = &ln[l]; keys_for(GL, bi);
         if (l == L_SFX) { arc_t A = arc_at(bi); gen_sfx(&G, &r, &T, bi, eff_prof(L_SFX, bi), ln[l].dens, &A, arc_at(bi + 1).drop); }
         else generate(PROF[p].st[l], &G, &r, &T, bi, PROF[p].st[l] == S_RIFF ? (int32_t)(seed & 1023u) + 4 : p);
         for (i = 0; i < G.n; i++) {

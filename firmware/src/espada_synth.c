@@ -67,6 +67,8 @@ static const patch_t PATCH[] = {
     {"PIANO",   16,  700,  90, 450,   1, 2600,    0, 260, 0, 0, 1100},   /* 1:1, the hammer's brightness fades, rings out */
     {"E.PIANO", 224, 120,   0, 160,   1, 2500,    0, 300, 0, 0, 1500},   /* 14:1 tine on the attack, then a sine */
     {"CHAOS",   16,  520, 380, 400,   4, 3800,  230, 500, 1, 0,    0, 1},   /* a light saw + a heavy pad + brown noise */
+    {"VIOLINS", 32,  300, 160, 400,  60, 1800,  230, 350, 1, 0,    0, 2},   /* a section, singing: the symphony's lead */
+    {"CELLOS",  16,  320, 150, 300,  90, 2700,  220, 300, 1, 0,    0, 2},   /* cellos and basses, bowed */
 };
 #define NPATCH (sizeof PATCH / sizeof PATCH[0])
 

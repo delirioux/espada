@@ -28,7 +28,9 @@ Hold **SEL** to turn in steps of 10.
 | Page | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
 | MAIN | queue (the next profile) | blend | energy | space (the room) |
-| a channel (HOME) | its profile (SFX: its sound) | density | octave | level |
+| MIX (MAIN, FX) | lead level | pad level | bass level | drums level (PRESETS: sfx) |
+| a channel (HOME) | melody | rhythm | pitch | change (SFX: sound, rhythm, change, level) |
+| PART (EDIT twice) | its profile | density | octave | level |
 | FX | filter | resonance | wobble | drive |
 | FX 2 (FX again) | brightness | crush | vary | |
 | TRK (ARP) | slide | retrigger | rate | echo |
@@ -41,15 +43,15 @@ Hold **SEL** to turn in steps of 10.
 | Button | Does |
 | --- | --- |
 | HOME | the next channel: MAIN, LEAD, PAD, BASS, DRUMS, SFX; it keeps the page (BASS FX to DRUMS FX). SEL + HOME: MAIN |
-| FX | the channel's effects; again: FX 2; again: back. From MAIN: the last channel |
+| FX | the channel's effects; again: FX 2; again: back. On MAIN: the MIX page (the lanes' levels) |
 | ARP | the channel's tracker effects (again: back) |
-| EDIT | the channel's own pattern, step by step (again: back) |
+| EDIT | the channel's own pattern, step by step; again: PART (profile, density, octave, level); again: back |
 | GLO | the song: key, scale, chords; again: the arc; again: back |
 | PLAY | start / stop. SEL + PLAY: from the top |
 | SEQ | LAUNCH: every unlocked lane moves to the queued profile on the next phrase (again: cancel) |
 | REC | DROP, while playing: tap = a break from the next bar and the drop on the next phrase; hold = a break while held, the drop on the bar after you let go. The channel in view (MAIN: the last one) plays alone in the break. On EDIT: GRAB (what the lane plays now becomes its pattern); SEL + REC: clear it |
-| ENV | LOCK the channel (it keeps its profile when you blend or launch). On EDIT: TIE |
-| LFO | GENERATE a pattern for the channel (a variation of the one there). SEL + LFO: a fresh one |
+| ENV | MUTE the channel: it fades out over a bar; again: it fades back in. SEL + ENV: LOCK (it keeps its profile when you blend or launch). On EDIT: TIE |
+| LFO | a new idea for the channel from the next bar (MELODY moves on). On EDIT: GENERATE a pattern (a variation; SEL + LFO: a fresh one) |
 | OCT- / OCT+ | the keys' octave; both together: back to 0. On EDIT: the octave you enter in |
 | SAVE | keep everything (settings and patterns); while playing it waits until you stop. SEL + SAVE: the audio interrupt's time in the header |
 
@@ -58,14 +60,24 @@ lane, a save waiting, the keys' octave off 0.
 
 ## What the knobs do
 
+- **The four knobs of a channel** (as Tuna's): **MELODY** picks the idea: every position is its own melody, riff,
+  voicing or drum pattern, and turning back brings one back. **RHYTHM** goes from slow long notes to busy 16ths (on
+  the other lanes: sparser or busier). **PITCH** goes from small steps to wide leaps and a higher register (the bass
+  jumps octaves, the pad's chords open up, the drums bring in the timpani). **CHANGE** says how soon new material
+  comes: FROZEN (the same 16 bars over and over), 64, 32 or 16 bars. All of it from the next bar.
+- **Long arcs.** The lead thinks in 16-bar sections of two 8-bar periods: the motif stated, answered upside down,
+  sequenced a step up and closed open on the third or fifth; then stated again, driven to the period's highest
+  notes and closed on the root. The second period climbs higher. Every second time round the progression comes as a
+  B section (its pairs swapped), so 8 chords make a 16-chord form.
+
 - **Energy** (MAIN) adds to or takes from every lane's density at once: one knob for a build or a breakdown.
 - **Space** (MAIN) is the room: a stereo reverb the lanes send to, the pad and sfx most, the bass hardly.
 - **The arc** is off until you turn it on (GLO twice, knob 1). On: it starts with a few drum hits and builds bass,
   pad and lead in as the energy rises, breaks, drops and builds again; the ARC page draws it. DROP works without it.
 - **Blend** moves lanes to the queued profile from the bottom up: drums, then bass, pad, lead (the D B P L boxes).
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.
-- **Instrument:** AUTO (A:) follows the profile; or one of fifteen FM patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
-  STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS), or one of three drum kits (STANDARD,
+- **Instrument:** AUTO (A:) follows the profile; or one of seventeen FM patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
+  STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS, VIOLINS, CELLOS), or one of three drum kits (STANDARD,
   TRACKER, ELECTRO). RAZOR is a cutting, saw-like lead; PULSE a hollow one; PIANO and E.PIANO ring out. CHAOS is
   three sounds in one: a light saw lead, a heavy pad under it (two detuned oscillators, one an octave down, fading
   in slowly and out late) and brown noise that breathes with the pad.
@@ -84,6 +96,11 @@ lane, a save waiting, the keys' octave off 0.
   middle. STRINGS and BRASS play as sections (two more players a little out of tune) and the strings swell in.
   HYPERSPACE's pad is chopped: the chord struck every 16th with an accent pattern, as a tracker re-strikes a long
   pad sample.
+- **SYMPHONY**, the fifth profile, is the orchestra: two bars a chord in minor with a major dominant before the
+  return; strings in open voicing (root, fifth, tenth) with a suspension resolving on each new chord and the inner
+  voice moving on the last bar; a legato violin line in long arcs; cellos and basses holding the root and walking
+  down into the next chord; timpani on the one with a roll into each phrase, a bass drum every other bar, a cymbal
+  on the phrase and a cymbal swell (sfx) before it; a march snare when the energy is up.
 - **A channel's profile** sets that lane alone (MAIN's profile is the one blend and launch move to).
 - **The lead** follows the chords: every beat is a chord tone, the notes between lead into the next one by scale
   steps, and each 4-bar phrase states a motif, answers it, varies it and lands on the root or third. Density adds a
