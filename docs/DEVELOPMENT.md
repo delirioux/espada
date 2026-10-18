@@ -107,14 +107,18 @@ and publishes the site with the web installer. A tag `v*` makes a release with [
 
 In order of value; open to change as Espada is played.
 
-1. **Measured on the FM-1.** The interrupt's worst time with every profile, the room trimmed if needed.
-2. **Tuned by ear.** Patch levels, the orchestra's balance, the drums against the bass.
-3. **Scenes.** Save and recall a whole set: the profiles per lane, the four knobs, levels, mutes and your own
+1. **A new interface.** The panel grew page by page and it shows: pages hidden behind double presses (EDIT
+   twice, GLO twice, FX on MAIN), buttons that do different things per page, settings scattered over them.
+   Redesigned as a whole: a clear map of pages a channel, every button one job everywhere, the LEDs showing
+   where you are, every value readable at arm's length. Tried in the browser first, then on the FM-1.
+2. **Measured on the FM-1.** The interrupt's worst time with every profile, the room trimmed if needed.
+3. **Tuned by ear.** Patch levels, the orchestra's balance, the drums against the bass.
+4. **Scenes.** Save and recall a whole set: the profiles per lane, the four knobs, levels, mutes and your own
    parts, to move between them live.
-4. **More profiles in the style.** Slower and darker (ambient pads, a lone lead), faster (trance arpeggios), and
+5. **More profiles in the style.** Slower and darker (ambient pads, a lone lead), faster (trance arpeggios), and
    more of the S3M scene's moves: key changes up a step for the last chorus, a breakdown with only the pad.
-5. **MIDI clock.** Follow an external clock and send one, so Espada plays in time with other gear.
-6. **The SFX lane on MIDI.** Today only lead, pad, bass (channels 1 to 3) and the drums (10) go out.
+6. **MIDI clock.** Follow an external clock and send one, so Espada plays in time with other gear.
+7. **The SFX lane on MIDI.** Today only lead, pad, bass (channels 1 to 3) and the drums (10) go out.
 
 ## Release checklist
 
