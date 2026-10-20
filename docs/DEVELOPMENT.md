@@ -4,8 +4,8 @@ How Espada is made and where it is going: the agreements, how changes reach GitH
 and why, how to build and test it, the open risks and what comes next. What Espada is and how to play it is in
 the [README](../README.md) and the [manual](MANUAL.md); the chip's rules are in [RULES.md](RULES.md).
 
-Status: 18 October 2026. Version 0.1 runs on the FM-1; playing on the hardware is being tested. Five lanes,
-five profiles, long lead arcs, the browser version and the web installer are in.
+Status: 20 October 2026. Version 0.1 runs on the FM-1; playing on the hardware is being tested. Five lanes,
+five profiles, long lead arcs, the one-screen interface, the browser version and the web installer are in.
 
 ## Agreements
 
@@ -42,7 +42,7 @@ stand-in.
 | `firmware/src/espada.c` | the app's shared state (lanes, effects, the clock), includes the parts below |
 | `firmware/src/espada_synth.c` | the audio interrupt: FM voices (patches with ensembles), drums, sfx voices, the stereo buses and the room, lane effects, the step clock, MIDI out |
 | `firmware/src/espada_music.c` | harmony, scales and progressions, the profiles, the generators per style, the lead's long arcs, density, the arc, your own patterns, the bar cache, mute fades |
-| `firmware/src/espada_ui.c` | the screen, the views and pages, the cards, the panel, the LEDs, saving |
+| `firmware/src/espada_ui.c` | the screen (header, title, lanes, knobs), the groups and their settings, the panel, the LEDs, saving |
 | `firmware/src/platform.c` | Dinghy's wiring of the FM-1 platform |
 | `tests/host.c` | host mode: the platform as a stand-in; runs a script of buttons, encoders and keys over time, writes screens and a WAV |
 | `web/emu/espada_web.c` | the browser's stand-in: `web_*` exports for Felucca's browser FM-1 page |
@@ -70,6 +70,9 @@ stand-in.
   scale. ENERGY moves every lane at once.
 - **Muting fades.** ENV fades a lane out or in over a bar instead of cutting it.
 - **The room at half rate.** The stereo reverb runs at half the sample rate to fit the interrupt's budget.
+- **One screen, a mixing desk.** The FM-1's screen is small: every setting gets the whole width, the four lanes'
+  values side by side under the four knobs, all five lanes always in view. A group button picks the kind of setting
+  and PRESETS steps through it, so no page hides behind another. The keys only play.
 - **The arc is off until asked for.** Espada starts with all lanes playing. The arc (build, break, drop) is a
   setting, and DROP works without it.
 - **Settings are versioned.** A saved record with an older version is ignored rather than misread (now
@@ -107,10 +110,9 @@ and publishes the site with the web installer. A tag `v*` makes a release with [
 
 In order of value; open to change as Espada is played.
 
-1. **A new interface.** The panel grew page by page and it shows: pages hidden behind double presses (EDIT
-   twice, GLO twice, FX on MAIN), buttons that do different things per page, settings scattered over them.
-   Redesigned as a whole: a clear map of pages a channel, every button one job everywhere, the LEDs showing
-   where you are, every value readable at arm's length. Tried in the browser first, then on the FM-1.
+1. **The new interface on the FM-1.** One screen as a mixing desk: a group button (PLAY, SOUND, TRACKER, SONG),
+   PRESETS through its settings, KNOB 1..4 the setting for the four lanes side by side. Tried in the browser; next
+   played on the FM-1 and tuned: the order of the settings, what reads at arm's length.
 2. **Measured on the FM-1.** The interrupt's worst time with every profile, the room trimmed if needed.
 3. **Tuned by ear.** Patch levels, the orchestra's balance, the drums against the bass.
 4. **Scenes.** Save and recall a whole set: the profiles per lane, the four knobs, levels, mutes and your own

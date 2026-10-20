@@ -1,18 +1,19 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Espada's screen and panel, laid out as Tuna and Felucca do it:
+/* Espada's screen and panel: one overview, a mixing desk of settings.
  *
- *   header 0..20     where you are (MAIN, BASS, BASS FX ...), the bar in the phrase, the tempo
- *   cards 22..68     four cards: what KNOB 1..4 do here and their values, in the order the knobs sit
- *   panel 70..200    the lanes (MAIN: all five; a channel: its own, large), the step grid, the song, the arc
- *   footer 202..240  what PRESETS sets (MAIN: the queued profile; a channel: its sound), and messages
+ *   header 0..20     the group (PLAY, SOUND, TRACKER, SONG; EDIT and its lane), the bar in the phrase, the tempo
+ *   title 22..58     the setting in large letters, its place in the group, the status (launch, break, next)
+ *   lanes 58..148    all five lanes, always (SONG's KEY and ARC rows: the chords, the arc; EDIT: the step grid)
+ *   knobs 148..240   KNOB 1..4: the setting for LEAD, PAD, BASS, DRUMS (SONG: four song or sfx settings)
  *
- * Knobs: SELECT tempo, ALGORITHM the channel (MAIN, LEAD, PAD, BASS, DRUMS, SFX), PRESETS the sound, KNOB 1..4
- * the cards. SEL held: steps of 10.
- * Buttons: HOME the next channel (SEL+HOME: MAIN). FX the channel's effects (again: FX 2, again: back), ARP its
- * tracker effects, EDIT its steps, GLO the song (again: the arc). PLAY start/stop (SEL+PLAY: from the top), SEQ
- * launch, REC drop (tap or hold; EDIT: grab, SEL+REC: clear), ENV lock (EDIT: tie), LFO generate (SEL+LFO:
- * fresh), OCT-/OCT+ the keys' octave (both: reset), SAVE (SEL+SAVE: the audio interrupt's time).
- * Keys: play the channel in view (MAIN: the last one); on the EDIT page they enter steps. */
+ * A group is a button: HOME play, FX sound, ARP tracker effects, GLO song and sfx; pressed again, the next
+ * setting. PRESETS steps through the group's settings, ALGORITHM picks the lane the buttons act on (turning a
+ * lane's knob picks it too), SELECT the tempo. SEL held: steps of 10.
+ * Buttons: EDIT the lane's steps (again: back), PLAY start/stop (SEL+PLAY: from the top), SEQ launch, REC drop
+ * (tap or hold; EDIT: grab, SEL+REC: clear), ENV fade the lane out and in (SEL+ENV: lock; EDIT: tie), LFO a new
+ * idea (EDIT: generate, SEL+LFO: fresh), OCT-/OCT+ the keys' octave (both: reset), SAVE (SEL+SAVE: the audio
+ * interrupt's time).
+ * Keys: play the lane; on EDIT they enter steps. Never settings. */
 
 #define RGBC(h) RGB(((h) >> 16) & 255, ((h) >> 8) & 255, (h) & 255)
 #define SW(c) ((uint16_t)(((c) >> 8) | ((c) << 8)))
@@ -30,16 +31,17 @@ static const char *const SXNAME[NSX] = {"WASH", "RISER", "IMPACT", "ZAP", "CRACK
 
 #define NOWX 60
 #define PPS 4
-#define HEAD_H 20                   /* the header: where you are, the tempo, the bar in the phrase */
-#define CARD_Y 22                   /* four cards: what KNOB 1..4 do here, as the knobs sit on the panel */
-#define CARD_W 57
-#define CARD_H 46
-#define CARD_X(c) (3 + 59 * (int32_t)(c))
-#define PANEL_Y 70                  /* the panel: the lanes, the step grid, the song */
-#define PANEL_H 130
-#define LH 24                       /* MAIN: five lanes of 24 + 2 */
-#define GAP 2
-#define FOOT_Y 202                  /* the footer: what PRESETS sets, and messages */
+#define HEAD_H 20                   /* the header: the group, the tempo, the bar in the phrase */
+#define TITLE_Y 22                  /* the setting, large */
+#define TITLE_H 36
+#define LANE_Y 58                   /* five lanes of 17 + 1 */
+#define LH 17
+#define GAP 1
+#define LANES_H 90
+#define KNOB_Y 148                  /* KNOB 1..4, as the knobs sit on the panel */
+#define KNOB_H 92
+#define COL_W 60
+static int32_t pan_y = LANE_Y, pan_h = LANES_H;    /* where the step grid, the song and the arc draw */
 
 /* ---- the strip canvas */
 #define STRIP_H 46u
@@ -143,10 +145,11 @@ static char *s_int(char *d, int32_t v)
 static char *s_pct(char *d, int32_t v) { d = s_int(d, v); return s_cat(d, "%"); }
 static char *s_sign(char *d, int32_t v) { if (v >= 0) *d++ = '+'; return s_int(d, v); }
 
-/* ---- UI state: the view (0 = MAIN, 1.. = a channel: lane + 1) and its page */
-enum { PG_HOME, PG_PART, PG_FX, PG_FX2, PG_TRK, PG_EDIT, PG_MIX, PG_SONG, PG_SONG2, NPG };   /* (MIX: MAIN's) */
-static const char *const PGN[NPG] = {"", "PART", "FX", "FX 2", "TRK", "EDIT", "MIX", "SONG", "ARC"};
-static int32_t page = PG_HOME, back_page = PG_HOME, sel = L_LEAD, view = 0, debug_on;
+/* ---- UI state: the group, the setting in each group, the lane the buttons act on, EDIT */
+enum { G_PLAY, G_SOUND, G_TRK, G_SONG, NGRP };
+static const char *const GNAME[NGRP] = {"PLAY", "SOUND", "TRACKER", "SONG"};
+static const uint16_t GCOL[NGRP] = {RGBC(0xefe6c8), RGBC(0x9ad04a), RGBC(0x6aa0ff), RGBC(0x3fe0e0)};
+static int32_t grp = G_PLAY, rowi[NGRP], edit_on, sel = L_LEAD, debug_on;
 static int32_t last_enc = -1, area_dirty = 1, kb_oct;
 static uint32_t last_enc_ms, keys_down;
 static int32_t cursor, entry_len = 1, entry_oct;
@@ -176,11 +179,11 @@ typedef void (*turn_fn)(int32_t d);
 typedef void (*val_fn)(char *o);
 typedef struct { const char *name; turn_fn turn; val_fn val, sub; } card_t;
 static int32_t clampi(int32_t v, int32_t a, int32_t b) { return v < a ? a : v > b ? b : v; }
-static void go_view(int32_t v)
+static void set_sel(int32_t l)
 {
-    view = fmodp(v, (int32_t)NLANE + 1);
-    if (view) { sel = view - 1; cursor = clampi(cursor, 0, ln[sel].up.bars * 16 - 1); if (page == PG_MIX) page = PG_HOME; }
-    else if (page < PG_SONG) page = PG_HOME;
+    if (l == sel) return;
+    sel = fmodp(l, NLANE);
+    cursor = clampi(cursor, 0, ln[sel].up.bars * 16 - 1);
     area_dirty = 1;
 }
 static void t_lprof(int32_t d) { ln[sel].prof = (uint8_t)fmodp(ln[sel].prof + (d > 0 ? 1 : -1), NPROF); invalidate(); }
@@ -202,9 +205,8 @@ static void t_inst(int32_t d)
 }
 static void v_inst(char *o) { if (sel == L_SFX && fxu[sel].inst < 0) s_cat(o, "AUTO"); else s_cat(o, inst_name(sel, inst_eff(sel))); }
 static void s_inst(char *o) { if (fxu[sel].inst < 0 && sel != L_SFX) s_cat(o, "AUTO"); }
-static void t_tempo(int32_t d) { set_bpm(seq_bpm + d); }
-static void v_tempo(char *o) { o = s_int(o, seq_bpm); s_cat(o, " BPM"); }
-static void v_filt(char *o) { int32_t f = fxu[sel].filt; if (!f) s_cat(o, "OFF"); else { o = s_cat(o, f < 0 ? "LP " : "HP "); s_pct(o, f < 0 ? -f : f); } }
+static void v_filt(char *o) { int32_t f = fxu[sel].filt; if (!f) s_cat(o, "OFF"); else s_pct(o, f < 0 ? -f : f); }
+static void s_filt(char *o) { int32_t f = fxu[sel].filt; s_cat(o, f < 0 ? "LOWPASS" : f > 0 ? "HIGHPASS" : ""); }
 static void t_filt(int32_t d) { fxu[sel].filt = clampi(fxu[sel].filt + d, -100, 100); }
 static void t_res(int32_t d) { fxu[sel].res = clampi(fxu[sel].res + d, 0, 100); }
 static void v_res(char *o) { s_pct(o, fxu[sel].res); }
@@ -259,13 +261,6 @@ static void numeral(char *o, int32_t root, const int8_t *t)
     else if (t[2] == 8) *o++ = '+';
     *o = 0;
 }
-static void prog_text(char *o, int32_t ps)
-{
-    const int8_t *P = prog_of(ps);
-    int32_t i, root; int8_t t[3];
-    for (i = 0; i < 4; i++) { chord_of(scale_sel, P[i], &root, t); numeral(o, root, t); while (*o) o++; if (i < 3) *o++ = ' '; }
-    *o = 0;
-}
 static void t_prog(int32_t d)
 {
     if (!scale_sel) scale_sel = 2;                          /* a progression needs a scale: start from minor */
@@ -297,57 +292,70 @@ static void v_rhy(char *o) { s_pct(o, ln[sel].rhy); }
 static void s_rhy(char *o) { s_cat(o, ln[sel].rhy < 34 ? "SLOW" : ln[sel].rhy < 67 ? "MIDDLE" : "BUSY"); }
 static void t_pit(int32_t d) { ln[sel].pit = (uint8_t)clampi(ln[sel].pit + d, 0, 100); invalidate(); }
 static void v_pit(char *o) { s_pct(o, ln[sel].pit); }
-static void s_pit(char *o) { s_cat(o, ln[sel].pit < 34 ? "STEPS" : ln[sel].pit < 67 ? "LEAPS" : ln[sel].pit > 80 ? "HIGH" : "WIDE"); }
+static void s_pit(char *o)
+{
+    if (HITS(sel)) { s_cat(o, ln[sel].pit > 60 ? "TIMPANI" : ""); return; }       /* the drums: timpani on the off-beats */
+    s_cat(o, ln[sel].pit < 34 ? "STEPS" : ln[sel].pit < 67 ? "LEAPS" : ln[sel].pit > 80 ? "HIGH" : "WIDE");
+}
 static void t_chg(int32_t d) { ln[sel].chg = (uint8_t)clampi(ln[sel].chg + d, 0, 100); invalidate(); }
 static void v_chg(char *o) { s_pct(o, ln[sel].chg); }
 static void s_chg(char *o) { s_cat(o, ln[sel].chg < 10 ? "FROZEN" : ln[sel].chg < 40 ? "64 BARS" : ln[sel].chg < 70 ? "32 BARS" : "16 BARS"); }
-/* the mixer (MAIN, FX): the four lanes' levels; PRESETS the sfx */
-static void t_mix(int32_t l, int32_t d) { fxu[l].level = clampi(fxu[l].level + d, 0, 100); }
-static void t_mix0(int32_t d) { t_mix(0, d); }
-static void t_mix1(int32_t d) { t_mix(1, d); }
-static void t_mix2(int32_t d) { t_mix(2, d); }
-static void t_mix3(int32_t d) { t_mix(3, d); }
-static void v_mixl(char *o, int32_t l) { if (ln[l].mute) s_cat(o, "OFF"); else s_pct(o, fxu[l].level); }
-static void v_mix0(char *o) { v_mixl(o, 0); }
-static void v_mix1(char *o) { v_mixl(o, 1); }
-static void v_mix2(char *o) { v_mixl(o, 2); }
-static void v_mix3(char *o) { v_mixl(o, 3); }
 static void t_auto(int32_t d) { auto_drop = d > 0; invalidate(); }
 static void v_auto(char *o) { s_cat(o, auto_drop ? "ON" : "OFF"); }
 
 
-/* the four cards of each page: KNOB 1..4 */
-static const card_t CARDS[NPG][4] = {
-    {{"MELODY", t_mel, v_mel, 0}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"PITCH", t_pit, v_pit, s_pit}, {"CHANGE", t_chg, v_chg, s_chg}},
-    {{"PROFILE", t_lprof, v_lprof, 0}, {"DENSITY", t_dens, v_dens, 0}, {"OCTAVE", t_oct, v_oct, 0}, {"LEVEL", t_level, v_level, 0}},
-    {{"FILTER", t_filt, v_filt, 0}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0}},
-    {{"BRIGHT", t_bright, v_bright, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary}, {0, 0, 0, 0}},
-    {{"SLIDE", t_slide, v_slide, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}, {"ECHO", t_echo, v_echo, 0}},
-    {{"STEP", t_step, v_step, 0}, {"LENGTH", t_len, v_len, 0}, {"BARS", t_bars, v_bars, 0}, {"PATTERN", t_use, v_use, 0}},
-    {{"LEAD", t_mix0, v_mix0, 0}, {"PAD", t_mix1, v_mix1, 0}, {"BASS", t_mix2, v_mix2, 0}, {"DRUMS", t_mix3, v_mix3, 0}},
-    {{"KEY", t_key, v_key, 0}, {"SCALE", t_scale, v_scale, 0}, {"CHORDS", t_prog, v_prog, 0}, {"BARS/CH", t_bpc, v_bpc, 0}},
-    {{"ARC", t_arc, v_arc, 0}, {"BUILD", t_build, v_build, s_phr}, {"PEAK", t_peak, v_peak, s_phr}, {"AUTODROP", t_auto, v_auto, 0}},
+/* ---- the settings. A lane group's setting is one row of the desk: KNOB 1..4 set it for LEAD, PAD, BASS, DRUMS.
+ * SONG's rows are four settings each, of the song or of the sfx lane. The functions act on `sel`: drawing sets it
+ * for the column and puts it back, turning a lane's knob leaves it there (the lane you touch is the lane). */
+static const card_t ROW_PLAY[] = {
+    {"MELODY", t_mel, v_mel, 0}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"PITCH", t_pit, v_pit, s_pit}, {"CHANGE", t_chg, v_chg, s_chg},
+    {"DENSITY", t_dens, v_dens, 0}, {"OCTAVE", t_oct, v_oct, 0}, {"PROFILE", t_lprof, v_lprof, 0}, {"SOUND", t_inst, v_inst, s_inst},
+    {"LEVEL", t_level, v_level, 0}};
+static const card_t ROW_SOUND[] = {
+    {"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0},
+    {"BRIGHT", t_bright, v_bright, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary}};
+static const card_t ROW_TRK[] = {
+    {"SLIDE", t_slide, v_slide, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}, {"ECHO", t_echo, v_echo, 0}};
+typedef struct { const char *name; int8_t lane; card_t c[4]; } srow_t;     /* lane: -1 the song, else that lane's */
+enum { SR_LIVE, SR_KEY, SR_ARC, SR_SFX };
+static const srow_t ROW_SONG[] = {
+    {"LIVE", -1, {{"QUEUE", t_prof, v_prof, 0}, {"BLEND", t_blend, v_blend, s_blend}, {"ENERGY", t_energy, v_energy, 0}, {"SPACE", t_space, v_space, 0}}},
+    {"KEY", -1, {{"KEY", t_key, v_key, 0}, {"SCALE", t_scale, v_scale, 0}, {"CHORDS", t_prog, v_prog, 0}, {"BARS/CH", t_bpc, v_bpc, 0}}},
+    {"ARC", -1, {{"ARC", t_arc, v_arc, 0}, {"BUILD", t_build, v_build, s_phr}, {"PEAK", t_peak, v_peak, s_phr}, {"AUTODROP", t_auto, v_auto, 0}}},
+    {"SFX", L_SFX, {{"SOUND", t_inst, v_inst, 0}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"CHANGE", t_chg, v_chg, s_chg}, {"LEVEL", t_level, v_level, 0}}},
+    {"SFX PART", L_SFX, {{"PROFILE", t_lprof, v_lprof, 0}, {"DENSITY", t_dens, v_dens, 0}, {"MELODY", t_mel, v_mel, 0}, {"VARY", t_vary, v_vary, s_vary}}},
+    {"SFX FX", L_SFX, {{"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0}}},
+    {"SFX FX 2", L_SFX, {{"CRUSH", t_crush, v_crush, 0}, {"ECHO", t_echo, v_echo, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}}},
 };
-static const card_t CARDS_MAIN[4] = {
-    {"QUEUE", t_prof, v_prof, 0}, {"BLEND", t_blend, v_blend, s_blend}, {"ENERGY", t_energy, v_energy, 0}, {"SPACE", t_space, v_space, 0}};
-static const card_t CARDS_SFX[4] = {
-    {"SOUND", t_inst, v_inst, 0}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"CHANGE", t_chg, v_chg, s_chg}, {"LEVEL", t_level, v_level, 0}};
-static const card_t *card_at(int32_t c)
+static const card_t ROW_EDIT[4] = {{"STEP", t_step, v_step, 0}, {"LENGTH", t_len, v_len, 0}, {"BARS", t_bars, v_bars, 0}, {"PATTERN", t_use, v_use, 0}};
+#define NROWS_OF(a) ((int32_t)(sizeof(a) / sizeof(a[0])))
+static int32_t nrows(int32_t g) { return g == G_PLAY ? NROWS_OF(ROW_PLAY) : g == G_SOUND ? NROWS_OF(ROW_SOUND) : g == G_TRK ? NROWS_OF(ROW_TRK) : NROWS_OF(ROW_SONG); }
+static const char *row_name(void)
 {
-    if (page >= PG_SONG) return &CARDS[page][c];
-    if (!view) return page == PG_MIX ? &CARDS[PG_MIX][c] : &CARDS_MAIN[c];
-    if (page == PG_HOME && sel == L_SFX) return &CARDS_SFX[c];
-    return &CARDS[page][c];
+    int32_t r = rowi[grp];
+    return grp == G_PLAY ? ROW_PLAY[r].name : grp == G_SOUND ? ROW_SOUND[r].name : grp == G_TRK ? ROW_TRK[r].name : ROW_SONG[r].name;
 }
-/* where you are: MAIN, BASS, BASS FX, ..., SONG; and its colour */
-static void where(char *o)
+/* what KNOB c does now, and for which lane (-1: the song) */
+static const card_t *knob_card(int32_t c, int32_t *lane)
 {
-    if (page >= PG_SONG) { s_cat(o, PGN[page]); return; }
-    if (!view) { s_cat(o, page == PG_MIX ? "MIX" : "MAIN"); return; }
-    o = s_cat(o, LNAME[sel]);
-    if (page != PG_HOME) { o = s_cat(o, " "); s_cat(o, PGN[page]); }
+    int32_t r = rowi[grp];
+    if (edit_on) { *lane = sel; return &ROW_EDIT[c]; }
+    if (grp == G_SONG) { *lane = ROW_SONG[r].lane; return &ROW_SONG[r].c[c]; }
+    *lane = c;
+    return grp == G_PLAY ? &ROW_PLAY[r] : grp == G_SOUND ? &ROW_SOUND[r] : &ROW_TRK[r];
 }
-static uint16_t where_col(void) { return page >= PG_SONG ? RGBC(0xb49bff) : view ? LCOL[sel] : C_CYAN; }
+static void card_text(const card_t *C, int32_t lane, char *v, char *sb)
+{
+    int32_t keep = sel;
+    v[0] = sb[0] = 0;
+    if (!C->name) return;
+    if (lane >= 0) sel = lane;
+    C->val(v);
+    if (C->sub) C->sub(sb);
+    sel = keep;
+}
+static uint16_t knob_col(int32_t c, int32_t lane) { return edit_on ? LCOL[sel] : grp == G_SONG ? (lane >= 0 ? LCOL[lane] : GCOL[G_SONG]) : LCOL[c]; }
+static uint16_t head_col(void) { return edit_on ? LCOL[sel] : GCOL[grp]; }
 
 /* ---- drawing: the lanes */
 static int32_t pos16;                                       /* the play head, in steps Q16 */
@@ -361,7 +369,7 @@ static void shape(int32_t x, int32_t y, int32_t w, int32_t h, int past, int ghos
 }
 static int32_t note_y(int32_t l, int32_t y, int32_t h, int32_t n)
 {
-    int32_t yy = y + h - 6 - (n - LLO[l]) * (h - 16) / (LHI[l] - LLO[l]);
+    int32_t big = h > 40, yy = y + h - (big ? 6 : 5) - (n - LLO[l]) * (h - (big ? 16 : 9)) / (LHI[l] - LLO[l]);
     if (fxu[l].crush > 0) { int32_t q = 1 + fxu[l].crush * 5 / 100; yy = (yy + q / 2) / q * q; }
     return yy;
 }
@@ -375,7 +383,7 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
     const bar_t *Bc = bar_get(cur_bar());
     if (y >= cy0 + chh || y + h + GAP <= cy0) return;
     for (r = 0; r < h; r++) {                                       /* the copper bar */
-        int32_t a = (big ? 44 : 26) + flash * 56, tri = 256 - (r > h / 2 ? r - h / 2 : h / 2 - r) * 256 / (h / 2);
+        int32_t a = (big ? 44 : l == sel ? 48 : 22) + flash * 56, tri = 256 - (r > h / 2 ? r - h / 2 : h / 2 - r) * 256 / (h / 2);
         fill(0, y + r, 240, 1, cscale(col, a * tri >> 8));
     }
     b0 = (pos16 >> 16) / 16 - 1; if (b0 < 0) b0 = 0;
@@ -440,14 +448,15 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
         if (yc > y + h) yc = y + h;
         if (lp) darken(0, y, 240, yc - y, 97); else darken(0, yc, 240, y + h - yc, 97);
         fill(0, yc - fx[l].res / 50, 240, 1 + fx[l].res / 50, cscale(col, 115 + fx[l].res * 140 / 100));
-        { int32_t ty = clampi(lp ? yc + 3 : yc - 13, y + 2, y + h - 12); fill(213, ty - 2, 20, 14, C_BG); text(215, ty, lp ? "LP" : "HP", col, 1); }
+        if (big) { int32_t ty = clampi(lp ? yc + 3 : yc - 13, y + 2, y + h - 12); fill(213, ty - 2, 20, 14, C_BG); text(215, ty, lp ? "LP" : "HP", col, 1); }
     }
     if (Bc && Bc->muted[l]) darken(0, y, NOWX, h, 140);
     if (ln[l].mute) darken(0, y, 240, h, 90);                       /* ENV: faded out */
-    if (!big) {                                                     /* MAIN: the name; locked: inverted */
+    if (!big) {                                                     /* the overview: the name; locked: inverted */
         int lock = ln[l].lock && l != L_SFX;
-        fill(1, y + (h - 14) / 2, tw(LNAME[l], 1) + 5, 14, lock ? C_CREAM : C_BG);
-        text(3, y + (h - 14) / 2 + 2, LNAME[l], lock ? C_BG : ln[l].mute ? cscale(col, 90) : col, 1);
+        fill(2, y + (h - 14) / 2, tw(LNAME[l], 1) + 5, 14, lock ? C_CREAM : C_BG);
+        text(4, y + (h - 14) / 2 + 2, LNAME[l], lock ? C_BG : ln[l].mute ? cscale(col, 90) : col, 1);
+        if (l == sel) fill(0, y, 2, h, C_WHITE);                   /* the lane the buttons and keys act on */
     } else {
     fill(1, y + 1, tw(LNAME[l], 1) + 5, 14, C_BG);                 /* the label: name */
     text(3, y + 3, LNAME[l], col, 1);
@@ -466,11 +475,11 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
     if (big || l == 0) { fill(NOWX - 3, y, 7, 1, C_WHITE); fill(NOWX - 2, y + 1, 5, 1, C_WHITE); fill(NOWX - 1, y + 2, 3, 1, C_WHITE); }
 }
 
-/* ---- drawing: the EDIT page (a step grid) and the SONG page, in strips over the lane area */
+/* ---- drawing: EDIT (a step grid), the chords (SONG KEY) and the arc (SONG ARC), in strips over the lane area */
 static void draw_edit_area(void)
 {
     const upat_t *U = &ln[sel].up;
-    int32_t n = U->bars * 16, x0 = 16, cwq = (220 << 8) / n, top = PANEL_Y + 1, h = PANEL_H - 2, hits = HITS(sel);
+    int32_t n = U->bars * 16, x0 = 16, cwq = (220 << 8) / n, top = pan_y + 1, h = pan_h - 2, hits = HITS(sel);
     int32_t rows = sel == L_DRUMS ? NDK : sel == L_SFX ? NSX : 18, rh = h / rows, i, s;
     uint16_t col = LCOL[sel];
 #define CX(s) (x0 + (((s) * cwq) >> 8))
@@ -497,65 +506,56 @@ static void draw_edit_area(void)
 static void draw_song_area(void)
 {
     char t[48];
-    int32_t auto_ = prog_sel == 0, i, n, cur, per, bw, y0 = PANEL_Y;
+    int32_t auto_ = prog_sel == 0, i, n, cur, per, bw, y0 = pan_y;
     int32_t roots[8]; int8_t tones[8][3];
-    text(6, y0 + 6, NN[key], C_CYAN, 2);
+    text(6, y0 + 8, NN[key], C_CYAN, 2);
     t[0] = 0;
     if (auto_) { char *o = s_cat(t, "PROFILE "); s_cat(o, PROF[ln[L_BASS].prof].name); } else s_cat(t, SCALES[scale_sel].name);
     text(48, y0 + 6, t, C_CREAM, 1);
     t[0] = 0;
     if (auto_) s_cat(t, "ITS OWN CHORDS"); else { char *o = s_int(t, bpc); s_cat(o, bpc == 1 ? " BAR A CHORD" : " BARS A CHORD"); }
     text(48, y0 + 20, t, C_MUTE, 1);
-    {                                                       /* the suggestions, the chosen one in the middle */
-        int32_t j;
-        for (j = -1; j <= 1; j++) {
-            int32_t k = prog_sel + j, yy = y0 + 38 + (j + 1) * 15;
-            if (k < 0 || k > (auto_ ? 0 : NPROG)) continue;
-            t[0] = 0;
-            if (k == 0) s_cat(t, "FROM THE PROFILE"); else prog_text(t, k - 1);
-            if (!j) { fill(4, yy, 232, 14, C_GRID); fill(4, yy, 3, 14, C_CYAN); }
-            text(12, yy + 2, t, j ? C_DIMG : C_WHITE, 1);
-        }
-    }
     if (auto_) { const prof_t *P = &PROF[ln[L_BASS].prof]; n = 8; for (i = 0; i < 8; i++) { int32_t q = P->prog[i][1], k; roots[i] = P->prog[i][0]; for (k = 0; k < 3; k++) tones[i][k] = k < QUAL_N[q] ? QUAL[q][k] : 0; if (QUAL_N[q] == 2) tones[i][2] = 7, tones[i][1] = 7; } }
     else { const int8_t *P = prog_of(prog_sel - 1); n = 4; for (i = 0; i < 4; i++) chord_of(scale_sel, P[i], &roots[i], tones[i]); }
     cur = auto_ ? prof_chord(&PROF[ln[L_BASS].prof], cur_bar()) : (cur_bar() / bpc) % n;
     per = n > 4 ? 4 : n; bw = (232 - (per - 1) * 4) / per;
     for (i = 0; i < n; i++) {                               /* the chords; the one playing lit */
-        int32_t big = n <= 4, hh = big ? 31 : 20, x = 4 + (i % per) * (bw + 4), yy = y0 + 86 + (i / per) * (hh + 2), on = seq_playing && i == cur;
+        int32_t big = n <= 4, hh = big ? 40 : 24, x = 4 + (i % per) * (bw + 4), yy = y0 + 38 + (i / per) * (hh + 2), on = seq_playing && i == cur;
         char *o = t;
         o = s_cat(o, NN[(key + roots[i]) % 12]);
         s_cat(o, tones[i][1] == 7 ? "5" : tones[i][2] == 6 ? "dim" : tones[i][2] == 8 ? "+" : tones[i][1] == 3 ? "m" : "");
         fill(x, yy, bw, hh, on ? C_CYAN : RGBC(0x1b2928));
-        textc(x + bw / 2, yy + 5, t, on ? C_BG : C_CREAM, 1);
-        if (big) { numeral(t, roots[i], tones[i]); textc(x + bw / 2, yy + 18, t, on ? C_BG : C_MUTE, 1); }
+        textc(x + bw / 2, yy + (big ? 7 : 7), t, on ? C_BG : C_CREAM, 1);
+        if (big) { numeral(t, roots[i], tones[i]); textc(x + bw / 2, yy + 23, t, on ? C_BG : C_MUTE, 1); }
     }
 }
-/* the ARC page: the energy over the coming bars, the phases in colour */
+/* the arc: the energy over the coming bars, the phases in colour */
 static const uint16_t MODEC[5] = {RGBC(0x5d7370), RGBC(0x3fe0e0), C_WHITE, RGBC(0xffb04a), RGBC(0xb49bff)};
 static void draw_arc_area(void)
 {
-    int32_t b, cb = cur_bar(), base = PANEL_Y + PANEL_H - 22;
+    int32_t b, cb = cur_bar(), base = pan_y + pan_h - 20;
     static const char *const MN[5] = {"OFF", "BUILD", "BREAK", "PEAK", "DOWN"};
     int32_t m;
-    if (!arc_on) { textc(120, PANEL_Y + 50, "THE ARC IS OFF", C_MUTE, 1); textc(120, PANEL_Y + 68, "KNOB 1 TURNS IT ON", C_DIMG, 1); return; }
+    if (!arc_on) { textc(120, pan_y + 30, "THE ARC IS OFF", C_MUTE, 1); textc(120, pan_y + 48, "KNOB 1 TURNS IT ON", C_DIMG, 1); return; }
     for (b = 0; b < 58; b++) {
         arc_t A = arc_at(cb + b);
-        int32_t hgt = 2 + A.e * (PANEL_H - 40) / 256;
+        int32_t hgt = 2 + A.e * (pan_h - 30) / 256;
         fill(4 + b * 4, base - hgt, 3, hgt, b ? MODEC[A.mode] : C_WHITE);
     }
-    for (m = 1; m < 5; m++) { fill(8 + (m - 1) * 58, base + 9, 8, 8, MODEC[m]); text(20 + (m - 1) * 58, base + 8, MN[m], C_MUTE, 1); }
+    for (m = 1; m < 5; m++) { fill(8 + (m - 1) * 58, base + 7, 8, 8, MODEC[m]); text(20 + (m - 1) * 58, base + 6, MN[m], C_MUTE, 1); }
 }
 
-/* ---- header, cards, footer */
+/* ---- header, title, knobs */
 static void draw_header(void)
 {
     char t[40], wh[24];
     int32_t cb = cur_bar(), cw, i, x;
-    wh[0] = 0; where(wh);
+    uint16_t hc = head_col();
+    wh[0] = 0;
+    if (edit_on) { char *o = s_cat(wh, "EDIT "); s_cat(o, LNAME[sel]); } else s_cat(wh, GNAME[grp]);
     cw = tw(wh, 1) + 6;
     cs_begin(0, HEAD_H + 2, C_BG);
-    fill(0, 0, cw, 15, where_col());
+    fill(0, 0, cw, 15, hc);
     text(3, 3, wh, C_BG, 1);
     t[0] = 0;
     if (debug_on) { char *o = s_cat(t, "ISR "); o = s_int(o, (int32_t)isr_us_max); s_cat(o, "US"); }
@@ -564,106 +564,130 @@ static void draw_header(void)
     text(x, 3, t, debug_on ? C_WHITE : C_CREAM, 1);
     for (i = 0; i < 4; i++) {                                       /* the bar in the phrase */
         int32_t on = seq_playing && cb % 4 == i;
-        fill(x - 50 + i * 11, 4, 9, 9, on ? where_col() : seq_playing && cb % 4 > i ? cscale(where_col(), 90) : RGBC(0x1d2b2b));
+        fill(x - 50 + i * 11, 4, 9, 9, on ? hc : seq_playing && cb % 4 > i ? cscale(hc, 90) : RGBC(0x1d2b2b));
     }
-    fill(0, HEAD_H, 240, 1, cscale(where_col(), 90));
+    fill(0, HEAD_H, 240, 1, cscale(hc, 90));
     cs_end();
 }
-static uint32_t cards_hash;
-static void draw_cards(int force)
+/* the status at the title's right: what is about to happen, else what holds the lane */
+static uint16_t status(char *o)
 {
-    int32_t c;
+    int32_t cb = cur_bar();
+    arc_t A = arc_at(cb);
+    *o = 0;
+    if (launch_bar >= 0) { int32_t left = launch_bar - cb; o = s_cat(o, "LAUNCH "); s_int(o, left < 0 ? 0 : left); return (pos16 >> 17) % 2 ? C_WHITE : C_CYAN; }
+    if (A.mode == A_BREAK || arc_at(cb + 1).mode == A_BREAK) {
+        arc_t N = A.mode == A_BREAK ? A : arc_at(cb + 1);
+        if (N.until >= 0) { o = s_cat(o, "DROP IN "); s_int(o, N.until - cb); } else s_cat(o, "LET GO: DROP");
+        return (pos16 >> 17) % 2 ? C_WHITE : RGBC(0xffb04a);
+    }
+    if (ln[sel].mute) { o = s_cat(o, LNAME[sel]); s_cat(o, " OFF"); return C_CREAM; }
+    if (ln[sel].lock && sel != L_SFX) { o = s_cat(o, LNAME[sel]); s_cat(o, " LOCK"); return C_CREAM; }
+    if (target != ln[L_BASS].prof || blend) { o = s_cat(o, "NEXT "); s_cat(o, PSHORT[target]); return blend ? C_CYAN : C_DIMG; }
+    if (kb_oct) { o = s_cat(o, "KEYS "); s_sign(o, kb_oct); return C_MUTE; }
+    return C_MUTE;
+}
+static uint32_t title_hash;
+static void draw_title(int force)
+{
+    char st[24];
+    const char *name = row_name();
+    uint16_t sc = status(st);
+    int32_t n = nrows(grp), i, toast_on = fm1_ms < toast_until;
+    uint32_t h = 2166136261u;
+    for (i = 0; st[i]; i++) h = (h ^ (uint8_t)st[i]) * 16777619u;
+    for (i = 0; toast_on && toast_s[i]; i++) h = (h ^ (uint8_t)toast_s[i]) * 16777619u;
+    h ^= (uint32_t)(grp * 977 + rowi[grp] * 31 + toast_on * 7) + sc;
+    if (!force && h == title_hash) return;
+    title_hash = h;
+    cs_begin(TITLE_Y, TITLE_H, C_BG);
+    if (toast_on) { fill(0, TITLE_Y + 4, 240, 26, C_FOOT); textc(120, TITLE_Y + 12, toast_s, C_WHITE, 1); }
+    else {
+        text(4, TITLE_Y + 8, name, C_CREAM, 2);
+        for (i = 0; i < n; i++) fill(236 - (n - i) * 7 + 2, TITLE_Y + 6, 5, 5, i == rowi[grp] ? head_col() : RGBC(0x2d4040));
+        textr(238, TITLE_Y + 18, st, sc, 1);
+    }
+    cs_end();
+}
+/* KNOB 1..4: per column the lane (or the setting's name), the value large, a bar for a share, a word under it */
+static uint32_t knobs_hash;
+static void draw_knobs(int force)
+{
+    int32_t c, k;
     uint32_t h = 2166136261u;
     char v[4][24], sb[4][24];
     for (c = 0; c < 4; c++) {
-        const card_t *C = card_at(c);
-        uint32_t i;
-        v[c][0] = sb[c][0] = 0;
-        if (C->name) { C->val(v[c]); if (C->sub) C->sub(sb[c]); }
+        int32_t lane; uint32_t i;
+        const card_t *C = knob_card(c, &lane);
+        card_text(C, lane, v[c], sb[c]);
         for (i = 0; v[c][i]; i++) h = (h ^ (uint8_t)v[c][i]) * 16777619u;
         for (i = 0; sb[c][i]; i++) h = (h ^ (uint8_t)sb[c][i]) * 16777619u;
-        h = (h ^ (uint32_t)(uintptr_t)C) * 16777619u;
+        h = (h ^ (uint32_t)(uintptr_t)C ^ (uint32_t)(lane >= 0 ? ln[lane].mute : 0) << 3) * 16777619u;
     }
-    h ^= (uint32_t)(last_enc * 131 + (fm1_ms - last_enc_ms < 1500u)) + where_col();
-    if (!force && h == cards_hash) return;
-    cards_hash = h;
-    cs_begin(CARD_Y, CARD_H, C_BG);
-    for (c = 0; c < 4; c++) {
-        const card_t *C = card_at(c);
-        int32_t x = CARD_X(c), hot = last_enc == c + 2 && fm1_ms - last_enc_ms < 1500u;
-        fill(x, CARD_Y, CARD_W, CARD_H, hot ? cscale(where_col(), 60) : RGBC(0x0e1818));
-        if (!C->name) continue;
-        fill(x, CARD_Y, CARD_W, 2, hot ? C_WHITE : cscale(where_col(), 150));
-        text7(x + 3, CARD_Y + 6, C->name, C_MUTE);
-        text7(x + 3, CARD_Y + 20, v[c], hot ? C_WHITE : C_CREAM);
-        if (sb[c][0]) text7(x + 3, CARD_Y + 33, sb[c], C_DIMG);
+    h ^= (uint32_t)(last_enc * 131 + (fm1_ms - last_enc_ms < 1500u) + sel * 7919 + grp * 31 + edit_on * 101);
+    if (!force && h == knobs_hash) return;
+    knobs_hash = h;
+    for (k = 0; k < 2; k++) {
+        cs_begin(KNOB_Y + k * (KNOB_H / 2), KNOB_H / 2, C_BG);
+        fill(0, KNOB_Y, 240, 1, C_GRID);
+        for (c = 0; c < 4; c++) {
+            int32_t lane, x = c * COL_W, cx = x + COL_W / 2, hot = last_enc == c + 2 && fm1_ms - last_enc_ms < 1500u, n, pct = -1, big, i, off;
+            const card_t *C = knob_card(c, &lane);
+            const char *label;
+            uint16_t col = knob_col(c, lane);
+            char *val = v[c];
+            if (c) fill(x, KNOB_Y + 1, 1, KNOB_H - 1, C_GRID);
+            if (!C->name) continue;
+            off = !edit_on && lane >= 0 && ln[lane].mute;
+            if (grp != G_SONG && !edit_on ? c == sel : hot) fill(x + 1, KNOB_Y + 1, COL_W - 1, KNOB_H - 1, cscale(col, 40));
+            fill(x + 4, KNOB_Y + 1, COL_W - 7, 2, hot ? C_WHITE : cscale(col, off ? 70 : 150));
+            label = grp != G_SONG && !edit_on ? LNAME[c] : C->name;
+            if (tw(label, 1) <= COL_W - 2) textc(cx, KNOB_Y + 8, label, off ? cscale(col, 100) : col, 1);
+            else text7(cx - tw7(label) / 2, KNOB_Y + 8, label, col);
+            for (n = 0; val[n]; n++) ;
+            if (n && val[n - 1] == '%') {                           /* a share: the number large, the bar */
+                val[--n] = 0;
+                for (pct = 0, i = 0; i < n; i++) if (val[i] >= '0' && val[i] <= '9') pct = pct * 10 + val[i] - '0';
+            }
+            if (val[0] == '-' && val[1] == '-') { textc(cx, KNOB_Y + 34, "-", C_DIMG, 2); continue; }    /* not for this lane */
+            big = n <= 3;
+            for (i = 0; i < n; i++) if (val[i] >= 'a' && val[i] <= 'z') big = 0;   /* FONT_L has capitals only */
+            if (big) textc(cx, KNOB_Y + 30, val, hot ? C_WHITE : C_CREAM, 2);
+            else { if (n > 8) val[8] = 0; text7(cx - tw7(val) / 2, KNOB_Y + 35, val, hot ? C_WHITE : C_CREAM); }
+            if (pct >= 0) { fill(x + 6, KNOB_Y + 60, COL_W - 12, 4, C_GRID); fill(x + 6, KNOB_Y + 60, (COL_W - 12) * clampi(pct, 0, 100) / 100, 4, col); }
+            if (off) { sb[c][0] = 0; s_cat(sb[c], "OFF"); }
+            if (sb[c][0]) { if (tw7(sb[c]) > COL_W - 2) sb[c][8] = 0; text7(cx - tw7(sb[c]) / 2, KNOB_Y + 72, sb[c], off ? C_CREAM : C_MUTE); }
+        }
+        cs_end();
     }
-    cs_end();
-}
-static uint32_t foot_hash;
-static void draw_footer(int force)
-{
-    char a[56], b[56], *o;
-    uint16_t ca = C_LIGHT, cb_ = C_LIGHT;
-    int32_t cb = cur_bar(), boxes = !view && page < PG_SONG && page != PG_MIX;
-    arc_t A = arc_at(cb);
-    uint32_t h = 2166136261u, i;
-    a[0] = b[0] = 0;
-    if (!view && page == PG_MIX) { o = s_cat(a, "SFX "); v_mixl(o, L_SFX); ca = LCOL[L_SFX]; }   /* PRESETS */
-    else if (!view || page >= PG_SONG) { o = s_cat(a, "NEXT "); s_cat(o, PROF[target].name); ca = target == ln[L_BASS].prof && !blend ? C_MUTE : C_CYAN; }
-    else { o = s_cat(a, sel == L_SFX ? "SOUND " : sel == L_DRUMS ? "KIT " : "SOUND "); v_inst(o); while (*o) o++; s_inst(b); if (b[0]) { o = s_cat(o, " ("); o = s_cat(o, b); s_cat(o, ")"); } b[0] = 0; ca = LCOL[sel]; }
-    if (launch_bar >= 0) {
-        int32_t left = launch_bar - cb; o = s_cat(b, "LAUNCH "); o = s_cat(o, PROF[target].name); o = s_cat(o, " IN "); o = s_int(o, left < 0 ? 0 : left); s_cat(o, left == 1 ? " BAR" : " BARS");
-        cb_ = (pos16 >> 17) % 2 ? C_WHITE : C_CYAN;
-    } else if (A.mode == A_BREAK || arc_at(cb + 1).mode == A_BREAK) {
-        arc_t N = A.mode == A_BREAK ? A : arc_at(cb + 1);
-        if (N.until >= 0) { int32_t left = N.until - cb; o = s_cat(b, A.mode == A_BREAK ? "BREAK - DROP IN " : "BREAK NEXT - DROP IN "); o = s_int(o, left); s_cat(o, left == 1 ? " BAR" : " BARS"); }
-        else s_cat(b, "BREAK - LET GO OF REC TO DROP");
-        cb_ = (pos16 >> 17) % 2 ? C_WHITE : RGBC(0xffb04a);
-    } else if (view && page < PG_SONG && ln[sel].mute) { s_cat(b, "MUTED: ENV FADES IT IN"); cb_ = C_CREAM; }
-    else if (view && page < PG_SONG && ln[sel].lock && sel != L_SFX) { s_cat(b, "LOCKED (SEL+ENV)"); cb_ = C_CREAM; }
-    else if (view && page < PG_SONG && kb_oct) { o = s_cat(b, "KEYS OCTAVE "); s_sign(o, kb_oct); cb_ = C_MUTE; }
-    if (fm1_ms < toast_until) { char *d = b; const char *s = toast_s; while ((*d++ = *s++)) ; cb_ = C_WHITE; }
-    for (i = 0; a[i]; i++) h = (h ^ (uint8_t)a[i]) * 16777619u;
-    for (i = 0; b[i]; i++) h = (h ^ (uint8_t)b[i]) * 16777619u;
-    h ^= (uint32_t)blend * 31u + (uint32_t)boxes * 977u + ca + cb_ * 7u;
-    if (!force && h == foot_hash) return;
-    foot_hash = h;
-    cs_begin(FOOT_Y, 240 - FOOT_Y, C_FOOT);
-    text(4, FOOT_Y + 5, a, ca, 1);
-    if (boxes) {                                                    /* the blend: drums, bass, pad, lead */
-        static const char *const BX[4] = {"D", "B", "P", "L"};
-        for (i = 0; i < 4u; i++) { int32_t x = 150 + (int32_t)i * 22, on = (int32_t)i < blend; fill(x, FOOT_Y + 2, 20, 15, on ? C_CYAN : RGBC(0x1d2b2b)); textc(x + 10, FOOT_Y + 5, BX[i], on ? C_BG : C_MUTE, 1); }
-    }
-    text(4, FOOT_Y + 22, b, cb_, 1);
-    cs_end();
 }
 
-/* ---- the frame: the header, the cards, the panel in three strips, the footer */
+/* ---- the frame: the header, the title, the lanes (or the grid, the chords, the arc) in strips, the knobs */
 static uint32_t frames, fps_t0, fps;
 static int32_t last_drawn_pos = -1;
 static void draw_frame(int force)
 {
-    int32_t l, k;
-    static const int32_t SY[4] = {0, 44, 88, 130};
+    int32_t l, k, ns, y0, h0, view = edit_on ? 1 : grp == G_SONG && rowi[G_SONG] == SR_KEY ? 2 : grp == G_SONG && rowi[G_SONG] == SR_ARC ? 3 : 0;
     pos16 = cur_step() * 65536 + (seq_playing ? (int32_t)vis_frac : 0);
-    draw_cards(force);
-    if (!force && pos16 == last_drawn_pos && !area_dirty && !seq_playing) { draw_footer(0); return; }
+    draw_knobs(force);
+    if (!edit_on) draw_title(force);
+    if (!force && pos16 == last_drawn_pos && !area_dirty && !seq_playing) return;
     last_drawn_pos = pos16;
     draw_header();
     platform_poll();
-    for (k = 0; k < 3; k++) {
-        cs_begin(PANEL_Y + SY[k], SY[k + 1] - SY[k], C_BG);
-        if (page == PG_SONG) draw_song_area();
-        else if (page == PG_SONG2) draw_arc_area();
-        else if (page == PG_EDIT && view) draw_edit_area();
-        else if (!view) for (l = 0; l < (int32_t)NLANE; l++) draw_lane(l, PANEL_Y + l * (LH + GAP), LH, 0);
-        else draw_lane(sel, PANEL_Y, PANEL_H, 1);
+    if (edit_on) { pan_y = TITLE_Y; pan_h = KNOB_Y - TITLE_Y; ns = 3; }        /* the grid takes the title's place too */
+    else { pan_y = LANE_Y; pan_h = LANES_H; ns = 2; }
+    for (k = 0; k < ns; k++) {
+        y0 = pan_y + k * pan_h / ns; h0 = pan_y + (k + 1) * pan_h / ns - y0;
+        cs_begin(y0, h0, C_BG);
+        if (view == 1) draw_edit_area();
+        else if (view == 2) draw_song_area();
+        else if (view == 3) draw_arc_area();
+        else for (l = 0; l < (int32_t)NLANE; l++) draw_lane(l, LANE_Y + l * (LH + GAP), LH, 0);
         cs_end();
         platform_poll();
     }
     area_dirty = 0;
-    draw_footer(force);
     frames++;
     if (fm1_ms - fps_t0 >= 1000u) { fps = frames; frames = 0; fps_t0 = fm1_ms; }
 }
@@ -727,21 +751,19 @@ static void start_stop(int from_top)
     seq_start_step = frozen_step;
     seq_start_req = 1;
 }
-/* a page button: from MAIN it opens the last channel; again: the next page (FX: FX 2) or back */
-static void set_page(int32_t p)
+/* a group button: the group; pressed again, its next setting. From EDIT: back to the group. */
+static void group_btn(int32_t g)
 {
-    if (p == PG_SONG) {
-        if (page == PG_SONG) page = PG_SONG2;
-        else if (page == PG_SONG2) page = back_page;
-        else { back_page = page; page = PG_SONG; }
-    } else {
-        if (p == PG_FX && !view) { page = page == PG_MIX ? PG_HOME : PG_MIX; area_dirty = 1; return; }   /* MAIN: the mixer */
-        if (!view) view = sel + 1;
-        if (p == PG_FX) page = page == PG_FX ? PG_FX2 : page == PG_FX2 ? PG_HOME : PG_FX;
-        else if (p == PG_EDIT) page = page == PG_EDIT ? PG_PART : page == PG_PART ? PG_HOME : PG_EDIT;   /* again: the part */
-        else page = page == p ? PG_HOME : p;
-    }
+    if (edit_on) edit_on = 0;
+    else if (grp == g) rowi[g] = fmodp(rowi[g] + 1, nrows(g));
+    grp = g;
     area_dirty = 1;
+}
+static void clear_pattern(void)
+{
+    int32_t i;
+    for (i = 0; i < 32; i++) { ln[sel].up.k[i] = EMPTY; ln[sel].up.kinds[i] = 0; }
+    cursor = 0; toast("PATTERN CLEARED"); invalidate_now();
 }
 static void edit_key(int32_t k, int32_t sel_held_now)
 {
@@ -773,8 +795,8 @@ static void edit_key(int32_t k, int32_t sel_held_now)
     }
 }
 
-/* ---- the keys play: the channel in view (MAIN: the last one), F3..G5 plus OCT- / OCT+; drums and sfx: their sounds
- * on the white keys. On the EDIT page they enter steps. */
+/* ---- the keys play the lane (the white bar beside it), F3..G5 plus OCT- / OCT+; drums and sfx: their sounds on the
+ * white keys. On EDIT they enter steps. */
 static void keys_play(uint32_t pressed, uint32_t released)
 {
     int32_t k, l = sel;
@@ -799,49 +821,49 @@ static void input(void)
         if (!d) continue;
         if (held) d *= 10;
         if (e == ENC_SELECT) { set_bpm(seq_bpm + d); area_dirty = 1; continue; }              /* SELECT: tempo */
-        if (e == ENC_ALGORITHM) { if (page >= PG_SONG) page = back_page; go_view(view + (d > 0 ? 1 : -1)); continue; }   /* the channel */
-        if (e == ENC_PRESETS) {                                         /* the sound: MAIN the queued profile, MIX the sfx */
-            if (!view && page == PG_MIX) t_mix(L_SFX, d);
-            else if (!view || page >= PG_SONG) t_prof(d); else t_inst(d);
+        if (e == ENC_ALGORITHM) { set_sel(sel + (d > 0 ? 1 : -1)); continue; }              /* the lane */
+        if (e == ENC_PRESETS) {                                         /* the setting in the group */
+            if (!edit_on) rowi[grp] = fmodp(rowi[grp] + (d > 0 ? 1 : -1), nrows(grp));
             area_dirty = 1; continue;
         }
         {
-            const card_t *C = card_at(e - ENC_KNOB1);
+            int32_t lane;
+            const card_t *C = knob_card(e - ENC_KNOB1, &lane);
             if (!C->name) continue;
+            if (lane >= 0) set_sel(lane);                               /* the lane you touch is the lane */
             C->turn(d);
             last_enc = e; last_enc_ms = fm1_ms;
             area_dirty = 1;
         }
     }
     if (b & (1u << BTN_PLAY)) start_stop(held);
-    if (b & (1u << BTN_HOME)) {                                     /* MAIN, LEAD, PAD, BASS, DRUMS, SFX, MAIN.. */
-        if (held) { go_view(0); page = PG_HOME; }
-        else if (page >= PG_SONG) { page = back_page; area_dirty = 1; }
-        else { int32_t pg = page; go_view(view + 1); page = view && pg != PG_MIX ? pg : PG_HOME; }
+    if (b & (1u << BTN_HOME)) group_btn(G_PLAY);
+    if (b & (1u << BTN_FX)) group_btn(G_SOUND);
+    if (b & (1u << BTN_ARP)) group_btn(G_TRK);
+    if (b & (1u << BTN_GLO)) group_btn(G_SONG);
+    if (b & (1u << BTN_EDIT)) {
+        if (held && edit_on) clear_pattern();
+        else { edit_on = !edit_on; cursor = clampi(cursor, 0, ln[sel].up.bars * 16 - 1); area_dirty = 1; }
     }
-    if (b & (1u << BTN_FX)) set_page(PG_FX);
-    if (b & (1u << BTN_ARP)) set_page(PG_TRK);
-    if (b & (1u << BTN_EDIT)) { if (held && page == PG_EDIT) { int32_t i; for (i = 0; i < 32; i++) { ln[sel].up.k[i] = EMPTY; ln[sel].up.kinds[i] = 0; } cursor = 0; toast("PATTERN CLEARED"); invalidate_now(); } else set_page(PG_EDIT); }
-    if (b & (1u << BTN_GLO)) set_page(PG_SONG);
     if (b & (1u << BTN_SEQ)) {
         if (launch_bar >= 0) { launch_bar = -1; toast("LAUNCH CANCELLED"); }
         else { launch_bar = (cur_bar() / 4 + 1) * 4; toast("LAUNCH ON THE NEXT PHRASE"); }
         invalidate();
     }
     if (b & (1u << BTN_REC)) {
-        if (page == PG_EDIT && view) { if (held) { int32_t i; for (i = 0; i < 32; i++) { ln[sel].up.k[i] = EMPTY; ln[sel].up.kinds[i] = 0; } toast("PATTERN CLEARED"); invalidate_now(); } else { pat_grab(sel); toast("GRABBED THIS BAR"); } }
+        if (edit_on) { if (held) clear_pattern(); else { pat_grab(sel); toast("GRABBED THIS BAR"); } }
         else if (!seq_playing) toast("DROP: PRESS PLAY FIRST");
         else { drop_press(sel); { char t[40], *o = s_cat(t, "BREAK: "); o = s_cat(o, LNAME[sel]); s_cat(o, " ALONE"); toast(t); } }
     }
     if (rel & (1u << BTN_REC)) drop_release();
-    if (b & (1u << BTN_ENV) && view) {
-        if (page == PG_EDIT) edit_key(1, 1);                        /* tie (key 1 = F#3, a black key) */
+    if (b & (1u << BTN_ENV)) {
+        if (edit_on) edit_key(1, 1);                                /* tie (key 1 = F#3, a black key) */
         else if (held) { if (sel != L_SFX) { ln[sel].lock = (uint8_t)!ln[sel].lock; toast(ln[sel].lock ? "LOCKED: KEEPS ITS PROFILE" : "UNLOCKED"); invalidate(); } }
         else { char t[32], *o = s_cat(t, LNAME[sel]); ln[sel].mute = (uint8_t)!ln[sel].mute; s_cat(o, ln[sel].mute ? " FADES OUT" : " FADES IN"); toast(t); }
+        area_dirty = 1;
     }
     if (b & (1u << BTN_LFO)) {
-        if (!view) toast("OPEN A CHANNEL: HOME");
-        else if (page != PG_EDIT) {                                 /* a new idea from the next bar */
+        if (!edit_on) {                                             /* a new idea from the next bar */
             char t[32], *o;
             ln[sel].mel = (uint8_t)fmodp(ln[sel].mel + 1 + (int32_t)(fm1_ms % 13u), 100); invalidate();
             o = s_cat(t, LNAME[sel]); o = s_cat(o, ": MELODY "); s_int(o, ln[sel].mel); toast(t);
@@ -851,12 +873,13 @@ static void input(void)
             if (n) { o = s_cat(t, LNAME[sel]); o = s_cat(o, held ? ": NEW PATTERN #" : ": VARIATION #"); s_int(o, n - 1); toast(t); gen_count[sel] = n; }
             else toast("NO NEW ONE: SEL+LFO = FRESH");
         }
+        area_dirty = 1;
     }
     {                                                               /* OCT- / OCT+: the keys' octave (EDIT: the entry octave); both: 0 */
         uint32_t both = (1u << BTN_OCT_DOWN) | (1u << BTN_OCT_UP);
         if ((fm1_in.buttons & both) == both && b & both) { kb_oct = 0; entry_oct = 0; }
-        else if (b & (1u << BTN_OCT_DOWN)) { if (page == PG_EDIT) entry_oct = clampi(entry_oct - 1, -1, 1); else kb_oct = clampi(kb_oct - 1, -2, 2); }
-        else if (b & (1u << BTN_OCT_UP)) { if (page == PG_EDIT) entry_oct = clampi(entry_oct + 1, -1, 1); else kb_oct = clampi(kb_oct + 1, -2, 2); }
+        else if (b & (1u << BTN_OCT_DOWN)) { if (edit_on) entry_oct = clampi(entry_oct - 1, -1, 1); else kb_oct = clampi(kb_oct - 1, -2, 2); }
+        else if (b & (1u << BTN_OCT_UP)) { if (edit_on) entry_oct = clampi(entry_oct + 1, -1, 1); else kb_oct = clampi(kb_oct + 1, -2, 2); }
         if (b & both) area_dirty = 1;
     }
     if (b & (1u << BTN_SAVE)) {
@@ -864,7 +887,7 @@ static void input(void)
         else if (seq_playing) { save_pending = 1; toast("SAVES WHEN YOU STOP"); }
         else do_save();
     }
-    if (page == PG_EDIT && view) {
+    if (edit_on) {
         for (k = 0; k < 27; k++) if (keys >> k & 1u) { edit_key(k, held); area_dirty = 1; }
     } else keys_play(keys, keys_was & ~now);
     keys_was = now;
@@ -878,12 +901,12 @@ static void leds(void)
     arc_t A = arc_at(cur_bar());
     m |= (uint32_t)seq_playing << BTN_PLAY;
     m |= (uint32_t)(A.mode == A_BREAK || drop_seg >= 0) << BTN_REC;
-    m |= (uint32_t)(page < PG_SONG) << BTN_HOME | (uint32_t)(page == PG_FX || page == PG_FX2 || page == PG_MIX) << BTN_FX | (uint32_t)(page == PG_TRK) << BTN_ARP;
-    m |= (uint32_t)(page == PG_EDIT || page == PG_PART) << BTN_EDIT | (uint32_t)(page >= PG_SONG) << BTN_GLO;
-    m |= (uint32_t)(launch_bar >= 0) << BTN_SEQ | (uint32_t)(view && ln[sel].mute) << BTN_ENV | (uint32_t)save_pending << BTN_SAVE;
-    m |= (uint32_t)(page == PG_EDIT ? entry_oct < 0 : kb_oct < 0) << BTN_OCT_DOWN | (uint32_t)(page == PG_EDIT ? entry_oct > 0 : kb_oct > 0) << BTN_OCT_UP;
+    m |= (uint32_t)(!edit_on && grp == G_PLAY) << BTN_HOME | (uint32_t)(!edit_on && grp == G_SOUND) << BTN_FX | (uint32_t)(!edit_on && grp == G_TRK) << BTN_ARP;
+    m |= (uint32_t)edit_on << BTN_EDIT | (uint32_t)(!edit_on && grp == G_SONG) << BTN_GLO;
+    m |= (uint32_t)(launch_bar >= 0) << BTN_SEQ | (uint32_t)ln[sel].mute << BTN_ENV | (uint32_t)save_pending << BTN_SAVE;
+    m |= (uint32_t)(edit_on ? entry_oct < 0 : kb_oct < 0) << BTN_OCT_DOWN | (uint32_t)(edit_on ? entry_oct > 0 : kb_oct > 0) << BTN_OCT_UP;
     m |= (uint32_t)debug_on << BTN_SEL;
-    if (page == PG_EDIT && view) {
+    if (edit_on) {
         const upat_t *U = &ln[sel].up;
         for (k = 0; k < 27u; k++) {
             int32_t wi = white_index((int32_t)k);

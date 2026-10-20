@@ -10,42 +10,43 @@ profile, blend it in lane by lane from the bottom up, or launch it on the next p
 filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, retrigger, a bit crusher and
 echo. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
 
-<p align="center"><img src="docs/screens/main.png" width="320" alt="Espada's MAIN view: five lanes of notes scrolling past a fixed play line, a riser building on the SFX lane before the drop"></p>
+<p align="center"><img src="docs/screens/main.png" width="320" alt="Espada's screen: the MELODY setting, all five lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
 
 > **Status: 0.1, in development.** It boots and runs on the FM-1; playing on the hardware is still being tested.
 > Install it over the official firmware and keep the USB rescue in mind (below).
 
 ## The screens
 
-Laid out as Tuna is: four cards on top for the four knobs in a row, the music under them, and HOME (or ALGORITHM)
-steps from the overview to each channel.
+One screen, laid out as a mixing desk: the setting in large letters on top, all five lanes in the middle, and at the
+bottom the four knobs in a row: LEAD, PAD, BASS and DRUMS, each with its value for that setting. A group button picks
+the kind of setting, PRESETS steps through them.
 
 <table>
 <tr>
-<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="MAIN"><br><b>MAIN</b>: all five lanes. The knobs: the next profile, blend, energy (density for all) and space (the room).</td>
-<td align="center" width="33%"><img src="docs/screens/channel.png" width="240" alt="LEAD"><br><b>A channel</b>: its lane large. The knobs: melody, rhythm, pitch, change; PRESETS its sound (EDIT twice: profile, density, octave, level).</td>
-<td align="center" width="33%"><img src="docs/screens/fx.png" width="240" alt="PAD FX"><br><b>FX</b>: filter, resonance, wobble and drive (FX again: brightness, crush, vary). The screen darkens what the filter cuts.</td>
+<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="PLAY, MELODY"><br><b>PLAY</b> (HOME): melody, rhythm, pitch, change, density, octave, profile, sound, level.</td>
+<td align="center" width="33%"><img src="docs/screens/sound.png" width="240" alt="SOUND, FILTER"><br><b>SOUND</b> (FX): filter, resonance, wobble, drive, brightness, crush, vary. The lanes darken what the filter cuts.</td>
+<td align="center" width="33%"><img src="docs/screens/tracker.png" width="240" alt="TRACKER, RATE"><br><b>TRACKER</b> (ARP): slide, retrigger, rate, echo.</td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screens/sfx.png" width="240" alt="SFX"><br><b>SFX</b>: noise effects. A riser grows into the drop; the impact lands on it.</td>
-<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT"><br><b>EDIT</b>: your own part, step by step, in scale steps from the chord root, so it follows the chords.</td>
-<td align="center"><img src="docs/screens/song.png" width="240" alt="SONG"><br><b>SONG</b>: key, scale and a suggested progression, the chord playing lit.</td>
+<td align="center"><img src="docs/screens/song.png" width="240" alt="SONG, KEY"><br><b>SONG</b> (GLO): the knobs are four settings of their own. KEY: key, scale, chords, bars per chord, the chord playing lit.</td>
+<td align="center"><img src="docs/screens/arc.png" width="240" alt="SONG, ARC"><br><b>ARC</b> (off until you turn it on): the energy over the coming bars, build, break, peak and down.</td>
+<td align="center"><img src="docs/screens/sfx.png" width="240" alt="SONG, SFX"><br><b>SFX</b>: the noise lane's sound, rhythm, change and level, then its part and effects.</td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screens/arc.png" width="240" alt="ARC"><br><b>ARC</b> (off until you turn it on): the energy over the coming bars, build, break, peak and down.</td>
+<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT"><br><b>EDIT</b>: the lane's own part, step by step, in scale steps from the chord root, so it follows the chords.</td>
 <td colspan="2">
 
 | Control | Does |
 | --- | --- |
+| HOME / FX / ARP / GLO | the groups PLAY, SOUND, TRACKER, SONG; again: the next setting |
+| PRESETS | the setting in the group |
+| KNOB 1-4 | that setting for LEAD, PAD, BASS, DRUMS (SONG: the four shown) |
+| ALGORITHM | the lane the buttons and keys act on (turning its knob picks it too) |
 | SELECT | tempo |
-| ALGORITHM, HOME | the channel: MAIN, LEAD, PAD, BASS, DRUMS, SFX |
-| PRESETS | the sound (MAIN: the next profile) |
-| KNOB 1-4 | the four cards |
-| FX / ARP / EDIT / GLO | effects (twice: FX 2; on MAIN: the mixer), tracker effects, steps (twice: the part), song (twice: the arc) |
 | PLAY / SEQ / REC | start-stop, launch on the phrase, DROP (tap or hold) |
-| ENV / LFO / SAVE | fade the channel out and in (SEL+ENV: lock), a new idea, save |
-| OCT- / OCT+ | the keys' octave |
-| Keys | play the channel live; on EDIT they enter steps |
+| ENV / LFO / EDIT | fade the lane out and in (SEL+ENV: lock), a new idea, its steps |
+| SAVE, OCT- / OCT+ | save; the keys' octave |
+| Keys | play the lane live; on EDIT they enter steps |
 
 </td>
 </tr>
@@ -54,15 +55,15 @@ steps from the overview to each channel.
 ## How it plays
 
 - **Lanes.** Notes scroll from right to left past a fixed "now" line. Solid blocks are what a lane plays; outlined
-  blocks are a preview of the queued profile. HOME steps from the overview (MAIN) to each lane on its own, large,
-  with its values on the cards above it, and back. The keys play the channel live; every setting is on a knob.
+  blocks are a preview of the queued profile. All five are always on screen; the white mark is the lane the buttons
+  and keys act on. Every setting is on a knob, the keys only play.
 - **SFX.** The fifth lane: a noise riser into every drop, the impact on it, washes, laser zaps, crackle and 8-bit
   noise, following the arc and the profile.
 - **Profiles.** EPIC (orchestral minor), HYPERSPACE (techno minor with power chords), FUSION (melodic major with a
   chromatic turn and a riff that follows the chords), OLDSKOOL (the 4-channel sound with arpeggio chords), SYMPHONY
   (the orchestra: strings, a violin line, cellos, timpani, two bars a chord).
-- **Four knobs a channel.** MELODY (which idea), RHYTHM, PITCH and CHANGE (how soon new material comes, from frozen
-  to every 16 bars), as Tuna's. LFO: a new idea now. ENV fades a channel out and in; MAIN's MIX page has the levels.
+- **The music of a lane.** MELODY (which idea), RHYTHM, PITCH and CHANGE (how soon new material comes, from frozen
+  to every 16 bars), side by side for all four lanes. LFO: a new idea now. ENV fades a lane out and in.
 - **Long arcs.** The lead plays 16-bar sections of two 8-bar periods: a motif stated, answered, sequenced, closed
   open, then driven to its high point and closed on the root.
 - **Mixing.** BLEND moves lanes to the queued profile one at a time: drums, then bass, pad, lead. LAUNCH moves every
@@ -72,8 +73,8 @@ steps from the overview to each channel.
   answered and closed. VARY gives each phrase a different character (echo, slide, bite, filter, stutter).
 - **Density.** 50 % is the part as the profile writes it. Lower thins it out; higher adds notes inside the chord and
   its scale, 16th hats, ghost snares and fills.
-- **DROP.** Tap REC for a break (the channel in view plays alone) that drops on the next phrase with a crash and
-  an impact, or hold it and let go when you want the drop. ENERGY on MAIN turns every lane's density up or down at
+- **DROP.** Tap REC for a break (the marked lane plays alone) that drops on the next phrase with a crash and
+  an impact, or hold it and let go when you want the drop. ENERGY (SONG) turns every lane's density up or down at
   once.
 - **Stereo and a room.** The voices spread left and right as a tracker's channels do, strings and brass play as
   sections, and a stereo reverb (SPACE) puts it all in a hall.
