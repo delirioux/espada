@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Fail when the app and the platform declare a file-scope variable of the same name.
+"""Fail when the app and the platform declare a file-scope variable or an enum constant of the same name.
 
 espada.c includes the whole platform (platform.c, usb.c, ota.c, ...) into one translation unit. Two
 `static volatile uint32_t mo_w;` there are not an error in C: they are tentative definitions of ONE variable,
-so the app and the USB driver silently share it. Host mode cannot see it (tests/host.c stands in for the
-platform). This check can.
+so the app and the USB driver silently share it. An enum constant of the same name is a compile error, but only in
+the firmware build. Host mode and the browser build see neither (they stand in for the platform). This check can.
 
   python3 tools/check_names.py
 """
@@ -40,15 +40,28 @@ def file_scope_vars(path):
     return names
 
 
+def enum_constants(path):
+    """names of enum constants"""
+    text = re.sub(r"/\*.*?\*/", "", path.read_text(encoding="utf-8"), flags=re.S)
+    text = re.sub(r"//[^\n]*", "", text)
+    names = set()
+    for body in re.findall(r"\benum\b[^{;]*\{(.*?)\}", text, flags=re.S):
+        for part in body.split(","):
+            m = re.match(r"\s*([A-Za-z_]\w*)", part)
+            if m:
+                names.add(m.group(1))
+    return names
+
+
 def main():
-    app = {n: p.name for p in APP for n in file_scope_vars(p)}
-    plat = {n: p.name for p in PLATFORM if p.exists() for n in file_scope_vars(p)}
+    app = {n: p.name for p in APP for n in file_scope_vars(p) | enum_constants(p)}
+    plat = {n: p.name for p in PLATFORM if p.exists() for n in file_scope_vars(p) | enum_constants(p)}
     clash = sorted(set(app) & set(plat))
     for n in clash:
-        print(f"{n}: {app[n]} and {plat[n]} (one variable in the firmware: rename the app's)")
+        print(f"{n}: {app[n]} and {plat[n]} (one name in the firmware: rename the app's)")
     if clash:
         sys.exit(1)
-    print(f"names: {len(app)} app variables, none shared with the platform")
+    print(f"names: {len(app)} app variables and enum constants, none shared with the platform")
 
 
 if __name__ == "__main__":

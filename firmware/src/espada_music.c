@@ -91,7 +91,7 @@ enum { S_DRIVE, S_PEDAL, S_OCTAVE,                       /* bass */
        S_DEPIC, S_DTECH, S_DFUSION, S_DOLD,              /* drums */
        S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH,              /* the symphony: lead, strings, cellos, percussion */
        S_ROOTS, S_GALLOP, S_SLAP, S_ACID,                /* bass: TROPIC, STEEL, FUNK, RAVE */
-       S_SKANK, S_POWER, S_CLAV,                         /* pad: TROPIC, STEEL, FUNK */
+       S_SKANK, S_PCHORD, S_CLAV,                         /* pad: TROPIC, STEEL, FUNK */
        S_DTROPIC, S_DSTEEL, S_DDRIFT, S_DFUNK, S_DRAVE }; /* drums */
 static const int8_t AEO[7] = {0, 2, 3, 5, 7, 8, 10}, ION[7] = {0, 2, 4, 5, 7, 9, 11}, DOR[7] = {0, 2, 3, 5, 7, 9, 10},
                     MXL[7] = {0, 2, 4, 5, 7, 9, 10};
@@ -125,7 +125,7 @@ static const prof_t PROF[] = {
      {S_MELODY, S_SKANK, S_ROOTS, S_DTROPIC}, {8, 13, 3, 1}, 0, 110, 15, 0, 25},
     /* heavy: power chords in minor, a galloping bass, double kick, a gliding saw lead */
     {"STEEL", AEO, {{0, Q_5}, {0, Q_5}, {8, Q_5}, {10, Q_5}, {0, Q_5}, {3, Q_5}, {5, Q_5}, {7, Q_5}},
-     {S_MELODY, S_POWER, S_GALLOP, S_DSTEEL}, {10, 10, 0, 0}, 0, 140, 40, 0, 0},
+     {S_MELODY, S_PCHORD, S_GALLOP, S_DSTEEL}, {10, 10, 0, 0}, 0, 140, 40, 0, 0},
     /* floating: sus chords resolving, two bars a chord, swelling strings, a breathy lead in long lines, no snare */
     {"DRIFT", AEO, {{0, Q_S4}, {0, Q_MIN}, {8, Q_MAJ}, {3, Q_MAJ}, {10, Q_S4}, {10, Q_MAJ}, {7, Q_S4}, {7, Q_MIN}},
      {S_EPIC, S_LUSH, S_PEDAL, S_DDRIFT}, {8, 5, 3, 2}, 2, 96, 30, 70, 50},
@@ -506,7 +506,7 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
             if (chance(r, 20)) g_add(G, s + 1, 1, 3, ct(T, 1), ct(T, 2), ct(T, 3), EV_ACC2);
         }
         break;
-    case S_POWER:               /* power chords, root fifth octave: held half bars, or chugged 8ths at the height */
+    case S_PCHORD:               /* power chords, root fifth octave: held half bars, or chugged 8ths at the height */
         if (chance(r, 60)) { g_add(G, 0, 8, 3, ct(T, 0), ct(T, 0) + 7, ct(T, 0) + 12, 0); g_add(G, 8, 8, 3, ct(T, 0), ct(T, 0) + 7, ct(T, 0) + 12, 0); }
         else for (s = 0; s < 16; s += 2) g_add(G, s, 2, 3, ct(T, 0), ct(T, 0) + 7, ct(T, 0) + 12, s % 4 ? EV_ACC1 : 0);
         break;

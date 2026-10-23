@@ -58,7 +58,7 @@ stand-in.
 - **Integers only.** No FPU use, no 64-bit division ([RULES.md](RULES.md)). CI fails on any soft-float or 64-bit
   division routine in the image: a soft-float routine is what crashed an FM-1 running Tuna.
 - **One translation unit, checked for names.** C merges two `static` file-scope variables of the same name
-  into one without a word. Espada's MIDI queue once shared its counters with the USB driver's that way, and the
+  into one without a word, and an enum constant the platform also has fails only the firmware build. Espada's MIDI queue once shared its counters with the USB driver's that way, and the
   FM-1 froze on PLAY. `tools/check_names.py` runs in CI and catches it.
 - **Bars are composed ahead, played in the interrupt.** The main loop writes each lane's next bar into a cache;
   the interrupt only plays events. Composing never runs late, and the screen can show what is coming.
@@ -95,7 +95,9 @@ On Linux (or WSL2 / Docker), as in the [README](../README.md#build):
 ./build.sh                                   # the firmware: build/espada.fwsc
 tests/run_host.sh                            # host mode: screens as PNG, the sound as WAV
 build/host/espada OUT tests/demo.txt         # a scripted tour
-python3 tools/check_names.py                 # no variable shared with the platform
+python3 tools/check_names.py                 # no variable or enum constant shared with the platform
+clang -fsyntax-only -w -m32 -ffreestanding -Ifirmware/hal -Ifirmware/src -Ifirmware/gen \
+    -DFELUCCA_ID='"FM-1_961"' -DAPP_VER='"x"' firmware/src/espada.c     # the firmware's unit, without the toolchain
 web/emu/espada_build.sh                      # the browser version: build/espada_emu/
 node web/emu/espada_emu_test.mjs build/espada_emu/espada.wasm
 ```
