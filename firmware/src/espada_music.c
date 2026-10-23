@@ -4,7 +4,8 @@
  *   harmony     a chord per bar: from the profile (explicit chords, borrowed ones allowed), or from the SONG
  *               page (key, scale, a suggested progression). Lines move through a "local scale": the scale
  *               with any note a semitone off a chord tone swapped for that chord tone, so nothing rubs.
- *   profiles    EPIC, HYPERSPACE, FUSION, OLDSKOOL: a progression and a style per lane
+ *   styles      ten profiles: a progression, a generator and an instrument per lane, a tempo, and a way of
+ *               playing (how many lead notes glide in, how many long chords swell or fade, the lead's echo)
  *   mixing      a queued profile; BLEND moves lanes to it bottom-up (drums, bass, pad, lead); LAUNCH moves
  *               every unlocked lane on the next phrase; the bass lane's profile carries the harmony
  *   density     50 = the part as designed; lower thins, higher adds notes inside the chord and its scale
@@ -88,8 +89,12 @@ enum { S_DRIVE, S_PEDAL, S_OCTAVE,                       /* bass */
        S_EPIC, S_STAB, S_RIFF, S_MELODY,                 /* lead */
        S_STRINGS, S_SUS, S_LUSH, S_ARP, S_CHOP,          /* pad */
        S_DEPIC, S_DTECH, S_DFUSION, S_DOLD,              /* drums */
-       S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH };            /* the symphony: lead, strings, cellos, percussion */
-static const int8_t AEO[7] = {0, 2, 3, 5, 7, 8, 10}, ION[7] = {0, 2, 4, 5, 7, 9, 11}, DOR[7] = {0, 2, 3, 5, 7, 9, 10};
+       S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH,              /* the symphony: lead, strings, cellos, percussion */
+       S_ROOTS, S_GALLOP, S_SLAP, S_ACID,                /* bass: TROPIC, STEEL, FUNK, RAVE */
+       S_SKANK, S_POWER, S_CLAV,                         /* pad: TROPIC, STEEL, FUNK */
+       S_DTROPIC, S_DSTEEL, S_DDRIFT, S_DFUNK, S_DRAVE }; /* drums */
+static const int8_t AEO[7] = {0, 2, 3, 5, 7, 8, 10}, ION[7] = {0, 2, 4, 5, 7, 9, 11}, DOR[7] = {0, 2, 3, 5, 7, 9, 10},
+                    MXL[7] = {0, 2, 4, 5, 7, 9, 10};
 typedef struct {
     const char *name;
     const int8_t *scale;
@@ -97,21 +102,39 @@ typedef struct {
     uint8_t st[NLANE];          /* style per lane (LEAD, PAD, BASS, DRUMS; the sfx lane has its own generator) */
     uint8_t inst[NLANE];        /* suggested patch per lane, kit for the drums (sfx: unused) */
     uint8_t hr;                 /* bars a chord (0 = 1) */
+    uint8_t bpm;                /* its tempo (LAUNCH sets it) */
+    uint8_t glide, swell, echo; /* how it plays: % of lead notes that glide in, % of long chords that swell or
+                                 * fade, the echo it adds to the lead */
 } prof_t;
-/* from a study of 90s tracker music: orchestral minor, techno minor, melodic major with a chromatic turn,
- * the 4-channel sound with arpeggio chords */
+/* ten styles of 90s tracker music, from a study of their modules: chords (sus chords everywhere), drum grids,
+ * tempos, and how the notes are played (glides, swells, an echo channel) */
 static const prof_t PROF[] = {
     {"EPIC", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}},
-     {S_EPIC, S_STRINGS, S_DRIVE, S_DEPIC}, {10, 5, 2, 1}},
+     {S_EPIC, S_STRINGS, S_DRIVE, S_DEPIC}, {10, 5, 2, 1}, 0, 125, 15, 35, 25},
     {"HYPERSPACE", AEO, {{0, Q_5}, {0, Q_5}, {10, Q_5}, {5, Q_5}, {7, Q_5}, {5, Q_5}, {3, Q_5}, {10, Q_5}},
-     {S_STAB, S_CHOP, S_DRIVE, S_DTECH}, {11, 7, 0, 2}},
+     {S_STAB, S_CHOP, S_DRIVE, S_DTECH}, {11, 7, 0, 2}, 0, 130, 20, 0, 30},
     {"FUSION", ION, {{0, Q_MAJ}, {9, Q_MIN}, {0, Q_MAJ}, {9, Q_MIN}, {9, Q_MAJ}, {1, Q_MAJ}, {9, Q_MAJ}, {5, Q_MAJ}},
-     {S_RIFF, S_LUSH, S_PEDAL, S_DFUSION}, {9, 13, 1, 0}},
+     {S_RIFF, S_LUSH, S_PEDAL, S_DFUSION}, {9, 13, 1, 0}, 0, 125, 25, 25, 20},
     {"OLDSKOOL", AEO, {{5, Q_MIN}, {3, Q_MAJ}, {1, Q_MAJ}, {5, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {0, Q_MIN}, {3, Q_MAJ}},
-     {S_MELODY, S_ARP, S_OCTAVE, S_DOLD}, {8, 9, 0, 1}},
+     {S_MELODY, S_ARP, S_OCTAVE, S_DOLD}, {8, 9, 0, 1}, 0, 125, 10, 0, 35},
     /* the orchestra: minor, two bars a chord, a dominant before the return */
     {"SYMPHONY", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {5, Q_MIN}, {8, Q_MAJ}, {7, Q_MAJ}, {0, Q_MIN}},
-     {S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH}, {15, 5, 16, 0}, 2},
+     {S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH}, {15, 5, 16, 0}, 2, 110, 5, 55, 0},
+    /* sunny: mixolydian, I and bVII, a sus4 into the turn; off-beat chords, a deep bass with rests, congas */
+    {"TROPIC", MXL, {{0, Q_MAJ}, {0, Q_S4}, {10, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}, {10, Q_MAJ}, {5, Q_MAJ}, {7, Q_S4}},
+     {S_MELODY, S_SKANK, S_ROOTS, S_DTROPIC}, {8, 13, 3, 1}, 0, 110, 15, 0, 25},
+    /* heavy: power chords in minor, a galloping bass, double kick, a gliding saw lead */
+    {"STEEL", AEO, {{0, Q_5}, {0, Q_5}, {8, Q_5}, {10, Q_5}, {0, Q_5}, {3, Q_5}, {5, Q_5}, {7, Q_5}},
+     {S_MELODY, S_POWER, S_GALLOP, S_DSTEEL}, {10, 10, 0, 0}, 0, 140, 40, 0, 0},
+    /* floating: sus chords resolving, two bars a chord, swelling strings, a breathy lead in long lines, no snare */
+    {"DRIFT", AEO, {{0, Q_S4}, {0, Q_MIN}, {8, Q_MAJ}, {3, Q_MAJ}, {10, Q_S4}, {10, Q_MAJ}, {7, Q_S4}, {7, Q_MIN}},
+     {S_EPIC, S_LUSH, S_PEDAL, S_DDRIFT}, {8, 5, 3, 2}, 2, 96, 30, 70, 50},
+    /* funky: a major vamp with a diminished passing chord, a slapped syncopated bass, clav stabs, kick off the beat */
+    {"FUNK", ION, {{0, Q_MAJ}, {0, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}, {6, Q_DIM}, {5, Q_MAJ}, {7, Q_S4}, {7, Q_MAJ}},
+     {S_RIFF, S_CLAV, S_SLAP, S_DFUNK}, {11, 13, 1, 1}, 0, 112, 10, 0, 0},
+    /* the rave: four on the floor, an acid bass that slides, organ stabs, brass chord hits */
+    {"RAVE", AEO, {{0, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {8, Q_MAJ}, {3, Q_MAJ}, {3, Q_MAJ}, {10, Q_MAJ}, {7, Q_S4}},
+     {S_STAB, S_SUS, S_ACID, S_DRAVE}, {4, 7, 0, 2}, 0, 138, 20, 0, 35},
 };
 #define NPROF (int32_t)(sizeof PROF / sizeof PROF[0])
 
@@ -324,13 +347,13 @@ static void lead_long(gen_t *G, const tools_t *T, int32_t b, int32_t p, int slow
     }
     for (i = 0; i < n; i++) {
         int32_t note, st = on[i];
-        if (pos == 7 && i == n - 1) note = ct(T, c[i] ? 3 : reg ? 3 : 0);   /* the close: the root (or its octave) */
+        if (pos == 7 && i == n - 1) note = (c[i] || reg ? ct(T, 0) + 12 : ct(T, 0));   /* the close: the root (or its octave; power chords too) */
         else if (st % 4 == 0 || i == 0) note = ct(T, c[i] + lift);  /* on the beat: a chord tone */
         else {                                                      /* between: a scale run into the next beat's tone */
             int32_t j = i + 1, k, nx;
             while (j < n && on[j] % 4) j++;
             k = j - i;
-            nx = j < n ? (pos == 7 && j == n - 1 ? ct(T, c[j] ? 3 : reg ? 3 : 0) : ct(T, c[j] + lift)) : 0;
+            nx = j < n ? (pos == 7 && j == n - 1 ? (c[j] || reg ? ct(T, 0) + 12 : ct(T, 0)) : ct(T, c[j] + lift)) : 0;
             if (j < n) note = move(T, nx, prev > nx ? k : -k);
             else note = move(T, prev, PICK(&v, -1, 1));
         }
@@ -443,6 +466,88 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
         for (s = 0; s < 16; s++)
             if (a[s] < 3) g_add(G, s, 1, 3, ct(T, 0), ct(T, 1), ct(T, 2), a[s] == 1 ? EV_ACC1 : a[s] == 2 ? EV_ACC2 : 0);
         break; }
+    case S_ROOTS:               /* deep and roomy: the root held, a rest, the fifth, the root again, a step into the turn */
+        NOTE(G, 0, 3, ct(T, 0));
+        if (chance(r, 70)) NOTE(G, 6, 2, ct(T, 1) - (ct(T, 1) - ct(T, 0) > 5 ? 12 : 0));
+        NOTE(G, 8, 3, ct(T, 0));
+        if (chance(r, 60)) NOTE(G, 11, 1, ct(T, 0) + 12);
+        if (chance(r, 55)) NOTE(G, 14, 2, stp(T, PICK(r, -1, 1, 2)));
+        break;
+    case S_GALLOP: {            /* the gallop: an 8th and two 16ths, on the root, an octave on the bar's last beat */
+        static const int8_t GP[12] = {0, 2, 3, 4, 6, 7, 8, 10, 11, 12, 14, 15};
+        for (i = 0; i < 12; i++) NOTE(G, GP[i], 1, GP[i] >= 12 && b % 2 && chance(r, 40) ? ct(T, 0) + 12 : ct(T, 0));
+        break; }
+    case S_SLAP: {              /* slapped and popped: the root on the one, octaves off the beat, ghosts, the seventh */
+        static const int8_t SP[3][8] = {{0, 3, 6, 7, 10, 11, 14, -1}, {0, 2, 6, 8, 10, 13, 14, -1}, {0, 3, 4, 7, 10, 12, 15, -1}};
+        rng_t m = {hash3(b / 2, 53, p)};
+        const int8_t *sp = SP[(rnd(&m) >> 16) * 3u >> 16];
+        for (i = 0; i < 8 && sp[i] >= 0; i++) {
+            int32_t st = sp[i], n = st == 0 ? ct(T, 0) : (st % 4 == 3 || st % 4 == 2) && chance(r, 55) ? ct(T, 0) + 12
+                       : chance(r, 25) ? stp(T, -1) : chance(r, 30) ? ct(T, 1) : ct(T, 0);
+            ev_t *e = NOTE(G, st, 1, n);
+            if (e && st % 2 && chance(r, 30)) e->flags = EV_ACC2;           /* a ghost note */
+        }
+        break; }
+    case S_ACID: {              /* acid: 16ths on the root with octave jumps and accents; some notes slide into the next */
+        rng_t m = {hash3(b / 4, 59, p)};
+        for (s = 0; s < 16; s++) {
+            int on = s % 4 == 0 || chance(&m, 62);
+            if (!on) continue;
+            {
+                int32_t n = ct(T, 0) + (chance(&m, 30) ? 12 : 0) + (chance(&m, 10) ? 7 : 0);
+                ev_t *e = NOTE(G, s, 1, n);
+                if (e) e->flags = (uint8_t)((s % 4 ? EV_ACC1 : 0) | (chance(&m, 22) ? EV_GLIDE : 0));
+            }
+        }
+        break; }
+    case S_SKANK:               /* the off-beat chord, short; a doubled stroke now and then */
+        for (s = 2; s < 16; s += 4) {
+            g_add(G, s, 1, 3, ct(T, 1), ct(T, 2), ct(T, 3), 0);
+            if (chance(r, 20)) g_add(G, s + 1, 1, 3, ct(T, 1), ct(T, 2), ct(T, 3), EV_ACC2);
+        }
+        break;
+    case S_POWER:               /* power chords, root fifth octave: held half bars, or chugged 8ths at the height */
+        if (chance(r, 60)) { g_add(G, 0, 8, 3, ct(T, 0), ct(T, 0) + 7, ct(T, 0) + 12, 0); g_add(G, 8, 8, 3, ct(T, 0), ct(T, 0) + 7, ct(T, 0) + 12, 0); }
+        else for (s = 0; s < 16; s += 2) g_add(G, s, 2, 3, ct(T, 0), ct(T, 0) + 7, ct(T, 0) + 12, s % 4 ? EV_ACC1 : 0);
+        break;
+    case S_CLAV: {              /* clav stabs on syncopated 16ths, the chord's upper notes */
+        static const int8_t CP[3][7] = {{1, 3, 6, 9, 11, 14, -1}, {0, 3, 5, 8, 11, 13, -1}, {2, 4, 7, 10, 12, 15, -1}};
+        rng_t m = {hash3(b / 2, 61, p)};
+        const int8_t *cp = CP[(rnd(&m) >> 16) * 3u >> 16];
+        for (i = 0; i < 7 && cp[i] >= 0; i++) g_add(G, cp[i], 1, 3, ct(T, 1), ct(T, 2), ct(T, 3), i % 2 ? EV_ACC1 : 0);
+        break; }
+    case S_DTROPIC: {           /* the one and the three, rim shots on two and four with a push, congas, shaker 8ths */
+        static const int8_t K[16] = {100, 0, 30, 20, 0, 0, 30, 0, 90, 0, 40, 0, 0, 0, 25, 0}, SN[16] = {0, 0, 0, 0, 90, 0, 0, 45, 0, 35, 0, 0, 90, 0, 25, 30},
+                            H[16] = {50, 0, 85, 0, 50, 0, 85, 0, 50, 0, 85, 0, 50, 0, 85, 0}, TT[16] = {0, 0, 0, 45, 0, 0, 55, 0, 0, 0, 0, 45, 0, 0, 55, 0};
+        hits(G, r, DK_KICK, K); hits(G, r, DK_SNARE, SN); hits(G, r, DK_HAT, H); hits(G, r, DK_KETTLE, TT);
+        break; }
+    case S_DSTEEL: {            /* double kick on the gallop, the snare on two and four, the ride on 8ths */
+        static const int8_t K[16] = {100, 0, 0, 85, 90, 0, 0, 85, 100, 0, 0, 85, 90, 0, 0, 85}, SN[16] = {0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 100, 0, 0, 20},
+                            H[16] = {90, 0, 90, 0, 90, 0, 90, 0, 90, 0, 90, 0, 90, 0, 90, 0};
+        hits(G, r, DK_KICK, K); hits(G, r, DK_SNARE, SN); hits(G, r, DK_HAT, H);
+        if (b % 4 == 0) DRUM(G, 0, DK_CRASH);
+        break; }
+    case S_DDRIFT: {            /* no snare: a soft heartbeat kick, sparse hats, a low drum into the phrase */
+        static const int8_t K[16] = {80, 0, 0, 0, 0, 0, 40, 0, 0, 0, 30, 0, 0, 0, 0, 0}, H[16] = {0, 0, 30, 0, 0, 0, 30, 0, 0, 0, 30, 0, 0, 0, 30, 0};
+        for (s = 0; s < 16; s++) if (K[s] && chance(r, K[s])) { ev_t *e = DRUM(G, s, DK_KICK); if (e && s) e->flags = EV_ACC1; }
+        for (s = 0; s < 16; s++) if (H[s] && chance(r, H[s])) { ev_t *e = DRUM(G, s, DK_HAT); if (e) e->flags = EV_ACC2; }
+        if (b % 4 == 3) DRUM(G, 12, DK_KETTLE);
+        break; }
+    case S_DFUNK: {             /* the kick on the one and off the beat, the snare on two and four with ghosts, 16th hats */
+        static const int8_t K[16] = {100, 0, 0, 50, 0, 0, 0, 30, 0, 0, 75, 0, 0, 25, 0, 0}, SN[16] = {0, 0, 0, 0, 0, 0, 0, 35, 0, 40, 0, 0, 0, 0, 0, 35},
+                            H[16] = {85, 55, 85, 55, 85, 55, 85, 55, 85, 55, 85, 55, 85, 55, 85, 55};
+        hits(G, r, DK_KICK, K); hits(G, r, DK_HAT, H);
+        DRUM(G, 4, DK_SNARE); DRUM(G, 12, DK_SNARE);
+        for (s = 0; s < 16; s++) if (SN[s] && chance(r, SN[s])) { ev_t *e = DRUM(G, s, DK_SNARE); if (e) e->flags = EV_ACC2; }
+        break; }
+    case S_DRAVE: {             /* four on the floor, a clap on two and four, the open hat on the off-beats */
+        static const int8_t H[16] = {0, 0, 100, 0, 0, 0, 100, 0, 0, 0, 100, 0, 0, 0, 100, 0}, H2[16] = {0, 40, 0, 40, 0, 40, 0, 40, 0, 40, 0, 40, 0, 40, 0, 40};
+        for (s = 0; s < 16; s += 4) DRUM(G, s, DK_KICK);
+        DRUM(G, 4, DK_SNARE); DRUM(G, 12, DK_SNARE);
+        hits(G, r, DK_HAT, H);
+        for (s = 0; s < 16; s++) if (H2[s] && chance(r, H2[s])) { ev_t *e = DRUM(G, s, DK_HAT); if (e) e->flags = EV_ACC2; }
+        if (b % 8 == 0) DRUM(G, 0, DK_CRASH);
+        break; }
     case S_DEPIC: {
         static const int8_t K[16] = {100, 0, 20, 0, 0, 0, 20, 0, 100, 0, 20, 0, 36, 0, 0, 0}, TT[16] = {60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45, 0, 40, 25},
                             SN[16] = {0, 0, 0, 0, 92, 0, 0, 20, 0, 0, 0, 0, 92, 0, 35, 20}, H[16] = {75, 38, 75, 38, 75, 38, 75, 38, 75, 38, 75, 38, 75, 38, 75, 38};
@@ -495,6 +600,24 @@ static void gen_sfx(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, 
             break;
         case 4:                                                     /* SYMPHONY: a cymbal swell into each phrase */
             if (b % 4 == 3 && !drop && chance(r, x)) SFX(G, 8, 8, SX_WASH, root);
+            break;
+        case 5:                                                     /* TROPIC: waves, a long wash every other phrase */
+            if (b % 8 == 0 && !drop && chance(r, x)) SFX(G, 0, 16, SX_WASH, root);
+            break;
+        case 6:                                                     /* STEEL: an impact on the phrase, bits at the top */
+            if (b % 4 == 0 && !drop && chance(r, x * 60 / 100)) SFX(G, 0, 2, SX_IMPACT, root);
+            if (e > 200) for (i = 0; i < 4; i++) if (chance(r, x * 20 / 100)) SFX(G, OFF[i], 1, SX_BITS, root);
+            break;
+        case 7:                                                     /* DRIFT: long washes, a rare zap far off */
+            if (b % 2 == 0 && !drop && chance(r, x)) SFX(G, 0, 16, SX_WASH, root);
+            if (chance(r, x * 10 / 100)) SFX(G, 10, 1, SX_ZAP, root + 24);
+            break;
+        case 8:                                                     /* FUNK: vinyl crackle under it all */
+            if (chance(r, x)) SFX(G, 0, 16, SX_CRACKLE, root);
+            break;
+        case 9:                                                     /* RAVE: zaps on the off-beats, a riser every phrase */
+            for (i = 0; i < 4; i++) if (chance(r, x * 35 / 100)) SFX(G, OFF[i], 1, SX_ZAP, root + PICK(r, 12, 19, 24));
+            if (b % 4 == 3 && !drop) SFX(G, 8, 8, SX_RISER, root);
             break;
         default:                                                    /* OLDSKOOL: crackle under everything, bits */
             if (chance(r, x)) SFX(G, 0, 16, SX_CRACKLE, root);
@@ -551,6 +674,12 @@ static void densify(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t b, 
         return;
     }
     if (l == L_PAD && g_style == S_ORCH) return;
+    if (l == L_DRUMS && g_style == S_DDRIFT) {          /* more, but never a snare: hats and a second kick */
+        for (s = 2; s < 16; s += 2) if (chance(r, x * 50 / 100)) { ev_t *e = DRUM(G, s, DK_HAT); if (e) e->flags = EV_ACC2; }
+        if (chance(r, x * 40 / 100)) { ev_t *e = DRUM(G, 8, DK_KICK); if (e) e->flags = EV_ACC1; }
+        g_sort(G);
+        return;
+    }
     if (l == L_DRUMS) {
         uint32_t has[NDK] = {0};
         static const int8_t KS[7] = {2, 3, 6, 7, 10, 11, 14}, GS[6] = {1, 3, 5, 9, 11, 13};
@@ -646,6 +775,29 @@ static void pitch_shape(int32_t l, gen_t *G, rng_t *r, const tools_t *T)
     }
 }
 
+/* how the style plays: lead notes glide in from the last one (not over a leap wider than a fifth), long chords swell
+ * in or fade out; the tracker's tone portamento and volume slides */
+static void play_shape(int32_t l, gen_t *G, rng_t *r, int32_t p)
+{
+    const prof_t *P = &PROF[p];
+    uint32_t i;
+    int32_t prev = -1;
+    if (l == L_LEAD && P->glide)
+        for (i = 0; i < G->n; i++) {
+            ev_t *e = &G->ev[i];
+            if (e->n != 1) { prev = -1; continue; }
+            if (prev >= 0 && e->note[0] != prev && (e->note[0] > prev ? e->note[0] - prev : prev - e->note[0]) <= 7 && chance(r, P->glide))
+                e->flags |= EV_GLIDE;
+            prev = e->note[0];
+        }
+    if ((l == L_PAD || l == L_BASS) && P->swell)
+        for (i = 0; i < G->n; i++) {
+            ev_t *e = &G->ev[i];
+            if (e->len < 8 || (e->flags & EV_ARP) || !chance(r, l == L_BASS ? P->swell / 2 : P->swell)) continue;
+            e->flags |= chance(r, 65) ? EV_SWELL : EV_FADE;
+        }
+}
+
 /* ---- one bar, all lanes */
 static void gen_bar(int32_t b, bar_t *B)
 {
@@ -679,6 +831,7 @@ static void gen_bar(int32_t b, bar_t *B)
         if (dens > 100) dens = 100;
         if (l != L_SFX) densify(l, &G, &r, &T, b, dens);
         if (!ln[l].up.on) pitch_shape(l, &G, &r, &T);
+        if (!HITS(l)) play_shape(l, &G, &r, p);
         if (A.drop && l == L_DRUMS) {
             int has_c = 0, has_k = 0;
             for (i = 0; i < G.n; i++) if (G.ev[i].st == 0) { if (G.ev[i].note[0] == DK_CRASH) has_c = 1; if (G.ev[i].note[0] == DK_KICK) has_k = 1; }
@@ -737,10 +890,13 @@ static void music_init(void)
         for (i = 0; i < 32u; i++) { ln[l].up.k[i] = EMPTY; ln[l].up.len[i] = 1; ln[l].up.kinds[i] = 0; }
     }
 }
+static int32_t launch_tempo = 1;                                /* LAUNCH brings the style's tempo (SEL + SEQ: keep yours) */
+static void set_bpm(int32_t b);
 static void commit_launch(void)
 {
     int32_t l;
     for (l = 0; l < (int32_t)NLANE; l++) if (!ln[l].lock) ln[l].prof = (uint8_t)target;
+    if (launch_tempo) set_bpm(PROF[target].bpm);
     blend = 0; launch_bar = -1;
 }
 
@@ -795,7 +951,7 @@ static void fx_apply(void)
         lanefx_t *F = &fx[l];
         int32_t v = U->vary, c = v ? (int32_t)((hash3(ph, l, 4242) >> 8) % 6u) : 0;
         int32_t filt = U->filt, res = U->res, wob = U->wob, bright = U->bright, drive = U->drive, slide = U->slide;
-        int32_t retrig = U->retrig, rate = U->rtg_rate, echo = U->echo;
+        int32_t retrig = U->retrig, rate = U->rtg_rate, echo = U->echo + (l == L_LEAD ? PROF[ln[L_LEAD].prof].echo : 0);   /* the style's echo channel */
         if (HITS(l) && (c == 2 || c == 3)) c = 1;                   /* no slide or brightness on hits: echo instead */
         switch (c) {
         case 1: echo += 60 * v / 100; break;
@@ -837,11 +993,12 @@ static int32_t note_to_k(const tools_t *T, int32_t note)
     for (k = -14; k <= 21; k++) { int32_t d = stp(T, k) - note, e = stp(T, best) - note; if ((d < 0 ? -d : d) < (e < 0 ? -e : e)) best = k; }
     return best;
 }
+static int32_t fill_style = -1;                                 /* EDIT's FILL: -1 = the lane's own style */
 static void pat_fresh(int32_t l)
 {
     upat_t *U = &ln[l].up;
     uint32_t seed = rnd(&ui_rng) ^ fm1_ms, i;
-    int32_t bi, p = ln[l].prof;
+    int32_t bi, p = fill_style >= 0 ? fill_style : ln[l].prof;
     static gen_t G;
     for (i = 0; i < 32u; i++) { U->k[i] = EMPTY; U->len[i] = 1; U->kinds[i] = 0; }
     for (bi = 0; bi < U->bars; bi++) {
@@ -849,7 +1006,7 @@ static void pat_fresh(int32_t l)
         harm_at(bi, &H);
         tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
         GL = &ln[l]; keys_for(GL, bi);
-        if (l == L_SFX) { arc_t A = arc_at(bi); gen_sfx(&G, &r, &T, bi, eff_prof(L_SFX, bi), ln[l].dens, &A, arc_at(bi + 1).drop); }
+        if (l == L_SFX) { arc_t A = arc_at(bi); gen_sfx(&G, &r, &T, bi, p, ln[l].dens, &A, arc_at(bi + 1).drop); }
         else generate(PROF[p].st[l], &G, &r, &T, bi, PROF[p].st[l] == S_RIFF ? (int32_t)(seed & 1023u) + 4 : p);
         for (i = 0; i < G.n; i++) {
             uint32_t s = (uint32_t)bi * 16u + G.ev[i].st;
@@ -898,12 +1055,40 @@ static int32_t pat_generate(int32_t l, int32_t fresh)           /* returns the n
     for (tries = 0; tries < 40; tries++) {
         uint32_t h;
         *U = keep;
-        if (fresh || was_empty) pat_fresh(l); else pat_vary(l);
+        if (fresh || was_empty || fill_style >= 0) pat_fresh(l); else pat_vary(l);
         h = pat_hash(l);
         if (!pat_seen(l, h) && !pat_empty(l)) { pat_remember(l, h); U->on = 1; invalidate_now(); return (int32_t)nseen[l]; }
     }
     *U = keep;
     return 0;
+}
+/* COPY: another lane's pattern into this one. Between melodic lanes the scale steps carry over (so a lead line
+ * becomes a bass line in the same chords); notes into drums become kicks on the beat and hats between; drums into
+ * notes become the root (kick), the fifth (snare) and the octave (the rest). */
+static void pat_copy(int32_t from, int32_t to)
+{
+    upat_t S, *U = &ln[to].up;
+    int32_t i;
+    for (i = 0; i < 32; i++) { S.k[i] = ln[from].up.k[i]; S.len[i] = ln[from].up.len[i]; S.kinds[i] = ln[from].up.kinds[i]; }
+    S.on = ln[from].up.on; S.bars = ln[from].up.bars;
+    for (i = 0; i < 32; i++) { U->k[i] = S.k[i]; U->len[i] = S.len[i]; U->kinds[i] = S.kinds[i]; }
+    U->bars = S.bars;
+    if (HITS(from) != HITS(to))
+        for (i = 0; i < 32; i++) {
+            if (HITS(to)) {
+                uint8_t k = 0;
+                if (S.k[i] != EMPTY) k = (uint8_t)(to == L_DRUMS ? 1u << (i % 4 == 0 ? DK_KICK : DK_HAT) : 1u << (i % 4 == 0 ? SX_ZAP : SX_BITS));
+                U->kinds[i] = k; U->k[i] = EMPTY; U->len[i] = 1;
+            } else {
+                uint8_t k = S.kinds[i];
+                U->kinds[i] = 0; U->len[i] = 1;
+                U->k[i] = !k ? EMPTY : from == L_DRUMS && (k & (1u << DK_KICK)) ? 0 : from == L_DRUMS && (k & (1u << DK_SNARE)) ? 4 : 7;
+            }
+        }
+    else if (HITS(to) && from != to)                                /* drums and sfx: their own kinds */
+        for (i = 0; i < 32; i++) U->kinds[i] = S.kinds[i] ? (uint8_t)(to == L_DRUMS ? 1u << (i % 4 == 0 ? DK_KICK : DK_HAT) : 1u << SX_BITS) : 0;
+    U->on = 1;
+    invalidate_now();
 }
 static void pat_grab(int32_t l)                                 /* what the lane plays in this bar becomes the pattern */
 {

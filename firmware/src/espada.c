@@ -53,6 +53,9 @@ typedef struct {
 #define EV_ARP 1u
 #define EV_ACC1 2u              /* accents (the chopped pad): a step softer */
 #define EV_ACC2 4u              /* two steps softer */
+#define EV_GLIDE 8u             /* the note glides in from the lane's last one (a tracker's tone portamento) */
+#define EV_SWELL 16u            /* the note swells in over most of its length (volume slide up) */
+#define EV_FADE 32u             /* the note fades out over its length (volume slide down) */
 #define MAXEV 80u
 typedef struct {
     int32_t num;                /* the bar this buffer holds (-1 = none) */

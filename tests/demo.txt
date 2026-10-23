@@ -1,58 +1,64 @@
 # A tour of Espada in host mode: build/host/espada build/host/demo tests/demo.txt
 # buttons: 2 FX, 3 SEL, 4 ENV, 5 LFO, 6 EDIT, 7 GLO, 8 HOME, 9 SAVE, 10 ARP, 11 SEQ, 12 PLAY, 13 REC
 # encoders: 0 SELECT, 1 ALGORITHM, 2..5 KNOB1..4, 6 PRESETS; keys: bit 0 = F3 .. bit 26 = G5
-1000 btn 12
+# (the first 1.5 s are the splash: the tour starts after it)
+2000 btn 12
 # PLAY, MELODY: a new idea for the pad and the bass
-2000 enc 3 7
-2100 enc 4 3
-5000 shot
+3000 enc 3 7
+3100 enc 4 3
+6000 shot
 # SOUND (FX), FILTER: the pad low-passed, the bass and drums high-passed
-5200 btn 2
-5300 enc 3 -45
-5350 enc 4 20
-5400 enc 5 30
-8000 shot
-# TRACKER (ARP), pressed again to its RATE; echo-like stutter on lead and pad
-8200 btn 10
-8250 btn 10
-8300 btn 10
-8400 enc 2 40
-8450 enc 3 25
-11000 shot
-# SONG (GLO), KEY: D major, the third suggestion
-11200 btn 7
-11300 enc 6 1
-11400 enc 3 2
-14000 shot
-# ARC: on
-14200 btn 7
-14300 enc 2 1
-17000 shot
-# SFX: busier
-17200 btn 7
-17300 enc 3 10
-20000 shot
-# SFX PART
-20200 btn 7
-20300 enc 4 30
-23000 shot
-# EDIT on the drums: kick, snare, hat at the cursor
-23200 btn 8
-23300 enc 1 -4
-23400 btn 6
-23500 keys 0x80
-23550 keys 0
-23600 keys 0x800
-23650 keys 0
-23700 keys 0x4000
-23750 keys 0
+6200 btn 2
+6300 enc 3 -45
+6350 enc 4 20
+6400 enc 5 30
+9000 shot
+# TRACKER (ARP), on to ECHO (pressed again three times): echo on the lead
+9200 btn 10
+9250 btn 10
+9300 btn 10
+9350 btn 10
+9400 enc 2 40
+12000 shot
+# SONG (GLO), PRESETS on to KEY: the scale MAJOR
+12200 btn 7
+12300 enc 6 1
+12400 enc 3 1
+15000 shot
+# ARC: on (the picture), then off again
+15200 enc 6 1
+15300 enc 2 1
+18000 shot
+18100 enc 2 -1
+# LIVE (PRESETS back to the first row): the next style, TROPIC, launched on the phrase with its tempo
+18200 enc 6 -1
+18250 enc 6 -1
+18300 enc 2 1
+18350 enc 2 1
+18400 enc 2 1
+18450 enc 2 1
+21000 shot
+21200 btn 11
+# EDIT on the pad: FILL from FUNK (EDIT 2), LFO fills it with clav stabs
+23000 btn 8
+23100 enc 1 2
+23200 btn 6
+23300 enc 6 1
+23400 enc 2 1
+23450 enc 2 1
+23500 enc 2 1
+23550 enc 2 1
+23600 enc 2 1
+23650 enc 2 1
+23700 enc 2 1
+23750 enc 2 1
+23800 enc 2 1
+23900 btn 5
 26000 shot
-# out of EDIT, launch the queued profile on the next phrase
 26200 btn 6
-26300 btn 11
-27000 shot
-# drop: the drums alone
-32000 btn 13
-32100 rel 13
-33000 shot
-34000 end
+32000 shot
+# drop: the pad alone
+33000 btn 13
+33100 rel 13
+36000 shot
+37000 end

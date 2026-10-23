@@ -7,10 +7,11 @@ One screen, always the same: a mixing desk.
 - The **header** names the group you are in (PLAY, SOUND, TRACKER, SONG, or EDIT and its lane), with four boxes for
   the bar in the phrase and the tempo.
 - The **title** shows the setting in large letters, dots for where it sits in its group, and on the right what is
-  about to happen (LAUNCH 3, DROP IN 2), the lane you act on when it is faded out or locked, or the queued profile.
+  about to happen (LAUNCH 3, DROP IN 2), the lane you act on when it is faded out or locked, or the queued style. Beside the group the header names the
+  style playing.
   Messages appear here for a moment.
 - The **lanes**: all five, always. Notes scroll past the white "now" line; the past is dimmed. Solid blocks play
-  now; outlined blocks show what the queued profile will play. A faded-out lane is dark, a locked lane's name
+  now; outlined blocks show what the queued style will play. A faded-out lane is dark, a locked lane's name
   inverted. The white bar left of a name marks the lane the buttons and keys act on. (SONG's KEY row shows the chords
   here instead, its ARC row the arc, EDIT the step grid.)
 - The **knobs**: KNOB 1 to 4, in the order they sit on the panel. In PLAY, SOUND and TRACKER they are the four lanes,
@@ -35,23 +36,24 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 
 | Group | Button | Settings (KNOB 1..4 = LEAD, PAD, BASS, DRUMS) |
 | --- | --- | --- |
-| PLAY | HOME | melody, rhythm, pitch, change, density, octave, profile, sound, level |
+| PLAY | HOME | melody, rhythm, pitch, change, density, octave, style, sound, level |
 | SOUND | FX | filter, resonance, wobble, drive, brightness, crush, vary |
 | TRACKER | ARP | slide, retrigger, rate, echo |
 
 | SONG (GLO) | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
-| LIVE | queue (the next profile) | blend | energy | space (the room) |
+| LIVE | style (the next one) | blend | energy | space (the room) |
 | KEY | key | scale | chords | bars per chord |
 | ARC | arc on / off | build | peak | auto drop |
 | SFX | sound | rhythm | change | level |
-| SFX PART | profile | density | melody | vary |
+| SFX PART | style | density | melody | vary |
 | SFX FX | filter | resonance | wobble | drive |
 | SFX FX 2 | crush | echo | retrigger | rate |
 
 | EDIT | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
-| the lane's steps | step | length | bars | pattern (yours or the profile's) |
+| the lane's steps | step | length | bars | pattern (yours or the style's) |
+| EDIT 2 (PRESETS) | fill (the style LFO fills from) | copy (the lane SEQ copies from) | | |
 
 ## Buttons
 
@@ -62,10 +64,10 @@ Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on
 | HOME, FX, ARP, GLO | the groups PLAY, SOUND, TRACKER, SONG; pressed again: the next setting. From EDIT: back |
 | EDIT | the lane's own pattern, step by step (again: back) |
 | PLAY | start / stop. SEL + PLAY: from the top |
-| SEQ | LAUNCH: every unlocked lane moves to the queued profile on the next phrase (again: cancel) |
+| SEQ | LAUNCH: every unlocked lane moves to the queued style on the next phrase, at the style's tempo (again: cancel). SEL + SEQ: launch and keep your tempo. On EDIT: COPY the pattern of the lane set on EDIT 2 into this one |
 | REC | DROP, while playing: tap = a break from the next bar and the drop on the next phrase; hold = a break while held, the drop on the bar after you let go. The marked lane plays alone in the break. On EDIT: GRAB (what the lane plays now becomes its pattern); SEL + REC: clear it |
-| ENV | fade the lane out over a bar; again: back in. SEL + ENV: LOCK (it keeps its profile when you blend or launch). On EDIT: TIE |
-| LFO | a new idea for the lane from the next bar (MELODY moves on). On EDIT: GENERATE a pattern (a variation; SEL + LFO: a fresh one) |
+| ENV | fade the lane out over a bar; again: back in. SEL + ENV: LOCK (it keeps its style when you blend or launch). On EDIT: TIE |
+| LFO | a new idea for the lane from the next bar (MELODY moves on). On EDIT: GENERATE a pattern: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
 | OCT- / OCT+ | the keys' octave; both together: back to 0. On EDIT: the octave you enter in |
 | SAVE | keep everything (settings and patterns); while playing it waits until you stop. SEL + SAVE: the audio interrupt's time in the header |
 
@@ -88,14 +90,15 @@ lane faded out, a save waiting, the keys' octave off 0.
 - **Space** (SONG, LIVE) is the room: a stereo reverb the lanes send to, the pad and sfx most, the bass hardly.
 - **The arc** is off until you turn it on (SONG, ARC, knob 1). On: it starts with a few drum hits and builds bass,
   pad and lead in as the energy rises, breaks, drops and builds again; the ARC row draws it. DROP works without it.
-- **Blend** moves lanes to the queued profile from the bottom up: drums, then bass, pad, lead (the word under it
+- **Blend** moves lanes to the queued style from the bottom up: drums, then bass, pad, lead (the word under it
   says how far).
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.
-- **Sound** (PLAY): AUTO follows the profile; or one of seventeen FM patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
+- **Sound** (PLAY): AUTO follows the style; or one of seventeen FM patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
   STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS, VIOLINS, CELLOS), or one of three drum kits (STANDARD,
   TRACKER, ELECTRO). RAZOR is a cutting, saw-like lead; PULSE a hollow one; PIANO and E.PIANO ring out. CHAOS is
   three sounds in one: a light saw lead, a heavy pad under it (two detuned oscillators, one an octave down, fading
-  in slowly and out late) and brown noise that breathes with the pad.
+  in slowly and out late) and brown noise that breathes with the pad. STRINGS, VIOLINS, CELLOS, BRASS and FLUTE carry
+  a little noise in the tone (bow, breath), as recorded ones do; the kits' snares and cymbals ring darker and longer.
 - **Vary:** each 4-bar phrase gives the lane a character on top of your effects: CLEAN, ECHO, SLIDE, BITE
   (brightness and drive), FILTER (a low-pass with resonance) or STUTTER (retrigger). VARY sets how far it reaches;
   the value shows the phrase's character. The lead starts at 40 %, the other lanes at 0. Your own settings stay as
@@ -111,16 +114,35 @@ lane faded out, a save waiting, the keys' octave off 0.
   middle. STRINGS and BRASS play as sections (two more players a little out of tune) and the strings swell in.
   HYPERSPACE's pad is chopped: the chord struck every 16th with an accent pattern, as a tracker re-strikes a long
   pad sample.
-- **SYMPHONY**, the fifth profile, is the orchestra: two bars a chord in minor with a major dominant before the
+- **The ten styles.** Each is a chord progression, a part for each lane, an instrument for each, a tempo, and a way
+  of playing. Change the mood with STYLE (SONG, LIVE) and SEQ.
+
+| Style | Tempo | What it is |
+| --- | --- | --- |
+| EPIC | 125 | orchestral minor: long lead lines over strings, a driving bass, toms and timpani |
+| HYPERSPACE | 130 | techno minor: power chords, a chopped pad, chord stabs, straight drums |
+| FUSION | 125 | melodic major with a chromatic turn: a riff through every chord, a pedal bass, lush chords |
+| OLDSKOOL | 125 | the 4-channel sound: arpeggio chords, an octave bass, a busy lead with an echo |
+| SYMPHONY | 110 | the orchestra: two bars a chord, swelling strings, a violin line, cellos, timpani |
+| TROPIC | 110 | sunny mixolydian: chords on the off-beat, a deep bass with rests, congas, a flute |
+| STEEL | 140 | heavy: power chords, a galloping bass, double kick, a saw lead that glides |
+| DRIFT | 96 | floating: sus chords resolving, two bars a chord, swells, a breathy lead with a long echo, no snare |
+| FUNK | 112 | a major vamp with a diminished passing chord: slap bass, clav stabs, ghost notes |
+| RAVE | 138 | four on the floor: an acid bass that slides, organ chords, brass stabs, risers |
+
+- **How a style plays.** As a tracker musician plays the notes by hand: some lead notes glide in from the last one
+  (STEEL most, DRIFT and FUSION often), long chords swell in or fade out (DRIFT and SYMPHONY most), and the lead
+  gets an echo, a quieter copy three 16ths later (DRIFT, OLDSKOOL, RAVE). The style's echo adds to the lane's ECHO.
+- **SYMPHONY** is the orchestra: two bars a chord in minor with a major dominant before the
   return; strings in open voicing (root, fifth, tenth) with a suspension resolving on each new chord and the inner
   voice moving on the last bar; a legato violin line in long arcs; cellos and basses holding the root and walking
   down into the next chord; timpani on the one with a roll into each phrase, a bass drum every other bar, a cymbal
   on the phrase and a cymbal swell (sfx) before it; a march snare when the energy is up.
-- **A lane's profile** (PLAY) sets that lane alone; the queued profile (SONG, LIVE) is the one blend and launch move to.
+- **A lane's style** (PLAY) sets that lane alone; the queued style (SONG, LIVE) is the one blend and launch move to.
 - **The lead** follows the chords: every beat is a chord tone, the notes between lead into the next one by scale
   steps, and each 4-bar phrase states a motif, answers it, varies it and lands on the root or third. Density adds a
   16th into a beat, never a stray note.
-- Profile, blend, density, octave and the SONG settings change on the next bar; SOUND and TRACKER act at once.
+- Style, blend, density, octave and the SONG settings change on the next bar; SOUND and TRACKER act at once.
 
 ## SFX
 
@@ -130,8 +152,9 @@ laser: a sine falling fast), **CRACKLE** (vinyl clicks and hiss) and **BITS** (1
 8-bit kind, on the chord's root).
 
 On **AUTO** (the default) it follows the arc: a riser fills the bar before each drop, the impact lands on it, and in
-between it plays what fits the profile: washes for EPIC and FUSION, zaps and bits for HYPERSPACE, crackle and bits
-for OLDSKOOL, more as the energy and the density rise. With the arc off: a riser every 8th bar, an impact after it.
+between it plays what fits the style: washes for EPIC, FUSION, TROPIC and DRIFT, zaps and bits for HYPERSPACE, crackle
+and bits for OLDSKOOL, crackle for FUNK, impacts for STEEL, zaps and a riser every phrase for RAVE, more as the
+energy and the density rise. With the arc off: a riser every 8th bar, an impact after it.
 Turn **SOUND** (SONG, SFX) to one of the six to hear only that one, in its own pattern. SFX FX and SFX FX 2 give it
 the effects of any lane (a filter sweep over a wash, echo on the zaps). On EDIT the first six white keys (F3 .. D4) switch
 WASH, RISER, IMPACT, ZAP, CRACKLE and BITS at the cursor.

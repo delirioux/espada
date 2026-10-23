@@ -160,7 +160,7 @@ static void toast(const char *s) { uint32_t i; for (i = 0; i < 47u && s[i]; i++)
 static const char *const NN[12] = {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
 static const char *const WOBN[6] = {"OFF", "1/1", "1/2", "1/4", "1/8", "1/16"};
 static const char *const DKN[NDK] = {"K", "S", "H", "T", "C"};
-static const char *const PSHORT[5] = {"EPIC", "HYPER", "FUSION", "OLDSKOOL", "SYMPHONY"};
+static const char *const PSHORT[10] = {"EPIC", "HYPER", "FUSION", "OLDSKOOL", "SYMPHONY", "TROPIC", "STEEL", "DRIFT", "FUNK", "RAVE"};
 static const char *const SSHORT[13] = {"AUTO", "MAJOR", "MINOR", "DORIAN", "PHRYGIAN", "LYDIAN", "MIXOLYD", "LOCRIAN",
                                        "HARM MIN", "MEL MIN", "MAJ PENT", "MIN PENT", "BLUES"};
 static void set_key(int32_t k) { key = fmodp(k, 12); key_off = key - 2 > 5 ? key - 14 : key - 2; invalidate(); }
@@ -302,6 +302,14 @@ static void v_chg(char *o) { s_pct(o, ln[sel].chg); }
 static void s_chg(char *o) { s_cat(o, ln[sel].chg < 10 ? "FROZEN" : ln[sel].chg < 40 ? "64 BARS" : ln[sel].chg < 70 ? "32 BARS" : "16 BARS"); }
 static void t_auto(int32_t d) { auto_drop = d > 0; invalidate(); }
 static void v_auto(char *o) { s_cat(o, auto_drop ? "ON" : "OFF"); }
+/* EDIT's second row: FILL (the style LFO fills the lane from; OWN = the lane's) and COPY (the lane SEQ copies from) */
+static int32_t copy_src = L_LEAD;
+static void t_fill(int32_t d) { fill_style = fmodp(fill_style + 1 + (d > 0 ? 1 : -1), NPROF + 1) - 1; }
+static void v_fill(char *o) { s_cat(o, fill_style < 0 ? "OWN" : PSHORT[fill_style]); }
+static void s_fill(char *o) { s_cat(o, "BY LFO"); }
+static void t_csrc(int32_t d) { copy_src = fmodp(copy_src + (d > 0 ? 1 : -1), NLANE); }
+static void v_csrc(char *o) { s_cat(o, LNAME[copy_src]); }
+static void s_csrc(char *o) { s_cat(o, ln[copy_src].up.on ? "BY SEQ" : "NO PART"); }
 
 
 /* ---- the settings. A lane group's setting is one row of the desk: KNOB 1..4 set it for LEAD, PAD, BASS, DRUMS.
@@ -309,7 +317,7 @@ static void v_auto(char *o) { s_cat(o, auto_drop ? "ON" : "OFF"); }
  * for the column and puts it back, turning a lane's knob leaves it there (the lane you touch is the lane). */
 static const card_t ROW_PLAY[] = {
     {"MELODY", t_mel, v_mel, 0}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"PITCH", t_pit, v_pit, s_pit}, {"CHANGE", t_chg, v_chg, s_chg},
-    {"DENSITY", t_dens, v_dens, 0}, {"OCTAVE", t_oct, v_oct, 0}, {"PROFILE", t_lprof, v_lprof, 0}, {"SOUND", t_inst, v_inst, s_inst},
+    {"DENSITY", t_dens, v_dens, 0}, {"OCTAVE", t_oct, v_oct, 0}, {"STYLE", t_lprof, v_lprof, 0}, {"SOUND", t_inst, v_inst, s_inst},
     {"LEVEL", t_level, v_level, 0}};
 static const card_t ROW_SOUND[] = {
     {"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0},
@@ -319,15 +327,18 @@ static const card_t ROW_TRK[] = {
 typedef struct { const char *name; int8_t lane; card_t c[4]; } srow_t;     /* lane: -1 the song, else that lane's */
 enum { SR_LIVE, SR_KEY, SR_ARC, SR_SFX };
 static const srow_t ROW_SONG[] = {
-    {"LIVE", -1, {{"QUEUE", t_prof, v_prof, 0}, {"BLEND", t_blend, v_blend, s_blend}, {"ENERGY", t_energy, v_energy, 0}, {"SPACE", t_space, v_space, 0}}},
+    {"LIVE", -1, {{"STYLE", t_prof, v_prof, 0}, {"BLEND", t_blend, v_blend, s_blend}, {"ENERGY", t_energy, v_energy, 0}, {"SPACE", t_space, v_space, 0}}},
     {"KEY", -1, {{"KEY", t_key, v_key, 0}, {"SCALE", t_scale, v_scale, 0}, {"CHORDS", t_prog, v_prog, 0}, {"BARS/CH", t_bpc, v_bpc, 0}}},
     {"ARC", -1, {{"ARC", t_arc, v_arc, 0}, {"BUILD", t_build, v_build, s_phr}, {"PEAK", t_peak, v_peak, s_phr}, {"AUTODROP", t_auto, v_auto, 0}}},
     {"SFX", L_SFX, {{"SOUND", t_inst, v_inst, 0}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"CHANGE", t_chg, v_chg, s_chg}, {"LEVEL", t_level, v_level, 0}}},
-    {"SFX PART", L_SFX, {{"PROFILE", t_lprof, v_lprof, 0}, {"DENSITY", t_dens, v_dens, 0}, {"MELODY", t_mel, v_mel, 0}, {"VARY", t_vary, v_vary, s_vary}}},
+    {"SFX PART", L_SFX, {{"STYLE", t_lprof, v_lprof, 0}, {"DENSITY", t_dens, v_dens, 0}, {"MELODY", t_mel, v_mel, 0}, {"VARY", t_vary, v_vary, s_vary}}},
     {"SFX FX", L_SFX, {{"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0}}},
     {"SFX FX 2", L_SFX, {{"CRUSH", t_crush, v_crush, 0}, {"ECHO", t_echo, v_echo, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}}},
 };
-static const card_t ROW_EDIT[4] = {{"STEP", t_step, v_step, 0}, {"LENGTH", t_len, v_len, 0}, {"BARS", t_bars, v_bars, 0}, {"PATTERN", t_use, v_use, 0}};
+static const card_t ROW_EDIT[2][4] = {
+    {{"STEP", t_step, v_step, 0}, {"LENGTH", t_len, v_len, 0}, {"BARS", t_bars, v_bars, 0}, {"PATTERN", t_use, v_use, 0}},
+    {{"FILL", t_fill, v_fill, s_fill}, {"COPY", t_csrc, v_csrc, s_csrc}, {0, 0, 0, 0}, {0, 0, 0, 0}}};
+static int32_t edit_row;
 #define NROWS_OF(a) ((int32_t)(sizeof(a) / sizeof(a[0])))
 static int32_t nrows(int32_t g) { return g == G_PLAY ? NROWS_OF(ROW_PLAY) : g == G_SOUND ? NROWS_OF(ROW_SOUND) : g == G_TRK ? NROWS_OF(ROW_TRK) : NROWS_OF(ROW_SONG); }
 static const char *row_name(void)
@@ -339,7 +350,7 @@ static const char *row_name(void)
 static const card_t *knob_card(int32_t c, int32_t *lane)
 {
     int32_t r = rowi[grp];
-    if (edit_on) { *lane = sel; return &ROW_EDIT[c]; }
+    if (edit_on) { *lane = sel; return &ROW_EDIT[edit_row][c]; }
     if (grp == G_SONG) { *lane = ROW_SONG[r].lane; return &ROW_SONG[r].c[c]; }
     *lane = c;
     return grp == G_PLAY ? &ROW_PLAY[r] : grp == G_SOUND ? &ROW_SOUND[r] : &ROW_TRK[r];
@@ -557,11 +568,13 @@ static void draw_header(void)
     cs_begin(0, HEAD_H + 2, C_BG);
     fill(0, 0, cw, 15, hc);
     text(3, 3, wh, C_BG, 1);
+
     t[0] = 0;
     if (debug_on) { char *o = s_cat(t, "ISR "); o = s_int(o, (int32_t)isr_us_max); s_cat(o, "US"); }
     else { char *o = s_int(t, seq_bpm); s_cat(o, " BPM"); }
     x = 238 - tw(t, 1);
     text(x, 3, t, debug_on ? C_WHITE : C_CREAM, 1);
+    if (cw + 6 + tw(PSHORT[ln[L_BASS].prof], 1) < x - 54) text(cw + 6, 3, PSHORT[ln[L_BASS].prof], C_MUTE, 1);   /* the style playing */
     for (i = 0; i < 4; i++) {                                       /* the bar in the phrase */
         int32_t on = seq_playing && cb % 4 == i;
         fill(x - 50 + i * 11, 4, 9, 9, on ? hc : seq_playing && cb % 4 > i ? cscale(hc, 90) : RGBC(0x1d2b2b));
@@ -824,6 +837,7 @@ static void input(void)
         if (e == ENC_ALGORITHM) { set_sel(sel + (d > 0 ? 1 : -1)); continue; }              /* the lane */
         if (e == ENC_PRESETS) {                                         /* the setting in the group */
             if (!edit_on) rowi[grp] = fmodp(rowi[grp] + (d > 0 ? 1 : -1), nrows(grp));
+            else edit_row = !edit_row;                                  /* EDIT: the steps, or FILL and COPY */
             area_dirty = 1; continue;
         }
         {
@@ -846,8 +860,17 @@ static void input(void)
         else { edit_on = !edit_on; cursor = clampi(cursor, 0, ln[sel].up.bars * 16 - 1); area_dirty = 1; }
     }
     if (b & (1u << BTN_SEQ)) {
-        if (launch_bar >= 0) { launch_bar = -1; toast("LAUNCH CANCELLED"); }
-        else { launch_bar = (cur_bar() / 4 + 1) * 4; toast("LAUNCH ON THE NEXT PHRASE"); }
+        if (edit_on) {                                              /* EDIT: copy the COPY lane's pattern into this one */
+            char t[40], *o;
+            if (copy_src == sel) toast("COPY: PICK ANOTHER LANE (EDIT 2)");
+            else if (pat_empty(copy_src)) { o = s_cat(t, LNAME[copy_src]); s_cat(o, " HAS NO PART: FILL IT FIRST"); toast(t); }
+            else { pat_copy(copy_src, sel); o = s_cat(t, LNAME[copy_src]); o = s_cat(o, " COPIED TO "); s_cat(o, LNAME[sel]); toast(t); }
+        } else if (launch_bar >= 0) { launch_bar = -1; toast("LAUNCH CANCELLED"); }
+        else {
+            char t[40], *o;
+            launch_bar = (cur_bar() / 4 + 1) * 4; launch_tempo = !held;
+            o = s_cat(t, "LAUNCH "); o = s_cat(o, PSHORT[target]); s_cat(o, held ? ", YOUR TEMPO" : " ON THE PHRASE"); toast(t);
+        }
         invalidate();
     }
     if (b & (1u << BTN_REC)) {
@@ -870,7 +893,12 @@ static void input(void)
         } else {
             int32_t n = pat_generate(sel, held);
             char t[40], *o;
-            if (n) { o = s_cat(t, LNAME[sel]); o = s_cat(o, held ? ": NEW PATTERN #" : ": VARIATION #"); s_int(o, n - 1); toast(t); gen_count[sel] = n; }
+            if (n) {
+                o = s_cat(t, LNAME[sel]);
+                if (fill_style >= 0) { o = s_cat(o, ": "); o = s_cat(o, PSHORT[fill_style]); o = s_cat(o, " #"); }
+                else o = s_cat(o, held ? ": NEW PATTERN #" : ": VARIATION #");
+                s_int(o, n - 1); toast(t); gen_count[sel] = n;
+            }
             else toast("NO NEW ONE: SEL+LFO = FRESH");
         }
         area_dirty = 1;

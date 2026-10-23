@@ -4,9 +4,10 @@
 
 **A generative groovebox for the M-VAVE FM-1, in the style of early-90s PC tracker music.**
 
-Five lanes (lead, pad, bass, drums and sfx) play parts that are composed live from a profile: chords, bass lines,
-melodies, drum patterns and noise in the manner of the S3M scene. You do not program steps; you mix styles. Queue the next
-profile, blend it in lane by lane from the bottom up, or launch it on the next phrase. Shape each lane with a
+Five lanes (lead, pad, bass, drums and sfx) play parts that are composed live in one of ten styles: chords, bass
+lines, melodies, drum patterns and noise in the manner of the S3M scene, played as a tracker musician plays them, with
+glides, swells and an echo channel. You do not program steps; you mix styles. Queue the next style, blend it in lane by
+lane from the bottom up, or launch it on the next phrase with its own tempo. Shape each lane with a
 filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, retrigger, a bit crusher and
 echo. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
 
@@ -23,17 +24,17 @@ the kind of setting, PRESETS steps through them.
 
 <table>
 <tr>
-<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="PLAY, MELODY"><br><b>PLAY</b> (HOME): melody, rhythm, pitch, change, density, octave, profile, sound, level.</td>
+<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="PLAY, MELODY"><br><b>PLAY</b> (HOME): melody, rhythm, pitch, change, density, octave, style, sound, level.</td>
 <td align="center" width="33%"><img src="docs/screens/sound.png" width="240" alt="SOUND, FILTER"><br><b>SOUND</b> (FX): filter, resonance, wobble, drive, brightness, crush, vary. The lanes darken what the filter cuts.</td>
 <td align="center" width="33%"><img src="docs/screens/tracker.png" width="240" alt="TRACKER, RATE"><br><b>TRACKER</b> (ARP): slide, retrigger, rate, echo.</td>
 </tr>
 <tr>
 <td align="center"><img src="docs/screens/song.png" width="240" alt="SONG, KEY"><br><b>SONG</b> (GLO): the knobs are four settings of their own. KEY: key, scale, chords, bars per chord, the chord playing lit.</td>
 <td align="center"><img src="docs/screens/arc.png" width="240" alt="SONG, ARC"><br><b>ARC</b> (off until you turn it on): the energy over the coming bars, build, break, peak and down.</td>
-<td align="center"><img src="docs/screens/sfx.png" width="240" alt="SONG, SFX"><br><b>SFX</b>: the noise lane's sound, rhythm, change and level, then its part and effects.</td>
+<td align="center"><img src="docs/screens/live.png" width="240" alt="SONG, LIVE"><br><b>LIVE</b>: the next of ten styles, blend, energy and space; SEQ launches it on the phrase with its tempo. (SONG's last rows: the sfx lane.)</td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT"><br><b>EDIT</b>: the lane's own part, step by step, in scale steps from the chord root, so it follows the chords.</td>
+<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT"><br><b>EDIT</b>: the lane's own part, step by step, in scale steps from the chord root. PRESETS: FILL it from any style (LFO), COPY another lane's (SEQ).</td>
 <td colspan="2">
 
 | Control | Does |
@@ -43,7 +44,7 @@ the kind of setting, PRESETS steps through them.
 | KNOB 1-4 | that setting for LEAD, PAD, BASS, DRUMS (SONG: the four shown) |
 | ALGORITHM | the lane the buttons and keys act on (turning its knob picks it too) |
 | SELECT | tempo |
-| PLAY / SEQ / REC | start-stop, launch on the phrase, DROP (tap or hold) |
+| PLAY / SEQ / REC | start-stop, launch the next style on the phrase (EDIT: copy a lane), DROP (tap or hold) |
 | ENV / LFO / EDIT | fade the lane out and in (SEL+ENV: lock), a new idea, its steps |
 | SAVE, OCT- / OCT+ | save; the keys' octave |
 | Keys | play the lane live; on EDIT they enter steps |
@@ -55,23 +56,27 @@ the kind of setting, PRESETS steps through them.
 ## How it plays
 
 - **Lanes.** Notes scroll from right to left past a fixed "now" line. Solid blocks are what a lane plays; outlined
-  blocks are a preview of the queued profile. All five are always on screen; the white mark is the lane the buttons
+  blocks are a preview of the queued style. All five are always on screen; the white mark is the lane the buttons
   and keys act on. Every setting is on a knob, the keys only play.
 - **SFX.** The fifth lane: a noise riser into every drop, the impact on it, washes, laser zaps, crackle and 8-bit
-  noise, following the arc and the profile.
-- **Profiles.** EPIC (orchestral minor), HYPERSPACE (techno minor with power chords), FUSION (melodic major with a
-  chromatic turn and a riff that follows the chords), OLDSKOOL (the 4-channel sound with arpeggio chords), SYMPHONY
-  (the orchestra: strings, a violin line, cellos, timpani, two bars a chord).
+  noise, following the arc and the style.
+- **Ten styles**, to change the mood in one move: EPIC (orchestral minor), HYPERSPACE (techno minor with power
+  chords), FUSION (melodic major with a chromatic turn), OLDSKOOL (the 4-channel sound with arpeggio chords), SYMPHONY
+  (the orchestra), TROPIC (off-beat chords, congas, a flute), STEEL (power chords, a galloping bass, double kick),
+  DRIFT (sus chords, swells, no snare), FUNK (slap bass, clav, ghost notes) and RAVE (four on the floor, an acid bass).
+  Each brings its chords, parts, instruments, tempo and way of playing.
+- **Played by hand.** Lead notes glide in from the last one, long chords swell in or fade out, the lead has an echo
+  channel, as in the trackers; strings carry bow noise and the drums ring as recorded ones.
 - **The music of a lane.** MELODY (which idea), RHYTHM, PITCH and CHANGE (how soon new material comes, from frozen
   to every 16 bars), side by side for all four lanes. LFO: a new idea now. ENV fades a lane out and in.
 - **Long arcs.** The lead plays 16-bar sections of two 8-bar periods: a motif stated, answered, sequenced, closed
   open, then driven to its high point and closed on the root.
-- **Mixing.** BLEND moves lanes to the queued profile one at a time: drums, then bass, pad, lead. LAUNCH moves every
-  unlocked lane at the next 4-bar phrase. LOCK keeps a lane where it is. The bass lane's profile sets the chords
+- **Mixing.** BLEND moves lanes to the queued style one at a time: drums, then bass, pad, lead. LAUNCH moves every
+  unlocked lane at the next 4-bar phrase. LOCK keeps a lane where it is. The bass lane's style sets the chords
   for everyone, so a half-blended mix stays in key.
 - **The lead** stays on the harmony: chord tones on every beat, scale runs into them, a motif per phrase that is
   answered and closed. VARY gives each phrase a different character (echo, slide, bite, filter, stutter).
-- **Density.** 50 % is the part as the profile writes it. Lower thins it out; higher adds notes inside the chord and
+- **Density.** 50 % is the part as the style writes it. Lower thins it out; higher adds notes inside the chord and
   its scale, 16th hats, ghost snares and fills.
 - **DROP.** Tap REC for a break (the marked lane plays alone) that drops on the next phrase with a crash and
   an impact, or hold it and let go when you want the drop. ENERGY (SONG) turns every lane's density up or down at
@@ -81,8 +86,9 @@ the kind of setting, PRESETS steps through them.
 - **The arc** (off until you turn it on): starts with a few drum hits and builds bass, pad and lead in as the
   energy rises, breaks, drops and builds again.
 - **Your own parts.** On the EDIT page you enter notes step by step, tracker style: white keys are scale steps
-  counted from the chord root, so a melody follows the chords and stays in key. GENERATE writes a fitting pattern or
-  a variation of yours, and never the same one twice.
+  counted from the chord root, so a melody follows the chords and stays in key. FILL writes a part in any of the ten
+  styles, or a variation of yours, never the same one twice; COPY takes another lane's part (a lead line becomes a bass
+  line in the same chords).
 - **Song.** Key, scale (major, minor, the church modes, harmonic and melodic minor, pentatonics, blues), a list of
   suggested progressions, bars per chord, and the arc's lengths.
 
@@ -137,7 +143,7 @@ above come from host mode, pixel for pixel what the FM-1 draws, at twice the siz
 ```
 firmware/src/espada.c         the app: shared state, includes the parts below
 firmware/src/espada_synth.c   the audio interrupt: FM, drum and sfx voices, lane effects, the step clock
-firmware/src/espada_music.c   harmony, profiles, generators, density, the arc, your patterns, the bar cache
+firmware/src/espada_music.c   harmony, the ten styles, generators, density, the arc, your patterns, the bar cache
 firmware/src/espada_ui.c      the screen, the views and pages, the panel, saving
 firmware/src/platform.c       Dinghy's wiring of the FM-1 platform (boot, USB, updates, panel, screen, settings)
 ```

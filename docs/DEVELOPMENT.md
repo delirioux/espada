@@ -5,7 +5,8 @@ and why, how to build and test it, the open risks and what comes next. What Espa
 the [README](../README.md) and the [manual](MANUAL.md); the chip's rules are in [RULES.md](RULES.md).
 
 Status: 20 October 2026. Version 0.1 runs on the FM-1; playing on the hardware is being tested. Five lanes,
-five profiles, long lead arcs, the one-screen interface, the browser version and the web installer are in.
+ten styles played as in a tracker, long lead arcs, the one-screen interface, the browser version and the web
+installer are in.
 
 ## Agreements
 
@@ -41,7 +42,7 @@ stand-in.
 | --- | --- |
 | `firmware/src/espada.c` | the app's shared state (lanes, effects, the clock), includes the parts below |
 | `firmware/src/espada_synth.c` | the audio interrupt: FM voices (patches with ensembles), drums, sfx voices, the stereo buses and the room, lane effects, the step clock, MIDI out |
-| `firmware/src/espada_music.c` | harmony, scales and progressions, the profiles, the generators per style, the lead's long arcs, density, the arc, your own patterns, the bar cache, mute fades |
+| `firmware/src/espada_music.c` | harmony, scales and progressions, the ten styles, their generators, the lead's long arcs, density, the arc, your own patterns, the bar cache, mute fades |
 | `firmware/src/espada_ui.c` | the screen (header, title, lanes, knobs), the groups and their settings, the panel, the LEDs, saving |
 | `firmware/src/platform.c` | Dinghy's wiring of the FM-1 platform |
 | `tests/host.c` | host mode: the platform as a stand-in; runs a script of buttons, encoders and keys over time, writes screens and a WAV |
@@ -61,12 +62,18 @@ stand-in.
   FM-1 froze on PLAY. `tools/check_names.py` runs in CI and catches it.
 - **Bars are composed ahead, played in the interrupt.** The main loop writes each lane's next bar into a cache;
   the interrupt only plays events. Composing never runs late, and the screen can show what is coming.
-- **Profiles are data.** A profile is a mode, a chord progression, a harmonic rhythm, a style and an instrument
-  per lane. The bass lane's profile sets the chords for everyone, so a half-blended mix stays in key.
+- **Styles are data.** A style is a mode, a chord progression, a harmonic rhythm, a generator and an instrument per
+  lane, a tempo, and a way of playing. The bass lane's style sets the chords for everyone, so a half-blended mix
+  stays in key. The ten come from a study of 90s tracker modules: their chords (sus chords everywhere), drum grids
+  and tempos.
+- **The playing is part of the sound.** In the modules most of the character is in how notes are played: lead notes
+  glide in (tone portamento), long chords swell and fade (volume slides), a second channel echoes the lead. Espada
+  marks events for that (EV_GLIDE, EV_SWELL, EV_FADE) and each style says how often; the voices do the rest. FM
+  patches take a little noise (bow, breath), and the drums ring longer and darker, as recorded ones do.
 - **The lead stays on the harmony.** Chord tones on every beat, scale runs between them. It writes 16-bar
   sections of two 8-bar periods: statement, answer, sequence and a half close, then a climb to the high point
   and a close on the root. CHANGE sets how soon new material comes; MELODY picks the idea.
-- **50 % density is the profile as written.** Lower thins it out, higher adds notes inside the chord and its
+- **50 % density is the style as written.** Lower thins it out, higher adds notes inside the chord and its
   scale. ENERGY moves every lane at once.
 - **Muting fades.** ENV fades a lane out or in over a bar instead of cutting it.
 - **The room at half rate.** The stereo reverb runs at half the sample rate to fit the interrupt's budget.
@@ -102,7 +109,7 @@ and publishes the site with the web installer. A tag `v*` makes a release with [
 | Risk | What happens | Check |
 | --- | --- | --- |
 | The audio interrupt's time | the reverb, the stereo buses and the orchestra's ensembles cost time; above about 2.9 ms the sound may crackle when USB and the key scan interrupt it | SEL + SAVE while SYMPHONY plays shows the worst time; trim the room or the ensembles if it is high |
-| Sound on the hardware | levels and patches were tuned in host mode and the browser, not yet by ear on the FM-1's output | play every profile on the FM-1 |
+| Sound on the hardware | levels and patches were tuned in host mode and the browser, not yet by ear on the FM-1's output | play every style on the FM-1 |
 | Name clashes in the one unit | a new file-scope variable with a platform name silently becomes one variable | settled: `check_names.py` in CI |
 | Soft floats, 64-bit division | a missing routine crashes the FM-1 | settled: CI fails on them |
 
@@ -113,12 +120,12 @@ In order of value; open to change as Espada is played.
 1. **The new interface on the FM-1.** One screen as a mixing desk: a group button (PLAY, SOUND, TRACKER, SONG),
    PRESETS through its settings, KNOB 1..4 the setting for the four lanes side by side. Tried in the browser; next
    played on the FM-1 and tuned: the order of the settings, what reads at arm's length.
-2. **Measured on the FM-1.** The interrupt's worst time with every profile, the room trimmed if needed.
+2. **Measured on the FM-1.** The interrupt's worst time with every style, the room trimmed if needed.
 3. **Tuned by ear.** Patch levels, the orchestra's balance, the drums against the bass.
-4. **Scenes.** Save and recall a whole set: the profiles per lane, the four knobs, levels, mutes and your own
+4. **Scenes.** Save and recall a whole set: the styles per lane, the four knobs, levels, mutes and your own
    parts, to move between them live.
-5. **More profiles in the style.** Slower and darker (ambient pads, a lone lead), faster (trance arpeggios), and
-   more of the S3M scene's moves: key changes up a step for the last chorus, a breakdown with only the pad.
+5. **More of the trackers' moves.** A key change up a step for the last chorus, a breakdown with only the pad,
+   sample-offset style stutters, vibrato that sets in late on long notes.
 6. **MIDI clock.** Follow an external clock and send one, so Espada plays in time with other gear.
 7. **The SFX lane on MIDI.** Today only lead, pad, bass (channels 1 to 3) and the drums (10) go out.
 
@@ -126,7 +133,7 @@ In order of value; open to change as Espada is played.
 
 Before 1.0:
 
-1. **It works on the FM-1**: every profile played, the interrupt's time measured, the way back to the stock
+1. **It works on the FM-1**: every style played, the interrupt's time measured, the way back to the stock
    firmware tried (OCT- at power-on, the official V15 from the installer).
 2. **The name**: search "Espada" in the EUIPO and BOIP registers (classes 9 and 15). Release as "Espada for
    FM-1" at least.
