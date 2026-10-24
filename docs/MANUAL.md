@@ -10,7 +10,7 @@ One screen, always the same: a mixing desk.
   about to happen (LAUNCH 3, DROP IN 2), the lane you act on when it is faded out or locked, or the queued style. Beside the group the header names the
   style playing.
   Messages appear here for a moment.
-- The **lanes**: all five, always. Notes scroll past the white "now" line; the past is dimmed. Solid blocks play
+- The **lanes**: all six, always (LEAD, ARP, PAD, BASS, DRUMS, SFX, top to bottom). Notes scroll past the white "now" line; the past is dimmed. Solid blocks play
   now; outlined blocks show what the queued style will play. A faded-out lane is dark, a locked lane's name
   inverted. The white bar left of a name marks the lane the buttons and keys act on. (SONG's KEY row shows the chords
   here instead, its ARC row the arc, EDIT the step grid.)
@@ -25,7 +25,7 @@ One screen, always the same: a mixing desk.
 | --- | --- |
 | SELECT | the tempo, everywhere |
 | PRESETS | the setting: steps through the group's settings |
-| ALGORITHM | the lane the buttons and keys act on (LEAD, PAD, BASS, DRUMS, SFX) |
+| ALGORITHM | the lane the buttons and keys act on (LEAD, ARP, PAD, BASS, DRUMS, SFX, in the screen's order) |
 | KNOB 1 .. 4 | the setting for LEAD, PAD, BASS, DRUMS (SONG: the four settings shown) |
 
 Turning a lane's knob also makes it the lane the buttons act on. Hold **SEL** to turn in steps of 10.
@@ -50,6 +50,10 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | SFX FX | filter | resonance | wobble | drive |
 | SFX FX 2 | crush | echo | retrigger | rate |
 | SFX ROOM | reverb | | | |
+| ARP | sound | melody: the pattern | rhythm: 16ths, 8ths or quarters | level |
+| ARP PART | style | pitch: 1 to 3 octaves | density | change |
+| ARP FX | filter | resonance | wobble | drive |
+| ARP FX 2 | echo | slide | crush | reverb |
 
 | EDIT | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
@@ -64,6 +68,7 @@ Hold **HOME** for SETUP; HOME (or any group button, or EDIT) leaves it. PRESETS 
 | --- | --- | --- | --- | --- |
 | LOOK | palette: ESPADA (its colours), AMBER, GREEN, CYAN, RED, MONO | screen: 100, 75, 50 or 25 % | lights: the keys' and buttons' glow on or off | |
 | MIDI | the lead's channel | the pad's | the bass's | the drums' (1..16 or OFF) |
+| MIDI 2 | the arp's channel | | | |
 | RESET | defaults: five clicks to the right puts everything back as it comes (patterns cleared); SAVE keeps it | | | |
 | SYSTEM | stack: free, of 23 K (the least it has had free since power-on) | the interrupts' stack: the same, of 7 K | RAM free | the pool free (the big buffers) |
 | AUDIO | the audio interrupt's worst time, µs | its average over the last half second | the worst as a share of the 5805 µs it has | any knob here starts the worst again |
@@ -140,12 +145,12 @@ lane faded out, a save waiting, the keys' octave off 0.
   pad sample.
 - **The form.** A piece has an INTRO, INTERs and an END, played by hand:
   - **INTRO** (PLAY): pad, drums or bass starts alone, chosen at random; the other two follow two bars apart, then
-    the lead and the sfx. All in after six bars. While Espada is stopped the lanes already show the INTRO that
+    the lead with the arp, and the sfx. All in after six bars. While Espada is stopped the lanes already show the INTRO that
     PLAY will start; each stop picks a new one.
   - **INTER** (a tap on REC): the marked lane alone for two bars, then the others back one by one, a bar apart, in a
     random order.
   - **DROP** (holding REC): the marked lane alone for as long as you hold; everything back at once when you let go.
-  - **END** (PLAY while playing): lead, sfx and pad fade out one by one, a bar apart, then bass or drums; the one
+  - **END** (PLAY while playing): lead (with the arp), sfx and pad fade out one by one, a bar apart, then bass or drums; the one
     left (chosen at random) plays alone two bars and fades last. Then Espada stops. The title says INTRO, INTER or
     END while one is running.
 - **The ten styles.** Each is a chord progression, a part for each lane, an instrument for each, a tempo, and a way
@@ -179,9 +184,24 @@ lane faded out, a save waiting, the keys' octave off 0.
 - Every setting acts at once: the music changes from the next 16th (a note already sounding plays on). LAUNCH and
   DROP too. Only ENV takes a bar: it fades.
 
+## ARP
+
+The sixth lane plays arpeggios: the notes of the chord that is playing, one after another, so it always fits the
+harmony and moves with every chord change. Each style brings its own: EPIC plucks up and down, HYPERSPACE a pulse
+going up, FUSION bells in broken thirds, OLDSKOOL the chip arpeggio, SYMPHONY a harp-like pizzicato in 8ths, TROPIC
+an Alberti figure on electric piano, STEEL a saw running down, DRIFT slow bells, FUNK a random electric piano, RAVE
+a supersaw going up.
+
+Its settings are SONG's ARP rows. **MELODY** steps to the next pattern: UP, DOWN, UP-DOWN, ALBERTI (low, high, middle,
+high), BROKEN (in thirds) and RANDOM. **RHYTHM** makes it faster or slower (16ths, 8ths, quarters), **PITCH** wider or
+narrower (1 to 3 octaves), **DENSITY** leaves out off-beat notes or throws in octave jumps, **CHANGE** moves to a new
+pattern every 16 bars. The pattern runs on across bar lines, so a chord change lands in the middle of a run, as an
+arpeggiator does. Like every lane it can have a part of your own on EDIT, fade with ENV and take the sound of any
+patch.
+
 ## SFX
 
-The fifth lane plays noise, no notes. Its sounds: **WASH** (filtered white noise with a slow sweep), **RISER**
+The SFX lane plays noise, no notes. Its sounds: **WASH** (filtered white noise with a slow sweep), **RISER**
 (noise opening up under a tone that climbs four octaves), **IMPACT** (a falling sub and a noise burst), **ZAP** (a
 laser: a sine falling fast), **CRACKLE** (vinyl clicks and hiss), **BITS** (1-bit periodic noise, the metallic
 8-bit kind, on the chord's root), **SURF** (dark brown noise in waves, brighter on each crest) and **GALE** (white
@@ -234,10 +254,10 @@ says what comes after your last bar:
   most of your hits there and add the ones you often play. The more bars you write, the more it sounds like you.
 
 SAVE keeps all parts (in a part of the FM-1's flash Espada has to itself: every write is checked against it, and the
-whole 5 x 512 bars always fit). A save of long parts takes about a second; it waits until you stop, as always.
+whole 6 x 512 bars always fit). A save of long parts takes about a second; it waits until you stop, as always.
 Parts saved before long parts came in are not read: enter them again.
 
 ## MIDI
 
-USB-MIDI out: lead, pad and bass on channels 1 to 3, the drums on channel 10 (kick 36, snare 38, hat 42,
+USB-MIDI out: lead, pad and bass on channels 1 to 3, the arp on 4, the drums on channel 10 (kick 36, snare 38, hat 42,
 kettle drum 47, crash 49, clap 39, open hat 46, toms 50 48 47 45 43 as they step down, rim shot 37); SETUP, MIDI changes the channels or turns a lane off. MIDI in: start, continue and stop.

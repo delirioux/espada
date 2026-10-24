@@ -71,7 +71,7 @@ static volatile uint32_t fm1_ms;                /* milliseconds since power-on (
 /* ---- flash: read anywhere; erase / program only the update's staging area and the settings sector */
 #define SETTINGS_AT 0x000FC000u                 /* one 4 KiB sector of Felucca's globals area */
 #define LONGS_AT 0x00097000u                    /* Espada: its own parts, at the start of Felucca's free store */
-#define LONGS_LEN 0x00016000u                   /* 88 KiB (22 sectors), well inside 0x97000..0xE0000 */
+#define LONGS_LEN 0x00019000u                   /* 100 KiB (25 sectors), well inside 0x97000..0xE0000 */
 #define FL_RANGE_OK(off, n) (FL_IN(off, n, FL_OTA_LO, FL_OTA_HI) || FL_IN(off, n, SETTINGS_AT, SETTINGS_AT + 0x1000u) || \
                              FL_IN(off, n, LONGS_AT, LONGS_AT + LONGS_LEN))
 #include "fm1_flash.h"

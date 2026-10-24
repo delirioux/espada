@@ -4,21 +4,21 @@
 
 **A generative groovebox for the M-VAVE FM-1, in the style of early-90s PC tracker music.**
 
-Five lanes (lead, pad, bass, drums and sfx) play parts that are composed live in one of ten styles: chords, bass
+Six lanes (lead, arp, pad, bass, drums and sfx) play parts that are composed live in one of ten styles: chords, bass
 lines, melodies, drum patterns and noise in the manner of the S3M scene, played as a tracker musician plays them, with
 glides, swells and an echo channel. You do not program steps; you mix styles. Queue the next style, blend it in lane by
 lane from the bottom up, or launch it at once with its own tempo. Shape each lane with a
 filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, retrigger, a bit crusher and
 echo. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
 
-<p align="center"><img src="docs/screens/main.png" width="320" alt="Espada's screen: the MELODY setting, all five lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
+<p align="center"><img src="docs/screens/main.png" width="320" alt="Espada's screen: the MELODY setting, all six lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
 
 > **Status: 0.1, in development.** It boots and runs on the FM-1; playing on the hardware is still being tested.
 > Install it over the official firmware and keep the USB rescue in mind (below).
 
 ## The screens
 
-One screen, laid out as a mixing desk: the setting in large letters on top, all five lanes in the middle, and at the
+One screen, laid out as a mixing desk: the setting in large letters on top, all six lanes in the middle, and at the
 bottom the four knobs in a row: LEAD, PAD, BASS and DRUMS, each with its value for that setting. A group button picks
 the kind of setting, PRESETS steps through them.
 
@@ -60,10 +60,12 @@ the kind of setting, PRESETS steps through them.
 ## How it plays
 
 - **Lanes.** Notes scroll from right to left past a fixed "now" line. Solid blocks are what a lane plays; outlined
-  blocks are a preview of the queued style. Stopped, the lanes show the INTRO that PLAY will start. All five are
+  blocks are a preview of the queued style. Stopped, the lanes show the INTRO that PLAY will start. All six are
   always on screen; the white mark is the lane the buttons and keys act on. Every setting is on a knob, the keys
   only play.
-- **SFX.** The fifth lane: a gale of noise into every drop, the impact on it, washes, surf, laser zaps, crackle and
+- **ARP.** Arpeggios through the chord that plays, in each style its own (up, down, up-down, Alberti, broken, random;
+  16ths to quarters, 1 to 3 octaves); SONG's ARP rows set it.
+- **SFX.** The sixth lane: a gale of noise into every drop, the impact on it, washes, surf, laser zaps, crackle and
   8-bit noise, following the arc and the style.
 - **Ten styles**, to change the mood in one move: EPIC (orchestral minor), HYPERSPACE (techno minor with power
   chords), FUSION (melodic major with a chromatic turn), OLDSKOOL (the 4-channel sound with arpeggio chords), SYMPHONY

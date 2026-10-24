@@ -17,8 +17,9 @@
 
 #define RGBC(h) RGB(((h) >> 16) & 255, ((h) >> 8) & 255, (h) & 255)
 #define SW(c) ((uint16_t)(((c) >> 8) | ((c) << 8)))
-static const uint16_t LCOL[NLANE] = {RGBC(0x5fe3e8), RGBC(0xb49bff), RGBC(0xffb04a), RGBC(0xf0e07a), RGBC(0xff7a9a)};
-static const char *const LNAME[NLANE] = {"LEAD", "PAD", "BASS", "DRUMS", "SFX"};
+static const uint16_t LCOL[NLANE] = {RGBC(0x5fe3e8), RGBC(0xb49bff), RGBC(0xffb04a), RGBC(0xf0e07a), RGBC(0xff7a9a), RGBC(0x7ee88c)};
+static const char *const LNAME[NLANE] = {"LEAD", "PAD", "BASS", "DRUMS", "SFX", "ARP"};
+static const uint8_t LROW[NLANE] = {L_LEAD, L_ARP, L_PAD, L_BASS, L_DRUMS, L_SFX};   /* top to bottom on the screen */
 static const char *const SXNAME[NSX] = {"WASH", "RISER", "IMPACT", "ZAP", "CRACKLE", "BITS", "SURF", "GALE"};
 #define C_BG RGBC(0x020404)
 #define C_FOOT RGBC(0x0b1414)
@@ -34,8 +35,8 @@ static const char *const SXNAME[NSX] = {"WASH", "RISER", "IMPACT", "ZAP", "CRACK
 #define HEAD_H 20                   /* the header: the group, the tempo, the bar in the phrase */
 #define TITLE_Y 22                  /* the setting, large */
 #define TITLE_H 36
-#define LANE_Y 58                   /* five lanes of 17 + 1 */
-#define LH 17
+#define LANE_Y 58                   /* six lanes of 14 + 1 */
+#define LH 14
 #define GAP 1
 #define LANES_H 90
 #define KNOB_Y 148                  /* KNOB 1..4, as the knobs sit on the panel */
@@ -369,6 +370,24 @@ static const card_t ROW_SOUND[] = {
 static const card_t ROW_TRK[] = {
     {"SLIDE", t_slide, v_slide, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}, {"ECHO", t_echo, v_echo, 0}};
 typedef struct { const char *name; int8_t lane; card_t c[4]; } srow_t;     /* lane: -1 the song, else that lane's */
+/* the arp lane's settings, as heard: the pattern MELODY gives, the step RHYTHM gives, the octaves PITCH gives */
+static void s_apat(char *o)
+{
+    static const char *const N[NAP] = {"UP", "DOWN", "UP-DOWN", "ALBERTI", "BROKEN", "RANDOM"};
+    s_cat(o, N[(PROF[ln[L_ARP].prof].arp[0] + ln[L_ARP].mel) % NAP]);
+}
+static void s_astep(char *o)
+{
+    int32_t st = PROF[ln[L_ARP].prof].arp[1];
+    if (ln[L_ARP].rhy >= 75 && st > 1) st /= 2; else if (ln[L_ARP].rhy < 25 && st < 4) st *= 2;
+    s_cat(o, st == 1 ? "16THS" : st == 2 ? "8THS" : "QUARTERS");
+}
+static void s_aoct(char *o)
+{
+    int32_t oc = PROF[ln[L_ARP].prof].arp[2] + (ln[L_ARP].pit >= 75) - (ln[L_ARP].pit < 25);
+    oc = oc < 1 ? 1 : oc > 3 ? 3 : oc;
+    o = s_int(o, oc); s_cat(o, oc == 1 ? " OCTAVE" : " OCTAVES");
+}
 enum { SR_LIVE, SR_KEY, SR_ARC, SR_SFX };
 static const srow_t ROW_SONG[] = {
     {"LIVE", -1, {{"STYLE", t_prof, v_prof, 0}, {"BLEND", t_blend, v_blend, s_blend}, {"ENERGY", t_energy, v_energy, 0}, {"SPACE", t_space, v_space, 0}}},
@@ -379,6 +398,10 @@ static const srow_t ROW_SONG[] = {
     {"SFX FX", L_SFX, {{"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0}}},
     {"SFX FX 2", L_SFX, {{"CRUSH", t_crush, v_crush, 0}, {"ECHO", t_echo, v_echo, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}}},
     {"SFX ROOM", L_SFX, {{"REVERB", t_send, v_send, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+    {"ARP", L_ARP, {{"SOUND", t_inst, v_inst, s_inst}, {"MELODY", t_mel, v_mel, s_apat}, {"RHYTHM", t_rhy, v_rhy, s_astep}, {"LEVEL", t_level, v_level, 0}}},
+    {"ARP PART", L_ARP, {{"STYLE", t_lprof, v_lprof, 0}, {"PITCH", t_pit, v_pit, s_aoct}, {"DENSITY", t_dens, v_dens, 0}, {"CHANGE", t_chg, v_chg, s_chg}}},
+    {"ARP FX", L_ARP, {{"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0}}},
+    {"ARP FX 2", L_ARP, {{"ECHO", t_echo, v_echo, 0}, {"SLIDE", t_slide, v_slide, 0}, {"CRUSH", t_crush, v_crush, 0}, {"REVERB", t_send, v_send, 0}}},
 };
 static const card_t ROW_EDIT[2][4] = {
     {{"STEP", t_step, v_step, s_step}, {"LENGTH", t_len, v_len, 0}, {"BAR", t_bar, v_bar, s_bar}, {"PATTERN", t_use, v_use, 0}},
@@ -404,6 +427,8 @@ static void v_ch0(char *o) { v_ch(o, L_LEAD); }
 static void v_ch1(char *o) { v_ch(o, L_PAD); }
 static void v_ch2(char *o) { v_ch(o, L_BASS); }
 static void v_ch3(char *o) { v_ch(o, L_DRUMS); }
+static void t_ch5(int32_t d) { t_ch(L_ARP, d); }
+static void v_ch5(char *o) { v_ch(o, L_ARP); }
 static void s_ch(char *o) { s_cat(o, "CHANNEL"); }
 static void t_reset(int32_t d)                                  /* five clicks to the right: the defaults */
 {
@@ -444,6 +469,7 @@ static void s_tr(char *o) { s_cat(o, "WORST"); }
 static const srow_t ROW_SETUP[] = {
     {"LOOK", -1, {{"PALETTE", t_pal, v_pal, 0}, {"SCREEN", t_scr, v_scr, 0}, {"LIGHTS", t_glow, v_glow, s_glow}, {0, 0, 0, 0}}},
     {"MIDI", -1, {{"LEAD", t_ch0, v_ch0, s_ch}, {"PAD", t_ch1, v_ch1, s_ch}, {"BASS", t_ch2, v_ch2, s_ch}, {"DRUMS", t_ch3, v_ch3, s_ch}}},
+    {"MIDI 2", -1, {{"ARP", t_ch5, v_ch5, s_ch}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
     {"RESET", -1, {{"DEFAULTS", t_reset, v_reset, s_reset}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
     {"SYSTEM", -1, {{"STACK", t_none, v_stk, s_stk}, {"IRQ", t_none, v_irq, s_irq}, {"RAM", t_none, v_ram, s_free}, {"POOL", t_none, v_pool, s_free}}},
     {"AUDIO", -1, {{"WORST", t_isr, v_worst, s_msw}, {"AVERAGE", t_isr, v_avg, s_msw}, {"LOAD", t_isr, v_load, s_load}, {"RESET", t_isr, v_tr, s_tr}}},
@@ -814,7 +840,7 @@ static void draw_frame(int force)
         if (view == 1) draw_edit_area();
         else if (view == 2) draw_song_area();
         else if (view == 3) draw_arc_area();
-        else for (l = 0; l < (int32_t)NLANE; l++) draw_lane(l, LANE_Y + l * (LH + GAP), LH, 0);
+        else for (l = 0; l < (int32_t)NLANE; l++) draw_lane(LROW[l], LANE_Y + l * (LH + GAP), LH, 0);
         cs_end();
         platform_poll();
     }
@@ -829,6 +855,7 @@ typedef struct {
     struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; } l[NLANE];
     uint8_t palette, screen, glow;
 } save_t;
+typedef char save_fits[sizeof(save_t) <= 256u ? 1 : -1];          /* settings_save takes at most 256 bytes */
 /* the own parts, in their store: [head 16 B][lanes 20 B][to 64][each lane's bars, 32 B each]; the CRC covers all
  * after the head, which is written last, so a cut save reads as none */
 #define PARTS_MAGIC 0x53545250u                 /* "PRTS" */
@@ -889,7 +916,7 @@ static void do_save(void)
 {
     static save_t S;
     int32_t l, rc;
-    S.ver = 8; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
+    S.ver = 9; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
     for (l = 0; l < (int32_t)NLANE; l++) {
         S.l[l].prof = ln[l].prof; S.l[l].lock = ln[l].lock; S.l[l].dens = ln[l].dens; S.l[l].oct = ln[l].oct; S.l[l].filt = (int8_t)fxu[l].filt;
@@ -906,7 +933,7 @@ static void do_load(void)
 {
     static save_t S;
     int32_t l;
-    if (settings_load(&S, sizeof S) == 0 && S.ver == 8) {
+    if (settings_load(&S, sizeof S) == 0 && S.ver == 9) {
         palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0;
         energy = clampi(S.energy, -50, 50); space = clampi(S.space, 0, 100);
         set_key(S.key % 12u); scale_sel = S.scale < NSCALE ? S.scale : 0; prog_sel = S.prog <= NPROG ? S.prog : 0; bpc = clampi(S.bpc, 1, 4);
@@ -1042,7 +1069,7 @@ static void input(void)
         if (!d) continue;
         if (held) d *= 10;
         if (e == ENC_SELECT) { set_bpm(seq_bpm + d); area_dirty = 1; continue; }              /* SELECT: tempo */
-        if (e == ENC_ALGORITHM) { set_sel(sel + (d > 0 ? 1 : -1)); continue; }              /* the lane */
+        if (e == ENC_ALGORITHM) { int32_t r = 0; while (LROW[r] != sel) r++; set_sel(LROW[fmodp(r + (d > 0 ? 1 : -1), NLANE)]); continue; }   /* the lane, in screen order */
         if (e == ENC_PRESETS) {                                         /* the setting in the group */
             if (setup_on) { setup_row = fmodp(setup_row + (d > 0 ? 1 : -1), NROWS_OF(ROW_SETUP)); reset_turns = 0; }
             else if (!edit_on) rowi[grp] = fmodp(rowi[grp] + (d > 0 ? 1 : -1), nrows(grp));
@@ -1189,7 +1216,7 @@ static uint32_t t_frame;
 /* everything as it comes: the lanes, the effects, the song, the look, the MIDI channels (patterns cleared) */
 static void defaults(void)
 {
-    static const uint8_t CH0[NLANE] = {0, 1, 2, 9, 16};
+    static const uint8_t CH0[NLANE] = {0, 1, 2, 9, 16, 3};
     uint32_t l;
     synth_init();
     music_init();

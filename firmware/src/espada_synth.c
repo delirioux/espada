@@ -110,9 +110,9 @@ typedef struct {
     uint32_t ss[6];                             /* SUPERSAW: the six detuned saws' phases */
     int32_t pamp, brown;                        /* the pad's level (Q15, slow), the brown noise */
 } voice_t;
-#define NVOICE 30u
+#define NVOICE 33u
 static voice_t vc[NVOICE];
-static const uint8_t VLO[NLANE] = {0, 5, 13, 17, 26}, VHI[NLANE] = {5, 13, 17, 26, 30};   /* voices per lane */
+static const uint8_t VLO[NLANE] = {0, 5, 13, 17, 26, 30}, VHI[NLANE] = {5, 13, 17, 26, 30, 33};   /* voices per lane */
 static uint32_t vage, noise_s = 22222u;
 
 /* ---- lane buses and effects state */
@@ -122,13 +122,13 @@ static uint32_t vage, noise_s = 22222u;
 #define B_SFXR (NLANE + 1u)
 #define B_HATS (NLANE + 2u)
 #define NBUS (NLANE + 3u)
-static const uint8_t BUS_LANE[NBUS] = {0, 1, 2, 3, 4, L_PAD, L_SFX, L_DRUMS};   /* whose effects a bus takes */
+static const uint8_t BUS_LANE[NBUS] = {0, 1, 2, 3, 4, 5, L_PAD, L_SFX, L_DRUMS};   /* whose effects a bus takes */
 static int32_t bus[NBUS][HALF_FRAMES];
 static int32_t sendb[HALF_FRAMES];                      /* the lanes' sends to the room */
 static volatile int32_t space = 35;                     /* 0..100: the room (MAIN) */
-/* where each lane sits (Q8 left, right): lead a little right, pad and sfx spread, bass and drums in the middle. How
+/* where each lane sits (Q8 left, right): lead a little right, the arp a little left, pad and sfx spread, bass and drums in the middle. How
  * much of each goes to the room is the lane's REVERB (fx.send) */
-static const uint16_t PAN_L[NBUS] = {150, 256, 256, 256, 256, 80, 90, 130}, PAN_R[NBUS] = {256, 80, 256, 256, 90, 256, 256, 256};
+static const uint16_t PAN_L[NBUS] = {150, 256, 256, 256, 256, 256, 80, 90, 130}, PAN_R[NBUS] = {256, 80, 256, 256, 90, 150, 256, 256, 256};
 
 /* ---- the room: Schroeder / Moorer, at 22 kHz; comb and allpass lines in the pool */
 #define RV_C0 557u
@@ -207,16 +207,17 @@ static void mo_push(uint32_t st, uint32_t d1, uint32_t d2)
     if (esp_mq_w - esp_mq_r < 64u) { esp_mq[esp_mq_w % 64u] = st | d1 << 8 | d2 << 16; RING_PUBLISH(); esp_mq_w++; }
 }
 static const uint8_t GM_DRUM[NDK] = {36, 38, 42, 47, 49, 39, 46, 45, 37};
-/* the MIDI channel of each lane (0..15; 16 = off): lead 1, pad 2, bass 3, drums 10 (SETUP, MIDI); the sfx sends none */
-static volatile uint8_t midi_chan[NLANE] = {0, 1, 2, 9, 16};
+/* the MIDI channel of each lane (0..15; 16 = off): lead 1, pad 2, bass 3, drums 10, arp 4 (SETUP, MIDI); the sfx sends none */
+static volatile uint8_t midi_chan[NLANE] = {0, 1, 2, 9, 16, 3};
 
 static void synth_init(void)
 {
     uint32_t i;
     for (i = 0; i < 1024u; i++) SIN[i] = (int16_t)sine_q15(i << 22);
-    static const uint8_t SEND0[NLANE] = {35, 60, 3, 18, 100};      /* REVERB: lead some, pad much, bass hardly, drums a little, sfx all */
+    static const uint8_t SEND0[NLANE] = {35, 60, 3, 18, 100, 45};  /* REVERB: lead some, pad much, bass hardly, drums a little, sfx all, arp some */
     for (i = 0; i < NLANE; i++) { fx[i].level = 80; fx[i].bright = 25; fx[i].rtg_rate = 1; fx[i].inst = -1; fx[i].res = 30; fx[i].send = SEND0[i]; }
     fx[L_SFX].level = 30;
+    fx[L_ARP].level = 60;                                         /* the arp sits under the lead */
 }
 
 static inline int32_t noise(void) { noise_s = noise_s * 1664525u + 1013904223u; return (int32_t)noise_s >> 17; }

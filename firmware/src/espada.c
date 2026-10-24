@@ -22,8 +22,8 @@ static void espada_host_stats(void);
 #include "espada_logo.h"
 
 /* ---- shared between the main loop and the audio interrupt (one writer each) */
-#define NLANE 5u
-enum { L_LEAD = 0, L_PAD = 1, L_BASS = 2, L_DRUMS = 3, L_SFX = 4 };
+#define NLANE 6u
+enum { L_LEAD = 0, L_PAD = 1, L_BASS = 2, L_DRUMS = 3, L_SFX = 4, L_ARP = 5 };   /* the arp lane last (saved lanes keep their place) */
 #define HITS(l) ((l) == L_DRUMS || (l) == L_SFX)    /* lanes of hits (a kind per event), not of notes */
 
 typedef struct {                /* written by the main loop, read by the audio interrupt */

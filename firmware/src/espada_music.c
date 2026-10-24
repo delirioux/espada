@@ -100,41 +100,43 @@ typedef struct {
     const int8_t *scale;
     int8_t prog[8][2];          /* root above the tonic, quality */
     uint8_t st[NLANE];          /* style per lane (LEAD, PAD, BASS, DRUMS; the sfx lane has its own generator) */
-    uint8_t inst[NLANE];        /* suggested patch per lane, kit for the drums (sfx: unused) */
+    uint8_t inst[NLANE];        /* suggested patch per lane, kit for the drums (sfx: unused), the arp's patch */
     uint8_t hr;                 /* bars a chord (0 = 1) */
     uint8_t bpm;                /* its tempo (LAUNCH sets it) */
     uint8_t glide, swell, echo; /* how it plays: % of lead notes that glide in, % of long chords that swell or
                                  * fade, the echo it adds to the lead */
+    uint8_t arp[3];             /* the arp lane: its pattern (AP_x), 16ths a note, octaves */
 } prof_t;
+enum { AP_UP, AP_DOWN, AP_UPDOWN, AP_ALBERTI, AP_BROKEN, AP_RANDOM, NAP };
 /* ten styles of 90s tracker music, from a study of their modules: chords (sus chords everywhere), drum grids,
  * tempos, and how the notes are played (glides, swells, an echo channel) */
 static const prof_t PROF[] = {
     {"EPIC", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}},
-     {S_EPIC, S_STRINGS, S_DRIVE, S_DEPIC}, {10, 5, 2, 1}, 0, 125, 15, 35, 25},
+     {S_EPIC, S_STRINGS, S_DRIVE, S_DEPIC}, {10, 5, 2, 1, 0, 2}, 0, 125, 15, 35, 25, {AP_UPDOWN, 1, 2}},
     {"HYPERSPACE", AEO, {{0, Q_5}, {0, Q_5}, {10, Q_5}, {5, Q_5}, {7, Q_5}, {5, Q_5}, {3, Q_5}, {10, Q_5}},
-     {S_STAB, S_CHOP, S_DRIVE, S_DTECH}, {11, 7, 0, 2}, 0, 130, 20, 0, 30},
+     {S_STAB, S_CHOP, S_DRIVE, S_DTECH}, {11, 7, 0, 2, 0, 11}, 0, 130, 20, 0, 30, {AP_UP, 1, 2}},
     {"FUSION", ION, {{0, Q_MAJ}, {9, Q_MIN}, {0, Q_MAJ}, {9, Q_MIN}, {9, Q_MAJ}, {1, Q_MAJ}, {9, Q_MAJ}, {5, Q_MAJ}},
-     {S_RIFF, S_LUSH, S_PEDAL, S_DFUSION}, {9, 13, 1, 0}, 0, 125, 25, 25, 20},
+     {S_RIFF, S_LUSH, S_PEDAL, S_DFUSION}, {9, 13, 1, 0, 0, 6}, 0, 125, 25, 25, 20, {AP_BROKEN, 1, 2}},
     {"OLDSKOOL", AEO, {{5, Q_MIN}, {3, Q_MAJ}, {1, Q_MAJ}, {5, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {0, Q_MIN}, {3, Q_MAJ}},
-     {S_MELODY, S_ARP, S_OCTAVE, S_DOLD}, {8, 9, 0, 1}, 0, 125, 10, 0, 35},
+     {S_MELODY, S_ARP, S_OCTAVE, S_DOLD}, {8, 9, 0, 1, 0, 9}, 0, 125, 10, 0, 35, {AP_UP, 1, 2}},
     /* the orchestra: minor, two bars a chord, a dominant before the return */
     {"SYMPHONY", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {5, Q_MIN}, {8, Q_MAJ}, {7, Q_MAJ}, {0, Q_MIN}},
-     {S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH}, {15, 5, 16, 0}, 2, 110, 5, 55, 0},
+     {S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH}, {15, 5, 16, 0, 0, 2}, 2, 110, 5, 55, 0, {AP_UP, 2, 2}},
     /* sunny: mixolydian, I and bVII, a sus4 into the turn; off-beat chords, a deep bass with rests, congas */
     {"TROPIC", MXL, {{0, Q_MAJ}, {0, Q_S4}, {10, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}, {10, Q_MAJ}, {5, Q_MAJ}, {7, Q_S4}},
-     {S_MELODY, S_SKANK, S_ROOTS, S_DTROPIC}, {8, 13, 3, 1}, 0, 110, 15, 0, 25},
+     {S_MELODY, S_SKANK, S_ROOTS, S_DTROPIC}, {8, 13, 3, 1, 0, 13}, 0, 110, 15, 0, 25, {AP_ALBERTI, 2, 1}},
     /* heavy: power chords in minor, a galloping bass, double kick, a gliding saw lead */
     {"STEEL", AEO, {{0, Q_5}, {0, Q_5}, {8, Q_5}, {10, Q_5}, {0, Q_5}, {3, Q_5}, {5, Q_5}, {7, Q_5}},
-     {S_MELODY, S_PCHORD, S_GALLOP, S_DSTEEL}, {10, 10, 0, 0}, 0, 140, 40, 0, 0},
+     {S_MELODY, S_PCHORD, S_GALLOP, S_DSTEEL}, {10, 10, 0, 0, 0, 10}, 0, 140, 40, 0, 0, {AP_DOWN, 1, 1}},
     /* floating: sus chords resolving, two bars a chord, swelling strings, a breathy lead in long lines, no snare */
     {"DRIFT", AEO, {{0, Q_S4}, {0, Q_MIN}, {8, Q_MAJ}, {3, Q_MAJ}, {10, Q_S4}, {10, Q_MAJ}, {7, Q_S4}, {7, Q_MIN}},
-     {S_EPIC, S_LUSH, S_PEDAL, S_DDRIFT}, {8, 5, 3, 2}, 2, 96, 30, 70, 50},
+     {S_EPIC, S_LUSH, S_PEDAL, S_DDRIFT}, {8, 5, 3, 2, 0, 6}, 2, 96, 30, 70, 50, {AP_UPDOWN, 2, 2}},
     /* funky: a major vamp with a diminished passing chord, a slapped syncopated bass, clav stabs, kick off the beat */
     {"FUNK", ION, {{0, Q_MAJ}, {0, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}, {6, Q_DIM}, {5, Q_MAJ}, {7, Q_S4}, {7, Q_MAJ}},
-     {S_RIFF, S_CLAV, S_SLAP, S_DFUNK}, {11, 13, 1, 1}, 0, 112, 10, 0, 0},
+     {S_RIFF, S_CLAV, S_SLAP, S_DFUNK}, {11, 13, 1, 1, 0, 13}, 0, 112, 10, 0, 0, {AP_RANDOM, 1, 1}},
     /* the rave: four on the floor, an acid bass that slides, organ stabs, brass chord hits */
     {"RAVE", AEO, {{0, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {8, Q_MAJ}, {3, Q_MAJ}, {3, Q_MAJ}, {10, Q_MAJ}, {7, Q_S4}},
-     {S_STAB, S_SUS, S_ACID, S_DRAVE}, {4, 7, 0, 2}, 0, 138, 20, 0, 35},
+     {S_STAB, S_SUS, S_ACID, S_DRAVE}, {4, 7, 0, 2, 0, 17}, 0, 138, 20, 0, 35, {AP_UP, 1, 2}},
 };
 #define NPROF (int32_t)(sizeof PROF / sizeof PROF[0])
 
@@ -183,8 +185,8 @@ typedef struct {
     uint8_t mute;                   /* ENV: faded out */
 } lane_t;
 static lane_t ln[NLANE];
-static const int32_t LBASE[NLANE] = {62, 50, 38, 0, 62}, LLO[NLANE] = {58, 45, 24, 0, 0}, LHI[NLANE] = {98, 86, 64, 0, 0};
-static const int32_t LORDER[NLANE] = {3, 2, 1, 0, 4};           /* blend order: drums first; sfx follows the bass */
+static const int32_t LBASE[NLANE] = {62, 50, 38, 0, 62, 62}, LLO[NLANE] = {58, 45, 24, 0, 0, 58}, LHI[NLANE] = {98, 86, 64, 0, 0, 100};   /* bases on the tonic */
+static const int32_t LORDER[NLANE] = {3, 2, 1, 0, 4, 3};        /* blend order: drums first, the arp with the lead; sfx follows the bass */
 static int32_t target = 2, blend = 0, launch_bar = -1;           /* FUSION queued, as it plays */
 
 static int32_t eff_prof(int32_t l, int32_t b)
@@ -226,7 +228,7 @@ static int32_t energy;                                          /* -50..50: adde
 static int32_t brk_from = -1, brk_until = -1, brk_lane;        /* DROP without the arc: a break, then the drop */
 static seg_t segs[16] = {{A_BUILD, 0, 0, -1, L_PAD}};
 static int32_t nsegs = 1;
-static const int32_t ENTER[NLANE] = {159, 108, 56, 0, 0};       /* lead, pad, bass, drums (sfx: always on) */
+static const int32_t ENTER[NLANE] = {159, 108, 56, 0, 0, 133};  /* lead, pad, bass, drums (sfx: always on), the arp */
 static int next_implicit(const seg_t *s, seg_t *o)
 {
     o->until = -1; o->lane = L_PAD; o->e0 = 230;
@@ -289,7 +291,7 @@ static void form_intro(int32_t from)
     form_rng.a ^= fm1_ms * 2654435761u;
     shuffle(base, 3);
     for (i = 0; i < 3; i++) intro_rank[base[i]] = i;
-    intro_rank[L_LEAD] = 3; intro_rank[L_SFX] = 3;               /* the lead (and the sfx) last */
+    intro_rank[L_LEAD] = 3; intro_rank[L_SFX] = 3; intro_rank[L_ARP] = 3;   /* the lead (with the arp and the sfx) last */
     intro_from = from;
 }
 static void form_inter(int32_t lane, int32_t from)
@@ -310,6 +312,7 @@ static void form_end(int32_t from)
     for (i = 0; i < 3; i++) end_bar[first[i]] = from + i;
     end_bar[last == L_BASS ? L_DRUMS : L_BASS] = from + 3;
     end_bar[last] = from + 6;                                   /* alone for two bars, then it fades too */
+    end_bar[L_ARP] = end_bar[L_LEAD];                           /* the arp goes with the lead */
     end_from = from;
 }
 /* does lane l play in bar b (INTRO and INTER; END fades, see fx_apply) */
@@ -726,6 +729,37 @@ static void gen_sfx(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, 
     }
 }
 
+/* the arp lane: the bar's chord tones in a pattern, over 1 to 3 octaves, a note every 1, 2 or 4 16ths. The style
+ * gives pattern, step and octaves; MELODY turns to the next pattern, RHYTHM faster or slower, PITCH more or fewer
+ * octaves, CHANGE a new pattern every 16 bars; the pattern runs on across the bars, so a chord change lands mid-run */
+static void gen_arp(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, int32_t dens)
+{
+    const prof_t *P = &PROF[p];
+    int32_t nt = T->H->nt, oct = P->arp[2] + (GL->pit >= 75) - (GL->pit < 25), step = P->arp[1], pat, n, s, x = (dens - 50) * 2;
+    if (oct < 1) oct = 1;
+    if (oct > 3) oct = 3;
+    if (GL->rhy >= 75 && step > 1) step /= 2;
+    else if (GL->rhy < 25 && step < 4) step *= 2;
+    pat = (P->arp[0] + GL->mel + (GL->chg >= 40 ? b / 16 * (GL->chg >= 70 ? 2 : 1) : 0)) % NAP;
+    n = nt * oct + 1;                                               /* the top: the root an octave up */
+    G->n = 0;
+    for (s = 0; s < 16; s += step) {
+        int32_t i = (b * 16 + s) / step, idx, w;
+        ev_t *e;
+        switch (pat) {
+        case AP_UP: idx = i % n; break;
+        case AP_DOWN: idx = n - 1 - i % n; break;
+        case AP_UPDOWN: w = i % (2 * n - 2); idx = w < n ? w : 2 * n - 2 - w; break;
+        case AP_ALBERTI: { static const int8_t A[4] = {0, 2, 1, 2}; idx = A[i % 4] + nt * ((i / 4) % oct); break; }
+        case AP_BROKEN: idx = (i / 2 + (i % 2 ? 2 : 0)) % n; break;
+        default: idx = (int32_t)((rnd(r) >> 16) * (uint32_t)n >> 16); break;
+        }
+        if (x < 0 && s % 4 && chance(r, -x)) continue;              /* sparser: the off-beat notes go first */
+        e = NOTE(G, s, step > 2 ? step - 1 : 1, ct(T, idx) + (x > 0 && chance(r, x / 4) ? 12 : 0));
+        if (e && s % 4) e->flags = EV_ACC1;                         /* the beat a little louder */
+    }
+}
+
 /* MY STYLE: what your bars do, counted per place in the 4-bar phrase: how often each 16th has a note (or each
  * sound), which scale-step jumps follow each other, the range. Built again only when the part changed. */
 typedef struct {
@@ -1008,14 +1042,15 @@ static void gen_bar(int32_t b, bar_t *B)
         if (B->muted[l]) continue;
         if (ln[l].up.on && user_bar(l, &G, &T, b)) B->user[l] = 1;
         else if (l == L_SFX) gen_sfx(&G, &r, &T, b, p, dens, &A, next_drop);
+        else if (l == L_ARP) gen_arp(&G, &r, &T, b, p, dens);
         else { g_style = PROF[p].st[l]; generate(g_style, &G, &r, &T, b, p); }
         if (A.mode != A_OFF) dens += (A.e - 154) * 80 / 256;
         dens += energy;
         if (l != L_LEAD) dens += (GL->rhy - 50) * 4 / 5;            /* RHYTHM: busier or sparser (the lead: its rhythms) */
         if (dens < 0) dens = 0;
         if (dens > 100) dens = 100;
-        if (l != L_SFX) densify(l, &G, &r, &T, b, dens);
-        if (!B->user[l]) pitch_shape(l, &G, &r, &T);
+        if (l != L_SFX && l != L_ARP) densify(l, &G, &r, &T, b, dens);
+        if (!B->user[l] && l != L_ARP) pitch_shape(l, &G, &r, &T);
         if (!HITS(l)) play_shape(l, &G, &r, p);
         if (A.drop && l == L_DRUMS) {
             int has_c = 0, has_k = 0;
@@ -1221,6 +1256,7 @@ static void pat_fresh(int32_t l, int32_t b)                     /* bar b written
     tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
     GL = &ln[l]; keys_for(GL, b);
     if (l == L_SFX) { arc_t A = arc_at(b); gen_sfx(&G, &r, &T, b, p, ln[l].dens, &A, arc_at(b + 1).drop); }
+    else if (l == L_ARP) gen_arp(&G, &r, &T, b, p, ln[l].dens);
     else generate(PROF[p].st[l], &G, &r, &T, b, PROF[p].st[l] == S_RIFF ? (int32_t)(seed & 1023u) + 4 : p);
     for (i = 0; i < G.n; i++) {
         uint32_t s = G.ev[i].st;

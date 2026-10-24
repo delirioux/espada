@@ -4,7 +4,7 @@ How Espada is made and where it is going: the agreements, how changes reach GitH
 and why, how to build and test it, the open risks and what comes next. What Espada is and how to play it is in
 the [README](../README.md) and the [manual](MANUAL.md); the chip's rules are in [RULES.md](RULES.md).
 
-Status: 20 October 2026. Version 0.1 runs on the FM-1; playing on the hardware is being tested. Five lanes,
+Status: 20 October 2026. Version 0.1 runs on the FM-1; playing on the hardware is being tested. Six lanes,
 ten styles played as in a tracker, long lead arcs, the one-screen interface, the browser version and the web
 installer are in.
 
@@ -76,14 +76,14 @@ stand-in.
 - **50 % density is the style as written.** Lower thins it out, higher adds notes inside the chord and its
   scale. ENERGY moves every lane at once.
 - **Your own parts in their own flash.** Up to 512 bars a lane, 32 bytes a bar, held in RAM (the pool) and saved to
-  88 KiB at the start of Felucca's free store (0x97000), which Espada does not otherwise use. Every erase, write and
-  read is checked against that window, a compile-time check proves 5 x 512 bars fit it, the header goes last with a
+  100 KiB at the start of Felucca's free store (0x97000), which Espada does not otherwise use. Every erase, write and
+  read is checked against that window, a compile-time check proves 6 x 512 bars fit it, the header goes last with a
   CRC (a cut save reads as none), and the linker fails the build if the pool overflows. MY STYLE is counting, not a
   network: per place in the phrase the 16ths and sounds used and the scale-step jumps, rebuilt when the part changes.
 - **Muting fades.** ENV fades a lane out or in over a bar instead of cutting it.
 - **The room at half rate.** The stereo reverb runs at half the sample rate to fit the interrupt's budget.
 - **One screen, a mixing desk.** The FM-1's screen is small: every setting gets the whole width, the four lanes'
-  values side by side under the four knobs, all five lanes always in view. A group button picks the kind of setting
+  values side by side under the four knobs, all six lanes always in view. A group button picks the kind of setting
   and PRESETS steps through it, so no page hides behind another. The keys only play.
 - **The arc is off until asked for.** Espada starts with all lanes playing. The arc (build, break, drop) is a
   setting, and DROP works without it.
