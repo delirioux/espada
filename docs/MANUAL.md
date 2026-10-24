@@ -53,8 +53,8 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 
 | EDIT | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
-| the lane's steps | step | length | bars | pattern (yours or the style's) |
-| EDIT 2 (PRESETS) | fill (the style LFO fills from) | copy (the lane SEQ copies from) | | |
+| the lane's steps | step in the bar (1..16) | the length a note goes in with | bar (1 .. your last + 1) | pattern (yours or the style's) |
+| EDIT 2 (PRESETS) | fill (the style LFO fills from) | copy (the lane SEQ copies from) | after your last bar: LOOP, PROFILE or MY STYLE | repeat: turn right, the bar before is copied here and the cursor moves on |
 
 ## Setup
 
@@ -79,14 +79,14 @@ Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on
 | Button | Does |
 | --- | --- |
 | HOME, FX, ARP, GLO | the groups PLAY, SOUND, TRACKER, SONG; pressed again: the next setting. From EDIT: back. Hold HOME: SETUP |
-| EDIT | the lane's own pattern, step by step (again: back) |
+| EDIT | the lane's own part, step by step, bar by bar (again: back). SEL + EDIT: clear this bar (the last bar goes) |
 | PLAY | stopped: start from the top with an INTRO (SEL + PLAY: everything at once). Playing: the END (SEL + PLAY, or PLAY again during the END: stop now) |
-| SEQ | LAUNCH: every unlocked lane moves to the queued style at once, at the style's tempo. SEL + SEQ: launch and keep your tempo. On EDIT: COPY the pattern of the lane set on EDIT 2 into this one |
-| REC | while playing, the marked lane alone at once. Tap = INTER (it plays alone for two bars, then the others come back one by one); hold = DROP (alone while held, everything back the moment you let go, with a crash and an impact). On EDIT: GRAB (what the lane plays now becomes its pattern); SEL + REC: clear it |
+| SEQ | LAUNCH: every unlocked lane moves to the queued style at once, at the style's tempo. SEL + SEQ: launch and keep your tempo. On EDIT: COPY the whole part of the lane set on EDIT 2 into this one |
+| REC | while playing, the marked lane alone at once. Tap = INTER (it plays alone for two bars, then the others come back one by one); hold = DROP (alone while held, everything back the moment you let go, with a crash and an impact). On EDIT: GRAB (what the lane plays now goes into this bar); SEL + REC: clear the whole part |
 | ENV | fade the lane out over a bar; again: back in. SEL + ENV: LOCK (it keeps its style when you blend or launch). On EDIT: TIE |
-| LFO | a new idea for the lane, at once (MELODY moves on). On EDIT: GENERATE a pattern: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
+| LFO | a new idea for the lane, at once (MELODY moves on). On EDIT: GENERATE this bar: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
 | OCT- / OCT+ | the keys' octave; both together: back to 0. On EDIT: the octave you enter in |
-| SAVE | keep everything (settings and patterns); while playing it waits until you stop. SEL + SAVE: the audio interrupt's time in the header (also SETUP, AUDIO) |
+| SAVE | keep everything (settings and your parts); while playing it waits until you stop. SEL + SAVE: the audio interrupt's time in the header (also SETUP, AUDIO) |
 
 Every button and key glows faintly; lit means: the group you are in, EDIT, playing, a break, a launch waiting, the
 lane faded out, a save waiting, the keys' octave off 0.
@@ -207,9 +207,35 @@ switch WASH, RISER, IMPACT, ZAP, CRACKLE, BITS, SURF and GALE at the cursor.
   so on (OCT- / OCT+ shift by a scale octave). A note goes in at the cursor with the set length, and the cursor moves
   on. Black keys: a rest; SEL + a black key: tie. On the DRUMS lane the first nine white keys (F3 .. G4) switch
   kick, snare, hat, kettle drum, crash, clap, open hat, tom and rim shot at the cursor (the rows K S H T C X O M R);
-  a black key moves the cursor on. Patterns saved before the clap came in are not read: enter them again.
+  a black key moves the cursor on.
 
 Your patterns follow the chords, as the generated parts do: they are written in scale steps, not fixed notes.
+
+## Your own parts
+
+Each lane can have a part of its own, as long as you write it: up to 512 bars. EDIT shows one bar at a time; BAR
+(KNOB 3) moves through your bars and one more, the new bar after the last (the grid says NEW BAR). Writing there makes
+the part a bar longer; you cannot go further, so a part never has holes at its end, and at 512 bars BAR says FULL and
+there is no new bar. SEL + EDIT clears the bar you are on (on the last bar it goes, and the part is a bar shorter),
+SEL + REC the whole part.
+
+To build fast: REPEAT (EDIT 2, KNOB 4) copies the bar before into this one and moves on, a bar a click; LFO writes
+this bar from a style (FILL) or varies it; REC grabs what the lane plays; COPY takes a whole part from another lane.
+
+Your part plays from the song's first bar: bar 1 of yours with the song's bar 1, and so on. AFTER (EDIT 2, KNOB 3)
+says what comes after your last bar:
+
+- **LOOP**: your part again from its bar 1.
+- **PROFILE**: the lane's generated part.
+- **MY STYLE**: new bars in your manner. Espada counts what your bars do at each place in the 4-bar phrase: which
+  16ths have notes (or which drums), which scale-step jumps you make, how high and low you go. Each new bar takes one
+  of your bars at the same place in the phrase, keeps most of its rhythm (or draws it from your counts), keeps some
+  of its notes and moves the rest by your kind of jumps; the last bar of each phrase closes on your note. Drums keep
+  most of your hits there and add the ones you often play. The more bars you write, the more it sounds like you.
+
+SAVE keeps all parts (in a part of the FM-1's flash Espada has to itself: every write is checked against it, and the
+whole 5 x 512 bars always fit). A save of long parts takes about a second; it waits until you stop, as always.
+Parts saved before long parts came in are not read: enter them again.
 
 ## MIDI
 

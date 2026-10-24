@@ -75,6 +75,11 @@ stand-in.
   and a close on the root. CHANGE sets how soon new material comes; MELODY picks the idea.
 - **50 % density is the style as written.** Lower thins it out, higher adds notes inside the chord and its
   scale. ENERGY moves every lane at once.
+- **Your own parts in their own flash.** Up to 512 bars a lane, 32 bytes a bar, held in RAM (the pool) and saved to
+  88 KiB at the start of Felucca's free store (0x97000), which Espada does not otherwise use. Every erase, write and
+  read is checked against that window, a compile-time check proves 5 x 512 bars fit it, the header goes last with a
+  CRC (a cut save reads as none), and the linker fails the build if the pool overflows. MY STYLE is counting, not a
+  network: per place in the phrase the 16ths and sounds used and the scale-step jumps, rebuilt when the part changes.
 - **Muting fades.** ENV fades a lane out or in over a bar instead of cutting it.
 - **The room at half rate.** The stereo reverb runs at half the sample rate to fit the interrupt's budget.
 - **One screen, a mixing desk.** The FM-1's screen is small: every setting gets the whole width, the four lanes'
@@ -125,7 +130,7 @@ In order of value; open to change as Espada is played.
    played on the FM-1 and tuned: the order of the settings, what reads at arm's length.
 2. **Measured on the FM-1.** The interrupt's worst time with every style, the room trimmed if needed.
 3. **Tuned by ear.** Patch levels, the orchestra's balance, the drums against the bass.
-4. **Scenes.** Save and recall a whole set: the styles per lane, the four knobs, levels, mutes and your own
+4. **Scenes (slots).** Save and recall a whole set: the styles per lane, the four knobs, levels, mutes and your own
    parts, to move between them live.
 5. **More of the trackers' moves.** A key change up a step for the last chorus, a breakdown with only the pad,
    sample-offset style stutters, vibrato that sets in late on long notes.

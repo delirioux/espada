@@ -195,11 +195,14 @@ typedef void (*turn_fn)(int32_t d);
 typedef void (*val_fn)(char *o);
 typedef struct { const char *name; turn_fn turn; val_fn val, sub; } card_t;
 static int32_t clampi(int32_t v, int32_t a, int32_t b) { return v < a ? a : v > b ? b : v; }
+/* EDIT reaches your part's bars and the one right after it (writing there makes the part a bar longer), up to MAXB */
+static int32_t nav_bars(int32_t l) { return ln[l].up.bars < MAXB ? ln[l].up.bars + 1 : MAXB; }
+static int32_t nav_steps(int32_t l) { return nav_bars(l) * 16; }
 static void set_sel(int32_t l)
 {
     if (l == sel) return;
     sel = fmodp(l, NLANE);
-    cursor = clampi(cursor, 0, ln[sel].up.bars * 16 - 1);
+    cursor = clampi(cursor, 0, nav_steps(sel) - 1);
     area_dirty = 1;
 }
 static void t_lprof(int32_t d) { ln[sel].prof = (uint8_t)fmodp(ln[sel].prof + (d > 0 ? 1 : -1), NPROF); invalidate(); }
@@ -249,12 +252,20 @@ static void t_crush(int32_t d) { fxu[sel].crush = clampi(fxu[sel].crush + d, 0, 
 static void v_crush(char *o) { s_pct(o, fxu[sel].crush); }
 static void t_echo(int32_t d) { fxu[sel].echo = clampi(fxu[sel].echo + d, 0, 100); }
 static void v_echo(char *o) { s_pct(o, fxu[sel].echo); }
-static void t_step(int32_t d) { int32_t n = ln[sel].up.bars * 16; cursor = fmodp(cursor + d, n); }
-static void v_step(char *o) { o = s_int(o, cursor + 1); o = s_cat(o, "/"); s_int(o, ln[sel].up.bars * 16); }
+static void t_step(int32_t d) { cursor = clampi(cursor + d, 0, nav_steps(sel) - 1); area_dirty = 1; }
+static void v_step(char *o) { s_int(o, (cursor & 15) + 1); }
+static void s_step(char *o) { s_cat(o, "OF 16"); }
 static void t_len(int32_t d) { entry_len = clampi(entry_len + (d > 0 ? 1 : -1), 1, 16); }
 static void v_len(char *o) { s_int(o, entry_len); }
-static void t_bars(int32_t d) { ln[sel].up.bars = (uint8_t)(d > 0 ? 2 : 1); cursor = clampi(cursor, 0, ln[sel].up.bars * 16 - 1); invalidate_now(); }
-static void v_bars(char *o) { s_int(o, ln[sel].up.bars); }
+static void t_bar(int32_t d) { int32_t b = clampi((cursor >> 4) + (d > 0 ? 1 : -1), 0, nav_bars(sel) - 1); cursor = b * 16 + (cursor & 15); area_dirty = 1; }
+static void v_bar(char *o) { s_int(o, (cursor >> 4) + 1); }
+static void s_bar(char *o)
+{
+    int32_t b = cursor >> 4, n = ln[sel].up.bars;
+    if (b >= n) s_cat(o, "NEW");
+    else if (n >= MAXB && b == n - 1) s_cat(o, "FULL");
+    else { o = s_cat(o, "OF "); s_int(o, n); }
+}
 static void t_use(int32_t d) { ln[sel].up.on = (uint8_t)(d > 0); invalidate_now(); }
 static void v_use(char *o) { s_cat(o, ln[sel].up.on ? "YOURS" : "PROFILE"); }
 static void t_key(int32_t d) { set_key(key + (d > 0 ? 1 : -1)); }
@@ -328,6 +339,21 @@ static void s_fill(char *o) { s_cat(o, "BY LFO"); }
 static void t_csrc(int32_t d) { copy_src = fmodp(copy_src + (d > 0 ? 1 : -1), NLANE); }
 static void v_csrc(char *o) { s_cat(o, LNAME[copy_src]); }
 static void s_csrc(char *o) { s_cat(o, ln[copy_src].up.on ? "BY SEQ" : "NO PART"); }
+/* AFTER: what plays past your last bar; REPEAT: the bar before into this one, then on to the next (turn right) */
+static void t_after(int32_t d) { ln[sel].up.after = (uint8_t)fmodp(ln[sel].up.after + (d > 0 ? 1 : -1), NAF); ln[sel].up.ver++; invalidate_now(); }
+static void v_after(char *o) { static const char *const N[NAF] = {"LOOP", "PROFILE", "MY STYLE"}; s_cat(o, N[ln[sel].up.after % NAF]); }
+static void s_after(char *o) { o = s_cat(o, "AFTER "); s_int(o, ln[sel].up.bars); }
+static void t_rep(int32_t d)
+{
+    int32_t b = cursor >> 4;
+    if (d <= 0) return;
+    if (b < 1) { toast("REPEAT: FROM BAR 2 ON"); return; }
+    if (!pat_repeat(sel, b)) { toast("FULL"); return; }
+    if (b + 1 < nav_bars(sel)) cursor = (b + 1) * 16 + (cursor & 15);
+    area_dirty = 1;
+}
+static void v_rep(char *o) { s_cat(o, "TURN"); }
+static void s_rep(char *o) { int32_t b = cursor >> 4; if (b < 1) s_cat(o, "FROM BAR 2"); else { o = s_cat(o, "BAR "); s_int(o, b); } }
 
 
 /* ---- the settings. A lane group's setting is one row of the desk: KNOB 1..4 set it for LEAD, PAD, BASS, DRUMS.
@@ -355,8 +381,8 @@ static const srow_t ROW_SONG[] = {
     {"SFX ROOM", L_SFX, {{"REVERB", t_send, v_send, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
 };
 static const card_t ROW_EDIT[2][4] = {
-    {{"STEP", t_step, v_step, 0}, {"LENGTH", t_len, v_len, 0}, {"BARS", t_bars, v_bars, 0}, {"PATTERN", t_use, v_use, 0}},
-    {{"FILL", t_fill, v_fill, s_fill}, {"COPY", t_csrc, v_csrc, s_csrc}, {0, 0, 0, 0}, {0, 0, 0, 0}}};
+    {{"STEP", t_step, v_step, s_step}, {"LENGTH", t_len, v_len, 0}, {"BAR", t_bar, v_bar, s_bar}, {"PATTERN", t_use, v_use, 0}},
+    {{"FILL", t_fill, v_fill, s_fill}, {"COPY", t_csrc, v_csrc, s_csrc}, {"AFTER", t_after, v_after, s_after}, {"REPEAT", t_rep, v_rep, s_rep}}};
 static int32_t edit_row;
 /* SETUP (hold HOME): the look, the MIDI channels, the defaults */
 static int32_t setup_on, setup_row, reset_turns;
@@ -575,7 +601,8 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
 static void draw_edit_area(void)
 {
     const upat_t *U = &ln[sel].up;
-    int32_t n = U->bars * 16, x0 = 16, cwq = (220 << 8) / n, top = pan_y + 1, h = pan_h - 2, hits = HITS(sel);
+    const ubar_t *P = &ubar[sel][cursor >> 4];
+    int32_t n = 16, x0 = 16, cwq = (220 << 8) / n, top = pan_y + 1, h = pan_h - 2, hits = HITS(sel), cs = cursor & 15, pb;
     int32_t rows = sel == L_DRUMS ? NDK : sel == L_SFX ? NSX : 18, rh = h / rows, i, s;
     uint16_t col = LCOL[sel];
 #define CX(s) (x0 + (((s) * cwq) >> 8))
@@ -587,16 +614,19 @@ static void draw_edit_area(void)
         if (strong) textc(8, yy + (rh - 10) / 2, t, col, 1);
     }
     for (s = 0; s <= n; s++) fill(CX(s), top, 1, h, s % 16 == 0 ? RGBC(0x9fb3b0) : s % 4 == 0 ? RGBC(0x3b5150) : RGBC(0x1b2928));
-    fill(CX(cursor), top, CX(cursor + 1) - CX(cursor), h, RGBC(0x2a3a3a));
-    outline(CX(cursor), top, CX(cursor + (hits ? 1 : entry_len)) - CX(cursor) + 1, h, C_WHITE);
+    fill(CX(cs), top, CX(cs + 1) - CX(cs), h, RGBC(0x2a3a3a));
+    outline(CX(cs), top, CX(cs + (hits ? 1 : entry_len) > n ? n : cs + (hits ? 1 : entry_len)) - CX(cs) + 1, h, C_WHITE);
     for (s = 0; s < n; s++) {
-        if (hits) { for (i = 0; i < rows; i++) if (U->kinds[s] >> i & 1u) fill(CX(s) + 1, top + i * rh + 2, CX(s + 1) - CX(s) - 2, rh - 5, col); }
-        else if (U->k[s] != EMPTY) {
-            i = 14 - U->k[s] - 3;
-            if (i >= 0 && i < rows) fill(CX(s) + 1, top + i * rh + 2, CX(s + (U->len[s] > n - s ? n - s : U->len[s])) - CX(s) - 2, rh - 4, col);
+        if (hits) { for (i = 0; i < rows; i++) if (P->kinds[s] >> i & 1u) fill(CX(s) + 1, top + i * rh + 2, CX(s + 1) - CX(s) - 2, rh - 5, col); }
+        else if (P->n.k[s] != EMPTY) {
+            i = 14 - P->n.k[s] - 3;
+            if (i >= 0 && i < rows) fill(CX(s) + 1, top + i * rh + 2, CX(s + (P->n.len[s] > n - s ? n - s : P->n.len[s])) - CX(s) - 2, rh - 4, col);
         }
     }
-    if (seq_playing && U->on) fill(CX((pos16 >> 16) % n) + (((pos16 & 0xFFFF) * (cwq >> 8)) >> 16), top, 1, h, C_CYAN);
+    if ((cursor >> 4) >= U->bars) { fill(46, top + h / 2 - 9, 160, 18, C_BG); textc(126, top + h / 2 - 5, "NEW BAR: WRITE TO ADD", C_MUTE, 1); }
+    pb = cur_bar();                                                 /* the bar playing, if it is this one of yours */
+    pb = pb < U->bars ? pb : U->after == AF_LOOP ? pb % (U->bars ? U->bars : 1) : -1;
+    if (seq_playing && U->on && pb == (cursor >> 4)) fill(CX((pos16 >> 16) % n) + (((pos16 & 0xFFFF) * (cwq >> 8)) >> 16), top, 1, h, C_CYAN);
 #undef CX
 }
 static void draw_song_area(void)
@@ -799,11 +829,65 @@ typedef struct {
     struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; } l[NLANE];
     uint8_t palette, screen, glow;
 } save_t;
-typedef struct { upat_t p[NLANE]; } pats_t;
+/* the own parts, in their store: [head 16 B][lanes 20 B][to 64][each lane's bars, 32 B each]; the CRC covers all
+ * after the head, which is written last, so a cut save reads as none */
+#define PARTS_MAGIC 0x53545250u                 /* "PRTS" */
+typedef struct { uint32_t magic, total, crc, rsv; } phead_t;
+typedef struct { uint16_t bars; uint8_t on, after; } plane_t;
+static uint32_t pcrc(uint32_t c, const uint8_t *p, uint32_t n)  /* CRC-32, a piece at a time (start with 0) */
+{
+    uint32_t k;
+    c = ~c;
+    while (n--) { c ^= *p++; for (k = 0; k < 8u; k++) c = c & 1u ? (c >> 1) ^ 0xEDB88320u : c >> 1; }
+    return ~c;
+}
+static int parts_save(void)
+{
+    static phead_t H;
+    static plane_t L[NLANE];
+    uint32_t total = 64, off, c, l;
+    int rc = 0;
+    for (l = 0; l < NLANE; l++) { L[l].bars = ln[l].up.bars; L[l].on = ln[l].up.on; L[l].after = ln[l].up.after; total += (uint32_t)L[l].bars * sizeof(ubar_t); }
+    if (total > LONGS_LEN) return -9;                               /* cannot happen: 5 x MAXB bars fit (checked below) */
+    for (off = 0; off < total && !rc; off += 0x1000u) rc = longs_erase(off);
+    if (rc) return rc;
+    c = pcrc(0, (const uint8_t *)L, sizeof L);
+    if ((rc = longs_write(16, L, sizeof L)) != 0) return rc;
+    for (off = 64, l = 0; l < NLANE; l++) {
+        uint32_t n = (uint32_t)L[l].bars * sizeof(ubar_t);
+        c = pcrc(c, (const uint8_t *)ubar[l], n);
+        if ((rc = longs_write(off, ubar[l], n)) != 0) return rc;
+        off += n;
+    }
+    H.magic = PARTS_MAGIC; H.total = total; H.crc = c; H.rsv = 0;
+    return longs_write(0, &H, sizeof H);
+}
+static void parts_load(void)
+{
+    static phead_t H;
+    static plane_t L[NLANE];
+    uint32_t total = 64, off, c, l;
+    if (longs_read(0, &H, sizeof H) || H.magic != PARTS_MAGIC || H.total > LONGS_LEN || longs_read(16, L, sizeof L)) return;
+    for (l = 0; l < NLANE; l++) { if (L[l].bars < 1 || L[l].bars > MAXB) return; total += (uint32_t)L[l].bars * sizeof(ubar_t); }
+    if (total != H.total) return;
+    c = pcrc(0, (const uint8_t *)L, sizeof L);
+    for (off = 64, l = 0; l < NLANE; l++) {
+        uint32_t n = (uint32_t)L[l].bars * sizeof(ubar_t);
+        if (longs_read(off, ubar[l], n)) { music_init(); return; }
+        c = pcrc(c, (const uint8_t *)ubar[l], n);
+        off += n;
+    }
+    if (c != H.crc) { for (l = 0; l < NLANE; l++) { int32_t b; for (b = 0; b < MAXB; b++) ubar_clear((int32_t)l, b); } return; }
+    for (l = 0; l < NLANE; l++) {
+        int32_t b;
+        ln[l].up.bars = L[l].bars; ln[l].up.on = L[l].on != 0; ln[l].up.after = (uint8_t)(L[l].after % NAF); ln[l].up.ver++;
+        for (b = L[l].bars; b < MAXB; b++) ubar_clear((int32_t)l, b);
+    }
+}
+typedef char parts_fit[64 + NLANE * MAXB * sizeof(ubar_t) <= LONGS_LEN ? 1 : -1];   /* the whole store always fits */
 static void do_save(void)
 {
     static save_t S;
-    static pats_t P;
     int32_t l, rc;
     S.ver = 8; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
@@ -813,16 +897,14 @@ static void do_save(void)
         S.l[l].slide = (uint8_t)fxu[l].slide; S.l[l].retrig = (uint8_t)fxu[l].retrig; S.l[l].rate = (uint8_t)fxu[l].rtg_rate; S.l[l].crush = (uint8_t)fxu[l].crush;
         S.l[l].echo = (uint8_t)fxu[l].echo; S.l[l].level = (uint8_t)fxu[l].level; S.l[l].inst = (int8_t)fxu[l].inst; S.l[l].vary = (uint8_t)fxu[l].vary;
         S.l[l].mel = ln[l].mel; S.l[l].rhy = ln[l].rhy; S.l[l].pit = ln[l].pit; S.l[l].chg = ln[l].chg; S.l[l].mute = ln[l].mute; S.l[l].send = (uint8_t)fxu[l].send; S.l[l].midi = midi_chan[l];
-        P.p[l] = ln[l].up;
     }
     rc = settings_save(&S, sizeof S);
-    if (!rc) rc = patterns_save(&P, sizeof P);
+    if (!rc) rc = parts_save();
     toast(rc ? "SAVE FAILED" : "SAVED");
 }
 static void do_load(void)
 {
     static save_t S;
-    static pats_t P;
     int32_t l;
     if (settings_load(&S, sizeof S) == 0 && S.ver == 8) {
         palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0;
@@ -840,8 +922,7 @@ static void do_load(void)
             fxu[l].inst = clampi(S.l[l].inst, -1, l == L_SFX ? (int32_t)NSX - 1 : l == L_DRUMS ? (int32_t)NKIT - 1 : (int32_t)NPATCH - 1);
         }
     }
-    if (patterns_load(&P, sizeof P) == 0)
-        for (l = 0; l < (int32_t)NLANE; l++) { ln[l].up = P.p[l]; if (ln[l].up.bars < 1 || ln[l].up.bars > 2) ln[l].up.bars = 1; }
+    parts_load();
 }
 
 /* the drop, the moment DROP is let go: its one has passed, so the crash and the impact come now */
@@ -884,39 +965,54 @@ static void group_btn(int32_t g)
     grp = g;
     area_dirty = 1;
 }
-static void clear_pattern(void)
+static void clear_bar_ui(void)                                  /* EDIT held: this bar (the last one goes) */
 {
-    int32_t i;
-    for (i = 0; i < 32; i++) { ln[sel].up.k[i] = EMPTY; ln[sel].up.kinds[i] = 0; }
-    cursor = 0; toast("PATTERN CLEARED"); invalidate_now();
+    char t[24], *o;
+    int32_t b = cursor >> 4, last = b == ln[sel].up.bars - 1 && b > 0;
+    if (b >= ln[sel].up.bars) return;
+    pat_clear_bar(sel, b);
+    o = s_cat(t, "BAR "); o = s_int(o, b + 1); s_cat(o, last ? " REMOVED" : " CLEARED"); toast(t);
+    cursor = clampi(cursor, 0, nav_steps(sel) - 1);
+}
+static void clear_part_ui(void)                                 /* REC held: the whole part */
+{
+    pat_clear_all(sel);
+    cursor = 0; toast("PART CLEARED");
 }
 static void edit_key(int32_t k, int32_t sel_held_now)
 {
-    upat_t *U = &ln[sel].up;
-    int32_t n = U->bars * 16, wi = white_index(k);
+    int32_t n = nav_steps(sel), wi = white_index(k), l = sel;
     if (HITS(sel)) {
         int32_t nk = sel == L_DRUMS ? NDK : NSX;
-        if (wi >= 0 && wi < nk) { U->kinds[cursor] ^= (uint16_t)(1u << wi); if (!seq_playing) audition((uint32_t)sel, (uint32_t)wi, sel == L_SFX ? 0u : fxu[L_DRUMS].inst >= 0 ? (uint32_t)fxu[L_DRUMS].inst : PROF[ln[L_DRUMS].prof].inst[L_DRUMS]); }
-        else cursor = fmodp(cursor + 1, n);
-        U->on = 1; invalidate_now(); return;
+        if (wi >= 0 && wi < nk) {
+            UKIND(l, cursor) ^= (uint16_t)(1u << wi); pat_touched(l, cursor >> 4);
+            if (!seq_playing) audition((uint32_t)sel, (uint32_t)wi, sel == L_SFX ? 0u : fxu[L_DRUMS].inst >= 0 ? (uint32_t)fxu[L_DRUMS].inst : PROF[ln[L_DRUMS].prof].inst[L_DRUMS]);
+        }
+        else cursor = clampi(cursor + 1, 0, nav_steps(sel) - 1);
+        area_dirty = 1; return;
     }
     if (wi < 0) {                                                   /* black keys: rest, SEL + black: tie */
-        if (sel_held_now) { int32_t s; for (s = cursor - 1; s >= 0; s--) if (U->k[s] != EMPTY) { U->len[s] = (uint8_t)clampi(cursor - s + 1, 1, 16); break; } }
-        else U->k[cursor] = EMPTY;
-        cursor = fmodp(cursor + 1, n); invalidate_now(); return;
+        if ((cursor >> 4) < ln[l].up.bars) {
+            if (sel_held_now) { int32_t s; for (s = cursor - 1; s >= 0; s--) if (UK(l, s) != EMPTY) { ULEN(l, s) = (uint8_t)clampi(cursor - s + 1, 1, 16); break; } }
+            else UK(l, cursor) = EMPTY;
+            ln[l].up.ver++; invalidate_now();
+        }
+        cursor = clampi(cursor + 1, 0, n - 1); area_dirty = 1; return;
     }
     {
         int32_t s;
-        U->k[cursor] = (int8_t)(wi - 4 + 7 * entry_oct); U->len[cursor] = (uint8_t)entry_len;
-        for (s = 1; s < entry_len; s++) U->k[(cursor + s) % n] = EMPTY;
+        UK(l, cursor) = (int8_t)(wi - 4 + 7 * entry_oct); ULEN(l, cursor) = (uint8_t)entry_len;
+        pat_touched(l, cursor >> 4);
+        n = nav_steps(sel);
+        for (s = 1; s < entry_len && cursor + s < ln[l].up.bars * 16; s++) UK(l, cursor + s) = EMPTY;
         if (!seq_playing) {                                         /* hear it */
             harm_t H; tools_t T; uint8_t nt;
             harm_at(cur_bar(), &H); tools_make(&T, &H, LBASE[sel] + ln[sel].oct * 12 + key_off);
-            nt = (uint8_t)clampi(stp(&T, U->k[cursor]), 0, 127);
+            nt = (uint8_t)clampi(stp(&T, UK(l, cursor)), 0, 127);
             audition((uint32_t)sel, nt, fxu[sel].inst >= 0 ? (uint32_t)fxu[sel].inst : PROF[ln[sel].prof].inst[sel]);
         }
-        cursor = (cursor + entry_len) % n;
-        U->on = 1; invalidate_now();
+        cursor = clampi(cursor + entry_len, 0, n - 1);
+        area_dirty = 1;
     }
 }
 
@@ -976,8 +1072,8 @@ static void input(void)
     if (b & (1u << BTN_GLO)) group_btn(G_SONG);
     if (b & (1u << BTN_EDIT) && setup_on) { setup_on = 0; area_dirty = 1; }
     else if (b & (1u << BTN_EDIT)) {
-        if (held && edit_on) clear_pattern();
-        else { edit_on = !edit_on; cursor = clampi(cursor, 0, ln[sel].up.bars * 16 - 1); area_dirty = 1; }
+        if (held && edit_on) clear_bar_ui();
+        else { edit_on = !edit_on; cursor = clampi(cursor, 0, nav_steps(sel) - 1); area_dirty = 1; }
     }
     if (b & (1u << BTN_SEQ)) {
         if (edit_on) {                                              /* EDIT: copy the COPY lane's pattern into this one */
@@ -994,7 +1090,10 @@ static void input(void)
         invalidate();
     }
     if (b & (1u << BTN_REC)) {
-        if (edit_on) { if (held) clear_pattern(); else { pat_grab(sel); toast("GRABBED THIS BAR"); } }
+        if (edit_on) {
+            if (held) clear_part_ui();
+            else { char t[24], *o; pat_grab(sel, cursor >> 4); o = s_cat(t, "GRABBED INTO BAR "); s_int(o, (cursor >> 4) + 1); toast(t); }
+        }
         else if (!seq_playing) toast("DROP: PRESS PLAY FIRST");
         else { drop_press(sel); { char t[40], *o = s_cat(t, LNAME[sel]); s_cat(o, " ALONE"); toast(t); } }
     }
@@ -1011,7 +1110,7 @@ static void input(void)
             ln[sel].mel = (uint8_t)fmodp(ln[sel].mel + 1 + (int32_t)(fm1_ms % 13u), 100); invalidate();
             o = s_cat(t, LNAME[sel]); o = s_cat(o, ": MELODY "); s_int(o, ln[sel].mel); toast(t);
         } else {
-            int32_t n = pat_generate(sel, held);
+            int32_t n = pat_generate(sel, held, cursor >> 4);
             char t[40], *o;
             if (n) {
                 o = s_cat(t, LNAME[sel]);
@@ -1055,11 +1154,10 @@ static void leds(void)
     m |= (uint32_t)(edit_on ? entry_oct < 0 : kb_oct < 0) << BTN_OCT_DOWN | (uint32_t)(edit_on ? entry_oct > 0 : kb_oct > 0) << BTN_OCT_UP;
     m |= (uint32_t)debug_on << BTN_SEL;
     if (edit_on) {
-        const upat_t *U = &ln[sel].up;
         for (k = 0; k < 27u; k++) {
             int32_t wi = white_index((int32_t)k);
-            if (HITS(sel)) { if (wi >= 0 && wi < (sel == L_DRUMS ? NDK : NSX) && (U->kinds[cursor] >> wi & 1u)) km |= 1u << k; }
-            else if (wi >= 0 && U->k[cursor] != EMPTY && wi - 4 + 7 * entry_oct == U->k[cursor]) km |= 1u << k;
+            if (HITS(sel)) { if (wi >= 0 && wi < (sel == L_DRUMS ? NDK : NSX) && (UKIND(sel, cursor) >> wi & 1u)) km |= 1u << k; }
+            else if (wi >= 0 && UK(sel, cursor) != EMPTY && wi - 4 + 7 * entry_oct == UK(sel, cursor)) km |= 1u << k;
         }
     } else {
         for (k = 0; k < 27u; k++) if (!HITS(sel) && (53u + k + 120u + 12u * (uint32_t)(kb_oct + 2)) % 12u == (uint32_t)key) km |= 1u << k;   /* the tonic */

@@ -91,9 +91,14 @@ static int midi_get(uint8_t *st, uint8_t *d1, uint8_t *d2)
 }
 static uint32_t host_midi_out;
 static void midi_send(uint32_t st, uint32_t d1, uint32_t d2) { (void)st; (void)d1; (void)d2; host_midi_out++; }
-static uint8_t host_pat[1024 + 4];
-static int patterns_load(void *p, uint32_t n) { if (host_pat[0] != 1 || n > 1024u) return -1; memcpy(p, host_pat + 4, n); return 0; }
-static int patterns_save(const void *p, uint32_t n) { host_pat[0] = 1; memcpy(host_pat + 4, p, n); printf("%6u ms  patterns saved (%u B)\n", fm1_ms, n); return 0; }
+#define LONGS_LEN 0x16000u                         /* the own parts' store, in memory (it starts erased) */
+#define FL_IN(off, n, lo, hi) ((uint32_t)(off) >= (lo) && (uint32_t)(off) <= (hi) && (uint32_t)(n) <= (hi) - (uint32_t)(off))
+static uint8_t host_longs[LONGS_LEN];
+static int host_longs_init;
+static void host_longs_erased(void) { if (!host_longs_init) { memset(host_longs, 0xFF, sizeof host_longs); host_longs_init = 1; } }
+static int longs_erase(uint32_t off) { host_longs_erased(); if ((off & 0xFFFu) || !FL_IN(off, 0x1000u, 0, LONGS_LEN)) return -8; memset(host_longs + off, 0xFF, 0x1000u); return 0; }
+static int longs_write(uint32_t off, const void *p, uint32_t n) { host_longs_erased(); if (!FL_IN(off, n, 0, LONGS_LEN)) return -8; memcpy(host_longs + off, p, n); return 0; }
+static int longs_read(uint32_t off, void *p, uint32_t n) { host_longs_erased(); if (!FL_IN(off, n, 0, LONGS_LEN)) return -8; memcpy(p, host_longs + off, n); return 0; }
 
 static void app_audio(int32_t *out, uint32_t n);
 static void app_main(void);

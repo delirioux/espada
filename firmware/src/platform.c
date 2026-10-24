@@ -70,9 +70,10 @@ static volatile uint32_t fm1_ms;                /* milliseconds since power-on (
 
 /* ---- flash: read anywhere; erase / program only the update's staging area and the settings sector */
 #define SETTINGS_AT 0x000FC000u                 /* one 4 KiB sector of Felucca's globals area */
-#define PATTERNS_AT 0x000FB000u                 /* Espada: one more sector, for the lanes' own patterns */
+#define LONGS_AT 0x00097000u                    /* Espada: its own parts, at the start of Felucca's free store */
+#define LONGS_LEN 0x00016000u                   /* 88 KiB (22 sectors), well inside 0x97000..0xE0000 */
 #define FL_RANGE_OK(off, n) (FL_IN(off, n, FL_OTA_LO, FL_OTA_HI) || FL_IN(off, n, SETTINGS_AT, SETTINGS_AT + 0x1000u) || \
-                             FL_IN(off, n, PATTERNS_AT, PATTERNS_AT + 0x1000u))
+                             FL_IN(off, n, LONGS_AT, LONGS_AT + LONGS_LEN))
 #include "fm1_flash.h"
 static uint8_t flash_ok;
 static int st_read(uint32_t off, void *dst, uint32_t n)
@@ -174,31 +175,29 @@ static int settings_save(const void *p, uint32_t n)   /* p in RAM, n <= 256 */
     return fl_write(SETTINGS_AT, (const uint8_t *)h, sizeof h);   /* the header last: a cut save stays invalid */
 }
 
-/* ---- Espada's patterns: the same layout as the settings, in their own sector, up to 1 KiB */
-#define PATTERNS_MAGIC 0x41445345u              /* "ESDA" */
-static int patterns_load(void *p, uint32_t n)
+/* ---- Espada's own parts: LONGS_LEN bytes of Felucca's free store (its projects' area, which Espada does not use
+ * otherwise). Every erase, write and read is checked against that window; the app keeps its own header and CRC. An
+ * erase stops the sound for ~50 ms: only while stopped. */
+static int longs_erase(uint32_t off)            /* the 4 KiB sector at off */
 {
-    static uint8_t buf[1024];
-    uint32_t h[3];
-    if (!flash_ok || n > sizeof buf || st_read(PATTERNS_AT, h, sizeof h) || h[0] != PATTERNS_MAGIC || h[1] != n)
-        return -1;
-    if (st_read(PATTERNS_AT + sizeof h, buf, n) || crc32(buf, n) != h[2])
-        return -1;
-    memcpy(p, buf, n);
-    return 0;
+    uint32_t took;
+    if (!flash_ok || (off & 0xFFFu) || !FL_IN(off, 0x1000u, 0, LONGS_LEN))
+        return -8;
+    fm1_wdt_feed();
+    return fl_erase4k(LONGS_AT + off, &took);
 }
-static int patterns_save(const void *p, uint32_t n)
+static int longs_write(uint32_t off, const void *p, uint32_t n)   /* p in RAM */
 {
-    uint32_t h[3] = {PATTERNS_MAGIC, n, 0}, took;
-    int rc;
-    if (!flash_ok || n > 1024u)
-        return -1;
-    h[2] = crc32(p, n);
-    if ((rc = fl_erase4k(PATTERNS_AT, &took)) != 0)
-        return rc;
-    if ((rc = fl_write(PATTERNS_AT + sizeof h, p, n)) != 0)
-        return rc;
-    return fl_write(PATTERNS_AT, (const uint8_t *)h, sizeof h);
+    if (!flash_ok || !FL_IN(off, n, 0, LONGS_LEN))
+        return -8;
+    fm1_wdt_feed();
+    return fl_write(LONGS_AT + off, (const uint8_t *)p, n);
+}
+static int longs_read(uint32_t off, void *p, uint32_t n)
+{
+    if (!flash_ok || !FL_IN(off, n, 0, LONGS_LEN))
+        return -8;
+    return st_read(LONGS_AT + off, p, n);
 }
 
 /* ---- MIDI over USB: 4-byte USB-MIDI packets, cable 0 */

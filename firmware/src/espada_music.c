@@ -167,7 +167,16 @@ static void chord_of(int32_t s, int32_t deg, int32_t *root, int8_t *tones)
 
 /* ---- lanes and mixing */
 #define EMPTY (-128)
-typedef struct { int8_t k[32]; uint8_t len[32]; uint16_t kinds[32]; uint8_t on, bars; } upat_t;   /* kinds: a bit per drum or sfx sound */
+/* your own parts: per lane up to MAXB bars, as long as you have written them. A bar is 32 bytes: a scale step and a
+ * length per 16th (lead, pad, bass), or a bit per drum or sfx sound (drums, sfx) */
+#define MAXB 512
+typedef union { struct { int8_t k[16]; uint8_t len[16]; } n; uint16_t kinds[16]; } ubar_t;
+static ubar_t ubar[NLANE][MAXB] __attribute__((section(".pool")));
+typedef struct { uint16_t bars, ver; uint8_t on, after; } upat_t;   /* bars: its length; ver: one more at every change */
+enum { AF_LOOP, AF_GEN, AF_STYLE, NAF };                          /* after your last bar: loop, the generated part, more like yours */
+#define UK(l, i) (ubar[l][(i) >> 4].n.k[(i) & 15])                /* by step from the part's start: bar * 16 + step */
+#define ULEN(l, i) (ubar[l][(i) >> 4].n.len[(i) & 15])
+#define UKIND(l, i) (ubar[l][(i) >> 4].kinds[(i) & 15])
 typedef struct {
     uint8_t prof, lock, dens; int8_t oct; upat_t up;
     uint8_t mel, rhy, pit, chg;     /* MELODY 0..99 (which idea), RHYTHM, PITCH, CHANGE 0..100 */
@@ -717,24 +726,116 @@ static void gen_sfx(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, 
     }
 }
 
-/* your own pattern for this bar, following the chord */
-static void user_bar(int32_t l, gen_t *G, const tools_t *T, int32_t b)
+/* MY STYLE: what your bars do, counted per place in the 4-bar phrase: how often each 16th has a note (or each
+ * sound), which scale-step jumps follow each other, the range. Built again only when the part changed. */
+typedef struct {
+    uint16_t ver, nb[4], on[4][16], kind[4][16][16], iv[15];
+    int8_t lo, hi;
+} smodel_t;
+static smodel_t smod[NLANE] __attribute__((section(".pool")));
+static const smodel_t *style_model(int32_t l)
+{
+    smodel_t *M = &smod[l];
+    const upat_t *U = &ln[l].up;
+    int32_t b, s, k, prev;
+    if (M->ver == U->ver && M->nb[0] + M->nb[1] + M->nb[2] + M->nb[3]) return M;
+    memset(M, 0, sizeof *M);
+    M->ver = U->ver; M->lo = 127; M->hi = -127;
+    for (b = 0; b < U->bars; b++) {
+        int32_t q = b % 4;
+        M->nb[q]++;
+        prev = EMPTY;
+        for (s = 0; s < 16; s++) {
+            if (HITS(l)) { for (k = 0; k < 16; k++) if (ubar[l][b].kinds[s] >> k & 1u) { M->kind[q][s][k]++; M->on[q][s]++; } continue; }
+            k = ubar[l][b].n.k[s];
+            if (k == EMPTY) continue;
+            M->on[q][s]++;
+            if (k < M->lo) M->lo = (int8_t)k;
+            if (k > M->hi) M->hi = (int8_t)k;
+            if (prev != EMPTY) { int32_t d = k - prev; M->iv[(d < -7 ? -7 : d > 7 ? 7 : d) + 7]++; }
+            prev = k;
+        }
+    }
+    if (M->lo > M->hi) M->lo = M->hi = 0;
+    return M;
+}
+/* a bar past your last one, in your manner: one of your bars at the same place in the phrase as its model; its rhythm
+ * kept (or drawn from your counts), its notes kept or moved by the jumps you make, the phrase's last bar closing on
+ * your note; drums and sfx keep most of the model's hits and add the ones you often play there */
+static void style_bar(int32_t l, int32_t b, ubar_t *o)
+{
+    const smodel_t *M = style_model(l);
+    const upat_t *U = &ln[l].up;
+    rng_t r;
+    int32_t q = b % 4, nq, pick, j, src = 0, s, k, prev = EMPTY, last = -1, keep_rhythm;
+    r.a = hash3(b, l, U->ver) | 1u;
+    nq = M->nb[q];
+    if (!nq) q = -1;
+    pick = (int32_t)((rnd(&r) >> 16) * (uint32_t)(nq ? nq : U->bars) >> 16);
+    for (j = 0; j < U->bars; j++) if (q < 0 || j % 4 == q) { if (!pick--) { src = j; break; } }
+    if (q < 0) { q = src % 4; nq = M->nb[q] ? M->nb[q] : 1; }
+    *o = ubar[l][src];
+    if (HITS(l)) {
+        for (s = 0; s < 16; s++)
+            for (k = 0; k < 16; k++) {
+                int32_t p = M->kind[q][s][k] * 100 / nq, has = o->kinds[s] >> k & 1u, hit = has ? chance(&r, 80 + p / 5) : chance(&r, p * 35 / 100);
+                if (hit) o->kinds[s] |= (uint16_t)(1u << k); else o->kinds[s] &= (uint16_t)~(1u << k);
+            }
+        return;
+    }
+    keep_rhythm = chance(&r, 70);
+    if (!keep_rhythm)
+        for (s = 0; s < 16; s++) {
+            int32_t p = M->on[q][s] * 100 / nq;
+            if (s == 0 && o->n.k[0] != EMPTY) continue;                 /* the one stays */
+            if (chance(&r, p)) { if (o->n.k[s] == EMPTY) { o->n.k[s] = 0; o->n.len[s] = 1; } }
+            else o->n.k[s] = EMPTY;
+        }
+    for (s = 0; s < 16; s++) {
+        int32_t tot = 0, x, i;
+        if (o->n.k[s] == EMPTY) continue;
+        last = s;
+        if (prev == EMPTY) { prev = ubar[l][src].n.k[s] != EMPTY ? ubar[l][src].n.k[s] : (M->lo + M->hi) / 2; o->n.k[s] = (int8_t)prev; continue; }
+        if (ubar[l][src].n.k[s] != EMPTY && chance(&r, 55)) { prev = o->n.k[s] = ubar[l][src].n.k[s]; continue; }
+        for (i = 0; i < 15; i++) tot += M->iv[i];
+        x = tot ? (int32_t)((rnd(&r) >> 16) * (uint32_t)tot >> 16) : 0;
+        for (i = 0; i < 15 && tot; i++) { x -= M->iv[i]; if (x < 0) break; }
+        k = prev + (tot ? i - 7 : PICK(&r, -1, 1));
+        if (k < M->lo) k = M->lo + (M->lo - k) % 3;
+        if (k > M->hi) k = M->hi - (k - M->hi) % 3;
+        prev = k; o->n.k[s] = (int8_t)k;
+    }
+    if (q == 3 && last >= 0) {                                      /* the phrase closes as yours does */
+        for (s = 15; s >= 0 && ubar[l][src].n.k[s] == EMPTY; s--) ;
+        if (s >= 0) o->n.k[last] = ubar[l][src].n.k[s];
+    }
+}
+/* your own part for this bar, following the chord: 0 when it has none here (AFTER: PROFILE, past its end) */
+static int user_bar(int32_t l, gen_t *G, const tools_t *T, int32_t b)
 {
     const upat_t *U = &ln[l].up;
-    int32_t off = fmodp(b, U->bars ? U->bars : 1) * 16, s, k;
+    static ubar_t tmp;
+    const ubar_t *P;
+    int32_t n = U->bars ? U->bars : 1, s, k;
     G->n = 0;
+    if (b < 0) b = 0;
+    if (b < n) P = &ubar[l][b];
+    else if (U->after == AF_GEN) return 0;
+    else if (U->after == AF_LOOP) P = &ubar[l][b % n];
+    else { style_bar(l, b, &tmp); P = &tmp; }
     for (s = 0; s < 16; s++) {
-        if (l == L_DRUMS) { for (k = 0; k < NDK; k++) if (U->kinds[off + s] >> k & 1u) DRUM(G, s, k); continue; }
+        if (l == L_DRUMS) { for (k = 0; k < NDK; k++) if (P->kinds[s] >> k & 1u) DRUM(G, s, k); continue; }
         if (l == L_SFX) {
-            for (k = 0; k < NSX; k++) if (U->kinds[off + s] >> k & 1u)
+            for (k = 0; k < NSX; k++) if (P->kinds[s] >> k & 1u)
                 SFX(G, s, SX_LONG(k) ? 16 - s : 1, k, ct(T, 0));
             continue;
         }
-        if (U->k[off + s] == EMPTY) continue;
-        k = U->k[off + s];
-        if (l == L_PAD) g_add(G, s, U->len[off + s] > 16 - s ? 16 - s : U->len[off + s], 3, stp(T, k), stp(T, k + 2), stp(T, k + 4), 0);
-        else NOTE(G, s, U->len[off + s] > 16 - s ? 16 - s : U->len[off + s], stp(T, k));
+        if (P->n.k[s] == EMPTY) continue;
+        k = P->n.k[s];
+        if (l == L_PAD) g_add(G, s, P->n.len[s] > 16 - s ? 16 - s : P->n.len[s], 3, stp(T, k), stp(T, k + 2), stp(T, k + 4), 0);
+        else NOTE(G, s, P->n.len[s] > 16 - s ? 16 - s : P->n.len[s], stp(T, k));
     }
+    return 1;
 }
 
 /* density: 50 = as designed; lower thins it out; higher adds notes (in the chord and its scale) */
@@ -902,10 +1003,10 @@ static void gen_bar(int32_t b, bar_t *B)
         g_style = -1;
         r.a = hash3(g_bk, l, p) ^ ((uint32_t)GL->mel * 2654435761u);
         tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
-        B->prof[l] = (uint8_t)p; B->inst[l] = PROF[p].inst[l]; B->user[l] = ln[l].up.on; B->cnt[l] = 0;
+        B->prof[l] = (uint8_t)p; B->inst[l] = PROF[p].inst[l]; B->user[l] = 0; B->cnt[l] = 0;
         B->muted[l] = (uint8_t)(!lane_active(&A, l) || !form_plays(l, b));
         if (B->muted[l]) continue;
-        if (ln[l].up.on) user_bar(l, &G, &T, b);
+        if (ln[l].up.on && user_bar(l, &G, &T, b)) B->user[l] = 1;
         else if (l == L_SFX) gen_sfx(&G, &r, &T, b, p, dens, &A, next_drop);
         else { g_style = PROF[p].st[l]; generate(g_style, &G, &r, &T, b, p); }
         if (A.mode != A_OFF) dens += (A.e - 154) * 80 / 256;
@@ -914,7 +1015,7 @@ static void gen_bar(int32_t b, bar_t *B)
         if (dens < 0) dens = 0;
         if (dens > 100) dens = 100;
         if (l != L_SFX) densify(l, &G, &r, &T, b, dens);
-        if (!ln[l].up.on) pitch_shape(l, &G, &r, &T);
+        if (!B->user[l]) pitch_shape(l, &G, &r, &T);
         if (!HITS(l)) play_shape(l, &G, &r, p);
         if (A.drop && l == L_DRUMS) {
             int has_c = 0, has_k = 0;
@@ -966,6 +1067,17 @@ static int bars_update(void)                    /* one bar per call at most: 1 =
     }
     return 0;
 }
+static void ubar_clear(int32_t l, int32_t b)
+{
+    int32_t s;
+    for (s = 0; s < 16; s++) { if (HITS(l)) ubar[l][b].kinds[s] = 0; else { ubar[l][b].n.k[s] = EMPTY; ubar[l][b].n.len[s] = 1; } }
+}
+static int ubar_empty(int32_t l, int32_t b)
+{
+    int32_t s;
+    for (s = 0; s < 16; s++) if (HITS(l) ? ubar[l][b].kinds[s] != 0 : ubar[l][b].n.k[s] != EMPTY) return 0;
+    return 1;
+}
 static void music_init(void)
 {
     uint32_t s, l, i;
@@ -974,8 +1086,8 @@ static void music_init(void)
         ln[l].prof = 2; ln[l].lock = 0;                 /* it starts with FUSION */
         ln[l].dens = 50; ln[l].oct = 0;
         ln[l].mel = 0; ln[l].rhy = 50; ln[l].pit = 50; ln[l].chg = 40; ln[l].mute = 0;
-        ln[l].up.on = 0; ln[l].up.bars = 1;
-        for (i = 0; i < 32u; i++) { ln[l].up.k[i] = EMPTY; ln[l].up.len[i] = 1; ln[l].up.kinds[i] = 0; }
+        ln[l].up.on = 0; ln[l].up.bars = 1; ln[l].up.after = AF_LOOP; ln[l].up.ver++;
+        for (i = 0; i < MAXB; i++) ubar_clear((int32_t)l, (int32_t)i);
     }
 }
 static int32_t launch_tempo = 1;                                /* LAUNCH brings the style's tempo (SEL + SEQ: keep yours) */
@@ -1073,16 +1185,24 @@ static void fx_apply(void)
  * every result is remembered per lane, so the same pattern never comes back */
 static uint32_t seen[NLANE][64], nseen[NLANE];
 static rng_t ui_rng = {0x1234567u};
-static uint32_t pat_hash(int32_t l)
+/* a bar was written: past the end it lengthens the part (only the bar right after it can be reached) */
+static void pat_touched(int32_t l, int32_t b)
 {
-    const upat_t *U = &ln[l].up;
-    uint32_t h = 2166136261u, i, n = U->bars * 16u;
-    for (i = 0; i < n; i++) { h = (h ^ (uint8_t)U->k[i]) * 16777619u; h = (h ^ U->len[i]) * 16777619u; h = (h ^ U->kinds[i]) * 16777619u; }
-    return h ^ U->bars;
+    upat_t *U = &ln[l].up;
+    if (b >= U->bars && b < MAXB) U->bars = (uint16_t)(b + 1);
+    U->on = 1; U->ver++;
+    invalidate_now();
+}
+static uint32_t pat_hash(int32_t l, int32_t b)
+{
+    const uint8_t *p = (const uint8_t *)&ubar[l][b];
+    uint32_t h = 2166136261u, i;
+    for (i = 0; i < sizeof(ubar_t); i++) h = (h ^ p[i]) * 16777619u;
+    return h;
 }
 static int pat_seen(int32_t l, uint32_t h) { uint32_t i, n = nseen[l] < 64u ? nseen[l] : 64u; for (i = 0; i < n; i++) if (seen[l][i] == h) return 1; return 0; }
 static void pat_remember(int32_t l, uint32_t h) { if (!pat_seen(l, h)) seen[l][nseen[l]++ % 64u] = h; }
-static int pat_empty(int32_t l) { uint32_t i; for (i = 0; i < ln[l].up.bars * 16u; i++) if (ln[l].up.k[i] != EMPTY || ln[l].up.kinds[i]) return 0; return 1; }
+static int pat_empty(int32_t l) { int32_t b; for (b = 0; b < ln[l].up.bars; b++) if (!ubar_empty(l, b)) return 0; return 1; }
 static int32_t note_to_k(const tools_t *T, int32_t note)
 {
     int32_t k, best = 0;
@@ -1090,32 +1210,29 @@ static int32_t note_to_k(const tools_t *T, int32_t note)
     return best;
 }
 static int32_t fill_style = -1;                                 /* EDIT's FILL: -1 = the lane's own style */
-static void pat_fresh(int32_t l)
+static void pat_fresh(int32_t l, int32_t b)                     /* bar b written by a style, with the chord of song bar b */
 {
-    upat_t *U = &ln[l].up;
     uint32_t seed = rnd(&ui_rng) ^ fm1_ms, i;
-    int32_t bi, p = fill_style >= 0 ? fill_style : ln[l].prof;
+    int32_t p = fill_style >= 0 ? fill_style : ln[l].prof;
     static gen_t G;
-    for (i = 0; i < 32u; i++) { U->k[i] = EMPTY; U->len[i] = 1; U->kinds[i] = 0; }
-    for (bi = 0; bi < U->bars; bi++) {
-        harm_t H; tools_t T; rng_t r = {seed + (uint32_t)bi * 7919u};
-        harm_at(bi, &H);
-        tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
-        GL = &ln[l]; keys_for(GL, bi);
-        if (l == L_SFX) { arc_t A = arc_at(bi); gen_sfx(&G, &r, &T, bi, p, ln[l].dens, &A, arc_at(bi + 1).drop); }
-        else generate(PROF[p].st[l], &G, &r, &T, bi, PROF[p].st[l] == S_RIFF ? (int32_t)(seed & 1023u) + 4 : p);
-        for (i = 0; i < G.n; i++) {
-            uint32_t s = (uint32_t)bi * 16u + G.ev[i].st;
-            if (HITS(l)) U->kinds[s] |= (uint16_t)(1u << G.ev[i].note[0]);
-            else { U->k[s] = (int8_t)note_to_k(&T, G.ev[i].note[0]); U->len[s] = G.ev[i].len; }
-        }
+    harm_t H; tools_t T; rng_t r = {seed};
+    ubar_clear(l, b);
+    harm_at(b, &H);
+    tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
+    GL = &ln[l]; keys_for(GL, b);
+    if (l == L_SFX) { arc_t A = arc_at(b); gen_sfx(&G, &r, &T, b, p, ln[l].dens, &A, arc_at(b + 1).drop); }
+    else generate(PROF[p].st[l], &G, &r, &T, b, PROF[p].st[l] == S_RIFF ? (int32_t)(seed & 1023u) + 4 : p);
+    for (i = 0; i < G.n; i++) {
+        uint32_t s = G.ev[i].st;
+        if (HITS(l)) ubar[l][b].kinds[s] |= (uint16_t)(1u << G.ev[i].note[0]);
+        else { ubar[l][b].n.k[s] = (int8_t)note_to_k(&T, G.ev[i].note[0]); ubar[l][b].n.len[s] = G.ev[i].len; }
     }
 }
-static void pat_vary(int32_t l)
+static void pat_vary(int32_t l, int32_t b)                      /* bar b, changed in a few places */
 {
-    upat_t *U = &ln[l].up;
-    int32_t n = U->bars * 16, used = 0, i, c, changes;
-    for (i = 0; i < n; i++) if (U->k[i] != EMPTY || U->kinds[i]) used++;
+    ubar_t *U = &ubar[l][b];
+    int32_t n = 16, used = 0, i, c, changes;
+    for (i = 0; i < n; i++) if (HITS(l) ? U->kinds[i] != 0 : U->n.k[i] != EMPTY) used++;
     changes = (used < 4 ? 4 : used) * (15 + (int32_t)((rnd(&ui_rng) >> 16) * 15u >> 16)) / 100;
     if (changes < 1) changes = 1;
     for (c = 0; c < changes; c++) {
@@ -1123,84 +1240,105 @@ static void pat_vary(int32_t l)
         if (HITS(l)) {
             static const int8_t K[6] = {DK_HAT, DK_OHAT, DK_KICK, DK_SNARE, DK_CLAP, DK_RIM}, X[6] = {SX_ZAP, SX_BITS, SX_SURF, SX_GALE, SX_CRACKLE, SX_IMPACT};
             int32_t k = (l == L_SFX ? X : K)[(rnd(&ui_rng) >> 16) * 6u >> 16];
-            if (l == L_DRUMS && s % 16 == 0 && k == DK_KICK) continue;   /* keep the kick on the one */
+            if (l == L_DRUMS && s == 0 && k == DK_KICK) continue;   /* keep the kick on the one */
             U->kinds[s] ^= (uint16_t)(1u << k);
             continue;
         }
         if (op < 45) {                                              /* move a note */
-            for (i = 0; i < n && U->k[(s + i) % n] == EMPTY; i++) ;
-            if (i < n) U->k[(s + i) % n] = (int8_t)(U->k[(s + i) % n] + PICK(&ui_rng, -2, -1, 1, 2));
-        } else if (op < 65 && U->k[s] == EMPTY) {                   /* add one next to a note */
+            for (i = 0; i < n && U->n.k[(s + i) % n] == EMPTY; i++) ;
+            if (i < n) U->n.k[(s + i) % n] = (int8_t)(U->n.k[(s + i) % n] + PICK(&ui_rng, -2, -1, 1, 2));
+        } else if (op < 65 && U->n.k[s] == EMPTY) {                 /* add one next to a note */
             int32_t d;
             for (d = 1; d < n; d++) {
-                if (U->k[(s + n - d) % n] != EMPTY) { U->k[s] = (int8_t)(U->k[(s + n - d) % n] + PICK(&ui_rng, -1, 1)); U->len[s] = 1; break; }
-                if (U->k[(s + d) % n] != EMPTY) { U->k[s] = (int8_t)(U->k[(s + d) % n] + PICK(&ui_rng, -1, 1)); U->len[s] = 1; break; }
+                if (U->n.k[(s + n - d) % n] != EMPTY) { U->n.k[s] = (int8_t)(U->n.k[(s + n - d) % n] + PICK(&ui_rng, -1, 1)); U->n.len[s] = 1; break; }
+                if (U->n.k[(s + d) % n] != EMPTY) { U->n.k[s] = (int8_t)(U->n.k[(s + d) % n] + PICK(&ui_rng, -1, 1)); U->n.len[s] = 1; break; }
             }
-        } else if (op < 80 && used > 3 && s % 16 && U->k[s] != EMPTY) { U->k[s] = EMPTY; used--; }   /* drop one */
-        else if (U->k[s] != EMPTY) {                                /* longer or shorter */
-            int32_t v = U->len[s] + PICK(&ui_rng, -1, 1, 2);
-            U->len[s] = (uint8_t)(v < 1 ? 1 : v > 8 ? 8 : v);
+        } else if (op < 80 && used > 3 && s && U->n.k[s] != EMPTY) { U->n.k[s] = EMPTY; used--; }   /* drop one */
+        else if (U->n.k[s] != EMPTY) {                              /* longer or shorter */
+            int32_t v = U->n.len[s] + PICK(&ui_rng, -1, 1, 2);
+            U->n.len[s] = (uint8_t)(v < 1 ? 1 : v > 8 ? 8 : v);
         }
     }
 }
-static int32_t pat_generate(int32_t l, int32_t fresh)           /* returns the number of patterns seen, 0 = none new */
+static int32_t pat_generate(int32_t l, int32_t fresh, int32_t b)   /* FILL bar b; the number of bars seen, 0 = none new */
 {
-    upat_t *U = &ln[l].up, keep = *U;
-    int32_t tries, was_empty = pat_empty(l);
-    pat_remember(l, pat_hash(l));
+    ubar_t keep = ubar[l][b];
+    int32_t tries, was_empty = ubar_empty(l, b);
+    pat_remember(l, pat_hash(l, b));
     for (tries = 0; tries < 40; tries++) {
         uint32_t h;
-        *U = keep;
-        if (fresh || was_empty || fill_style >= 0) pat_fresh(l); else pat_vary(l);
-        h = pat_hash(l);
-        if (!pat_seen(l, h) && !pat_empty(l)) { pat_remember(l, h); U->on = 1; invalidate_now(); return (int32_t)nseen[l]; }
+        ubar[l][b] = keep;
+        if (fresh || was_empty || fill_style >= 0) pat_fresh(l, b); else pat_vary(l, b);
+        h = pat_hash(l, b);
+        if (!pat_seen(l, h) && !ubar_empty(l, b)) { pat_remember(l, h); pat_touched(l, b); return (int32_t)nseen[l]; }
     }
-    *U = keep;
+    ubar[l][b] = keep;
     return 0;
 }
-/* COPY: another lane's pattern into this one. Between melodic lanes the scale steps carry over (so a lead line
+/* REPEAT: the bar before into bar b */
+static int pat_repeat(int32_t l, int32_t b)
+{
+    if (b < 1 || b >= MAXB) return 0;
+    ubar[l][b] = ubar[l][b - 1];
+    pat_touched(l, b);
+    return 1;
+}
+/* COPY: another lane's whole part into this one. Between melodic lanes the scale steps carry over (so a lead line
  * becomes a bass line in the same chords); notes into drums become kicks on the beat and hats between; drums into
- * notes become the root (kick), the fifth (snare) and the octave (the rest). */
+ * notes become the root (kick), the fifth (snare or clap) and the octave (the rest). */
 static void pat_copy(int32_t from, int32_t to)
 {
-    upat_t S, *U = &ln[to].up;
-    int32_t i;
-    for (i = 0; i < 32; i++) { S.k[i] = ln[from].up.k[i]; S.len[i] = ln[from].up.len[i]; S.kinds[i] = ln[from].up.kinds[i]; }
-    S.on = ln[from].up.on; S.bars = ln[from].up.bars;
-    for (i = 0; i < 32; i++) { U->k[i] = S.k[i]; U->len[i] = S.len[i]; U->kinds[i] = S.kinds[i]; }
-    U->bars = S.bars;
-    if (HITS(from) != HITS(to))
-        for (i = 0; i < 32; i++) {
-            if (HITS(to)) {
-                uint16_t k = 0;
-                if (S.k[i] != EMPTY) k = (uint16_t)(to == L_DRUMS ? 1u << (i % 4 == 0 ? DK_KICK : DK_HAT) : 1u << (i % 4 == 0 ? SX_ZAP : SX_BITS));
-                U->kinds[i] = k; U->k[i] = EMPTY; U->len[i] = 1;
-            } else {
+    int32_t b, i, n = ln[from].up.bars;
+    for (b = 0; b < MAXB; b++) {
+        ubar_t S = ubar[from][b], *U = &ubar[to][b];
+        if (b >= n) { ubar_clear(to, b); continue; }
+        if (HITS(from) == HITS(to)) {
+            if (HITS(to) && from != to)                             /* drums and sfx: their own kinds */
+                for (i = 0; i < 16; i++) U->kinds[i] = S.kinds[i] ? (uint16_t)(to == L_DRUMS ? 1u << (i % 4 == 0 ? DK_KICK : DK_HAT) : 1u << SX_BITS) : 0;
+            else *U = S;
+        } else if (HITS(to)) {
+            for (i = 0; i < 16; i++)
+                U->kinds[i] = S.n.k[i] == EMPTY ? 0 : (uint16_t)(to == L_DRUMS ? 1u << (i % 4 == 0 ? DK_KICK : DK_HAT) : 1u << (i % 4 == 0 ? SX_ZAP : SX_BITS));
+        } else {
+            for (i = 0; i < 16; i++) {
                 uint16_t k = S.kinds[i];
-                U->kinds[i] = 0; U->len[i] = 1;
-                U->k[i] = !k ? EMPTY : from == L_DRUMS && (k & (1u << DK_KICK)) ? 0 : from == L_DRUMS && (k & (1u << DK_SNARE | 1u << DK_CLAP)) ? 4 : 7;
+                U->n.len[i] = 1;
+                U->n.k[i] = !k ? EMPTY : from == L_DRUMS && (k & (1u << DK_KICK)) ? 0 : from == L_DRUMS && (k & (1u << DK_SNARE | 1u << DK_CLAP)) ? 4 : 7;
             }
         }
-    else if (HITS(to) && from != to)                                /* drums and sfx: their own kinds */
-        for (i = 0; i < 32; i++) U->kinds[i] = S.kinds[i] ? (uint16_t)(to == L_DRUMS ? 1u << (i % 4 == 0 ? DK_KICK : DK_HAT) : 1u << SX_BITS) : 0;
-    U->on = 1;
-    invalidate_now();
+    }
+    ln[to].up.bars = (uint16_t)n;
+    pat_touched(to, 0);
 }
-static void pat_grab(int32_t l)                                 /* what the lane plays in this bar becomes the pattern */
+static void pat_grab(int32_t l, int32_t b)                      /* what the lane plays in this song bar goes into bar b */
 {
-    upat_t *U = &ln[l].up;
     int32_t cb = cur_bar(), i;
     const bar_t *B = bar_get(cb);
     harm_t H; tools_t T;
     if (!B) return;
     harm_at(cb, &H);
     tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
-    for (i = 0; i < 32; i++) { U->k[i] = EMPTY; U->len[i] = 1; U->kinds[i] = 0; }
+    ubar_clear(l, b);
     for (i = 0; i < B->cnt[l]; i++) {
         const ev_t *e = &B->ev[l][i];
-        if (HITS(l)) U->kinds[e->st] |= (uint16_t)(1u << e->note[0]);
-        else { U->k[e->st] = (int8_t)note_to_k(&T, e->note[0]); U->len[e->st] = e->len; }
+        if (HITS(l)) ubar[l][b].kinds[e->st] |= (uint16_t)(1u << e->note[0]);
+        else { ubar[l][b].n.k[e->st] = (int8_t)note_to_k(&T, e->note[0]); ubar[l][b].n.len[e->st] = e->len; }
     }
-    U->bars = 1; U->on = 1;
+    pat_touched(l, b);
+}
+/* clearing: one bar (the last one goes, so the part gets shorter), or the whole part */
+static void pat_clear_bar(int32_t l, int32_t b)
+{
+    upat_t *U = &ln[l].up;
+    ubar_clear(l, b);
+    if (b == U->bars - 1 && U->bars > 1) U->bars--;
+    U->ver++;
+    invalidate_now();
+}
+static void pat_clear_all(int32_t l)
+{
+    int32_t b;
+    for (b = 0; b < MAXB; b++) ubar_clear(l, b);
+    ln[l].up.bars = 1; ln[l].up.ver++;
     invalidate_now();
 }

@@ -85,7 +85,9 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
 static uint8_t nor[0x100000];
 static uint32_t web_flash_writes;
 #define WEB_SETTINGS 0xFC000u
-#define WEB_PATTERNS 0xFD000u
+#define LONGS_AT 0x97000u                         /* the own parts: as on the FM-1 (the page keeps 0x97000..) */
+#define LONGS_LEN 0x16000u
+#define FL_IN(off, n, lo, hi) ((uint32_t)(off) >= (lo) && (uint32_t)(off) <= (hi) && (uint32_t)(n) <= (hi) - (uint32_t)(off))
 static int web_load(uint32_t at, uint32_t magic, void *p, uint32_t n)
 {
     uint32_t h[2];
@@ -106,8 +108,9 @@ static int web_save(uint32_t at, uint32_t magic, const void *p, uint32_t n)
 }
 static int settings_load(void *p, uint32_t n) { return web_load(WEB_SETTINGS, 0x59474E44u, p, n); }
 static int settings_save(const void *p, uint32_t n) { return web_save(WEB_SETTINGS, 0x59474E44u, p, n); }
-static int patterns_load(void *p, uint32_t n) { return web_load(WEB_PATTERNS, 0x41445345u, p, n); }
-static int patterns_save(const void *p, uint32_t n) { return web_save(WEB_PATTERNS, 0x41445345u, p, n); }
+static int longs_erase(uint32_t off) { if ((off & 0xFFFu) || !FL_IN(off, 0x1000u, 0, LONGS_LEN)) return -8; memset(nor + LONGS_AT + off, 0xFF, 0x1000u); return 0; }
+static int longs_write(uint32_t off, const void *p, uint32_t n) { if (!FL_IN(off, n, 0, LONGS_LEN)) return -8; memcpy(nor + LONGS_AT + off, p, n); web_flash_writes++; return 0; }
+static int longs_read(uint32_t off, void *p, uint32_t n) { if (!FL_IN(off, n, 0, LONGS_LEN)) return -8; memcpy(p, nor + LONGS_AT + off, n); return 0; }
 
 /* ---- MIDI: in from the page (Web MIDI), out nowhere */
 static uint8_t mq[64][3];

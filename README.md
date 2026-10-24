@@ -34,7 +34,7 @@ the kind of setting, PRESETS steps through them.
 <td align="center"><img src="docs/screens/live.png" width="240" alt="SONG, LIVE"><br><b>LIVE</b>: the next of ten styles, blend, energy and space; SEQ launches it at once, with its tempo. (SONG's last rows: the sfx lane.)</td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT, the drums"><br><b>EDIT</b>: the lane's own part, step by step, in scale steps from the chord root; the drums' nine hits by row. PRESETS: FILL it from any style (LFO), COPY another lane's (SEQ).</td>
+<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT, the drums"><br><b>EDIT</b>: the lane's own part, bar by bar, up to 512 bars, in scale steps from the chord root; the drums' nine hits by row. FILL a bar from any style, REPEAT the bar before, COPY another lane's part; after your last bar: LOOP, PROFILE or MY STYLE (new bars in your manner).</td>
 <td align="center"><img src="docs/screens/setup.png" width="240" alt="SETUP, LOOK"><br><b>SETUP</b> (hold HOME): the palette, the screen's level and the lights; the lanes' MIDI channels; back to defaults.</td>
 <td></td>
 </tr>
@@ -96,9 +96,11 @@ the kind of setting, PRESETS steps through them.
 - **The arc** (off until you turn it on): starts with a few drum hits and builds bass, pad and lead in as the
   energy rises, breaks, drops and builds again.
 - **Your own parts.** On the EDIT page you enter notes step by step, tracker style: white keys are scale steps
-  counted from the chord root, so a melody follows the chords and stays in key. FILL writes a part in any of the ten
-  styles, or a variation of yours, never the same one twice; COPY takes another lane's part (a lead line becomes a bass
-  line in the same chords).
+  counted from the chord root, so a melody follows the chords and stays in key. A part is as long as you write it, up
+  to 512 bars a lane. FILL writes a bar in any of the ten styles, or a variation of yours, never the same one twice;
+  REPEAT copies the bar before; COPY takes another lane's part (a lead line becomes a bass line in the same chords).
+  After your last bar the part loops, gives way to the generated one, or goes on in your style: MY STYLE learns the
+  rhythms and jumps of your bars and writes new ones like them.
 - **Song.** Key, scale (major, minor, the church modes, harmonic and melodic minor, pentatonics, blues), a list of
   suggested progressions, bars per chord, and the arc's lengths.
 

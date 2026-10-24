@@ -9,7 +9,7 @@ Espada 0.1: the first version of a generative groovebox for the M-VAVE FM-1 in t
 - Density from sparse to busy, inside the chord and its scale; ENERGY for all lanes at once.
 - Per lane: filter with a tempo-synced wobble, FM brightness, drive, crush, level; slide, retrigger, echo; VARY changes the character per phrase.
 - ENV fades a lane out and in; LEVEL sets it.
-- Your own parts on the EDIT page, entered in scale steps so they follow the chords; FILL from any style, COPY from another lane, GRAB what plays.
+- Your own parts on the EDIT page, up to 512 bars a lane, entered in scale steps so they follow the chords; FILL a bar from any style, REPEAT, COPY from another lane, GRAB what plays; after your last bar LOOP, PROFILE or MY STYLE (new bars learned from yours).
 - SONG: key, scale, suggested progressions, bars per chord.
 - Song form by hand: an INTRO from one lane, INTERs (one lane alone, the rest back one by one), DROPs and an END that fades the lanes out to bass or drums and stops.
 - The arc (off until you turn it on): builds from the drums, a break, the drop, and again; DROP by hand (tap or hold).
