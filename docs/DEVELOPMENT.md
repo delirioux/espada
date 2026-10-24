@@ -110,8 +110,9 @@ and publishes the site with the web installer. A tag `v*` makes a release with [
 
 | Risk | What happens | Check |
 | --- | --- | --- |
-| The audio interrupt's time | the reverb, the stereo buses and the orchestra's ensembles cost time; above about 2.9 ms the sound may crackle when USB and the key scan interrupt it | SEL + SAVE while SYMPHONY plays shows the worst time; trim the room or the ensembles if it is high |
+| The audio interrupt's time | the reverb, the stereo buses and the orchestra's ensembles cost time; above about 2.9 ms the sound may crackle when USB and the key scan interrupt it | SETUP, AUDIO (or SEL + SAVE) while SYMPHONY, STEEL or RAVE plays shows the worst time; trim the room or the ensembles if it is high |
 | Sound on the hardware | levels and patches were tuned in host mode and the browser, not yet by ear on the FM-1's output | play every style on the FM-1 |
+| Memory | the stacks' depth is decided at run time | SETUP, SYSTEM: the stacks are painted at boot and the least free since is shown; RAM and the pool from the linker's addresses |
 | Name clashes in the one unit | a new file-scope variable with a platform name silently becomes one variable | settled: `check_names.py` in CI |
 | Soft floats, 64-bit division | a missing routine crashes the FM-1 | settled: CI fails on them |
 

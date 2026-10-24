@@ -223,6 +223,26 @@ static void fm1_glow_all(void)
             if (FM1_KEYMAP[r][p] >= 0) fm1_led_dim[p] |= (uint8_t)(1u << r);
 }
 
+/* ---- memory: the stacks are painted at boot, so the deepest they have been can be read back; RAM and the pool
+ * from the linker's addresses (SETUP, SYSTEM) */
+#define SYS_PAINT 0x5AA5C33Cu
+typedef struct { uint32_t stack_free, stack_size, irq_free, irq_size, ram_free, pool_free, known; } sysmem_t;
+static uint32_t sys_untouched(const uint32_t *lo, const uint32_t *top)   /* bytes from lo still painted */
+{
+    const uint32_t *p = lo;
+    while (p < top && *p == SYS_PAINT) p++;
+    return (uint32_t)(p - lo) * 4u;
+}
+static void sys_mem(sysmem_t *m)
+{
+    extern char _ustack_top[];                  /* the other stack bounds: fm1_guard.h */
+    extern uint32_t _bss_end[], _pool_end[];
+    m->stack_size = (uint32_t)(_ustack_top - _ustack_lo); m->stack_free = sys_untouched((const uint32_t *)_ustack_lo, (const uint32_t *)_ustack_top);
+    m->irq_size = (uint32_t)(_sstack_top - _sstack_lo); m->irq_free = sys_untouched((const uint32_t *)_sstack_lo, (const uint32_t *)_sstack_top);
+    m->ram_free = 0x01C08000u + 96u * 1024u - (uint32_t)(uintptr_t)_bss_end;   /* app.ld: RAM 96 KiB */
+    m->pool_free = 0x01C74000u - (uint32_t)(uintptr_t)_pool_end;               /* app.ld: the pool ends at the stacks' guard */
+    m->known = 1;
+}
 static void fm1_glow_none(void)                 /* the glow off (the app's LIGHTS setting) */
 {
     uint32_t p;
@@ -363,6 +383,12 @@ void fm1_cstart(void)
     if (boot_mode == BOOT_ROM)
         fm1_enter_uboot();
     fm1_irq_init();
+    {                                           /* paint the stacks (interrupts are still off): the IRQ stack whole, ours below here */
+        volatile uint32_t here = 0;
+        uint32_t *lim = (uint32_t *)(uintptr_t)&here - 64;
+        for (d = (uint32_t *)_sstack_lo; d < (uint32_t *)_sstack_top; d++) *d = SYS_PAINT;
+        for (d = (uint32_t *)_ustack_lo; d < lim; d++) *d = SYS_PAINT;
+    }
     for (d = _bss_start; d < _bss_end; d++) *d = 0;
     for (d = _pool_start; d < _pool_end; d++) *d = 0;
     for (s = _data_load, d = _data_start; d < _data_end; s++, d++) *d = *s;

@@ -38,6 +38,8 @@ static uint32_t fm1_ticks(void) { struct timespec ts; clock_gettime(CLOCK_THREAD
 static void fm1_led_key(uint32_t id, int on) { (void)id; (void)on; }
 static void fm1_glow_all(void) { }
 static void fm1_glow_none(void) { }
+typedef struct { uint32_t stack_free, stack_size, irq_free, irq_size, ram_free, pool_free, known; } sysmem_t;
+static void sys_mem(sysmem_t *m) { m->known = 0; }   /* no FM-1 memory map here */
 
 /* the screen: 240 x 240 RGB565, as the ST7789 gets it (gfx.c sends the bytes swapped) */
 static uint16_t fb[240 * 240];

@@ -51,6 +51,8 @@ static void fm1_led_key(uint32_t id, int on)
 }
 static void fm1_glow_all(void) { web_glow64 = (1ull << 41) - 1u; }
 static void fm1_glow_none(void) { web_glow64 = 0; }
+typedef struct { uint32_t stack_free, stack_size, irq_free, irq_size, ram_free, pool_free, known; } sysmem_t;
+static void sys_mem(sysmem_t *m) { m->known = 0; }   /* no FM-1 memory map here */
 
 /* ---- the screen: as the panel gets it (high byte first); gfx.c's canvases are already in that order */
 static uint16_t web_fb[240 * 240];

@@ -65,8 +65,12 @@ Hold **HOME** for SETUP; HOME (or any group button, or EDIT) leaves it. PRESETS 
 | LOOK | palette: ESPADA (its colours), AMBER, GREEN, CYAN, RED, MONO | screen: 100, 75, 50 or 25 % | lights: the keys' and buttons' glow on or off | |
 | MIDI | the lead's channel | the pad's | the bass's | the drums' (1..16 or OFF) |
 | RESET | defaults: five clicks to the right puts everything back as it comes (patterns cleared); SAVE keeps it | | | |
+| SYSTEM | stack: free, of 23 K (the least it has had free since power-on) | the interrupts' stack: the same, of 7 K | RAM free | the pool free (the big buffers) |
+| AUDIO | the audio interrupt's worst time, µs | its average over the last half second | the worst as a share of the 5805 µs it has | any knob here starts the worst again |
 
-SAVE keeps the setup with everything else.
+SAVE keeps the setup with everything else. SYSTEM and AUDIO only show; they are how a firmware that runs short of
+memory or time is caught before it crackles or crashes. In the browser, SYSTEM shows N/A (there is no FM-1 memory
+there).
 
 ## Buttons
 
@@ -82,7 +86,7 @@ Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on
 | ENV | fade the lane out over a bar; again: back in. SEL + ENV: LOCK (it keeps its style when you blend or launch). On EDIT: TIE |
 | LFO | a new idea for the lane, at once (MELODY moves on). On EDIT: GENERATE a pattern: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
 | OCT- / OCT+ | the keys' octave; both together: back to 0. On EDIT: the octave you enter in |
-| SAVE | keep everything (settings and patterns); while playing it waits until you stop. SEL + SAVE: the audio interrupt's time in the header |
+| SAVE | keep everything (settings and patterns); while playing it waits until you stop. SEL + SAVE: the audio interrupt's time in the header (also SETUP, AUDIO) |
 
 Every button and key glows faintly; lit means: the group you are in, EDIT, playing, a break, a launch waiting, the
 lane faded out, a save waiting, the keys' octave off 0.

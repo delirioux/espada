@@ -386,10 +386,41 @@ static void t_reset(int32_t d)                                  /* five clicks t
 }
 static void v_reset(char *o) { if (!reset_turns) s_cat(o, "TURN"); else { o = s_int(o, 5 - reset_turns); s_cat(o, " MORE"); } }
 static void s_reset(char *o) { s_cat(o, "5 RIGHT"); }
+/* SYSTEM: what the memory has left (the stacks: the most they have ever used, read back from the paint); AUDIO: the
+ * audio interrupt's time in microseconds, of the 5805 it has. Read twice a second; any knob on AUDIO starts the worst again */
+static sysmem_t sysm;
+static uint32_t sys_at, isr_avg_us, isr_sum0, isr_n0;
+static void sys_poll(void)
+{
+    if (sys_at && fm1_ms - sys_at < 500u) return;
+    sys_at = fm1_ms ? fm1_ms : 1u;
+    sys_mem(&sysm);
+    if (isr_n != isr_n0) { isr_avg_us = (isr_us_sum - isr_sum0) / (isr_n - isr_n0); isr_sum0 = isr_us_sum; isr_n0 = isr_n; }
+}
+static void s_kib(char *o, uint32_t b) { o = s_int(o, (int32_t)((b + 512u) / 1024u)); s_cat(o, "K"); }
+static void v_free(char *o, uint32_t b) { sys_poll(); if (!sysm.known) s_cat(o, "N/A"); else s_kib(o, b); }
+static void t_none(int32_t d) { (void)d; }
+static void v_stk(char *o) { sys_poll(); v_free(o, sysm.stack_free); }
+static void s_stk(char *o) { if (sysm.known) { o = s_cat(o, "OF "); s_kib(o, sysm.stack_size); } }
+static void v_irq(char *o) { sys_poll(); v_free(o, sysm.irq_free); }
+static void s_irq(char *o) { if (sysm.known) { o = s_cat(o, "OF "); s_kib(o, sysm.irq_size); } }
+static void v_ram(char *o) { sys_poll(); v_free(o, sysm.ram_free); }
+static void v_pool(char *o) { sys_poll(); v_free(o, sysm.pool_free); }
+static void s_free(char *o) { if (sysm.known) s_cat(o, "FREE"); }
+static void t_isr(int32_t d) { (void)d; isr_us_max = 0; }
+static void v_worst(char *o) { s_int(o, (int32_t)isr_us_max); }
+static void v_avg(char *o) { sys_poll(); s_int(o, (int32_t)isr_avg_us); }
+static void v_load(char *o) { s_pct(o, (int32_t)(isr_us_max * 100u / 5805u)); }
+static void s_msw(char *o) { s_cat(o, "US"); }
+static void s_load(char *o) { s_cat(o, "OF 5.8MS"); }
+static void v_tr(char *o) { s_cat(o, "TURN"); }
+static void s_tr(char *o) { s_cat(o, "WORST"); }
 static const srow_t ROW_SETUP[] = {
     {"LOOK", -1, {{"PALETTE", t_pal, v_pal, 0}, {"SCREEN", t_scr, v_scr, 0}, {"LIGHTS", t_glow, v_glow, s_glow}, {0, 0, 0, 0}}},
     {"MIDI", -1, {{"LEAD", t_ch0, v_ch0, s_ch}, {"PAD", t_ch1, v_ch1, s_ch}, {"BASS", t_ch2, v_ch2, s_ch}, {"DRUMS", t_ch3, v_ch3, s_ch}}},
     {"RESET", -1, {{"DEFAULTS", t_reset, v_reset, s_reset}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+    {"SYSTEM", -1, {{"STACK", t_none, v_stk, s_stk}, {"IRQ", t_none, v_irq, s_irq}, {"RAM", t_none, v_ram, s_free}, {"POOL", t_none, v_pool, s_free}}},
+    {"AUDIO", -1, {{"WORST", t_isr, v_worst, s_msw}, {"AVERAGE", t_isr, v_avg, s_msw}, {"LOAD", t_isr, v_load, s_load}, {"RESET", t_isr, v_tr, s_tr}}},
 };
 #define NROWS_OF(a) ((int32_t)(sizeof(a) / sizeof(a[0])))
 static int32_t nrows(int32_t g) { return g == G_PLAY ? NROWS_OF(ROW_PLAY) : g == G_SOUND ? NROWS_OF(ROW_SOUND) : g == G_TRK ? NROWS_OF(ROW_TRK) : NROWS_OF(ROW_SONG); }
