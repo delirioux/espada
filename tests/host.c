@@ -40,6 +40,7 @@ static void fm1_glow_all(void) { }
 static void fm1_glow_none(void) { }
 typedef struct { uint32_t stack_free, stack_size, irq_free, irq_size, ram_free, pool_free, known; } sysmem_t;
 static void sys_mem(sysmem_t *m) { m->known = 0; }   /* no FM-1 memory map here */
+static uint32_t sys_seed(void) { return 0x1234567u; }   /* host mode stays repeatable */
 
 /* the screen: 240 x 240 RGB565, as the ST7789 gets it (gfx.c sends the bytes swapped) */
 static uint16_t fb[240 * 240];

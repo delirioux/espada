@@ -243,6 +243,17 @@ static void sys_mem(sysmem_t *m)
     m->pool_free = 0x01C74000u - (uint32_t)(uintptr_t)_pool_end;               /* app.ld: the pool ends at the stacks' guard */
     m->known = 1;
 }
+/* a seed that differs at every power-on: the boot always takes as long, so the timer's low bits and the ADCs'
+ * noise (the battery and the volume knob, read many times) are what varies */
+static uint32_t sys_seed(void)
+{
+    uint32_t h = 2166136261u ^ fm1_ticks(), i;
+    for (i = 0; i < 32u; i++) {
+        int32_t a = fm1_adc_read(i & 1u ? FM1_ADC_MASTER : FM1_ADC_BATT);
+        h = (h ^ (uint32_t)a ^ fm1_ticks()) * 16777619u;
+    }
+    return h;
+}
 static void fm1_glow_none(void)                 /* the glow off (the app's LIGHTS setting) */
 {
     uint32_t p;

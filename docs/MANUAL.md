@@ -94,7 +94,8 @@ lane faded out, a save waiting, the keys' octave off 0.
 ## What the knobs do
 
 - **The musical settings** (PLAY, the first four): **MELODY** picks the idea: every position is its own melody, riff,
-  voicing or drum pattern, and turning back brings one back. **RHYTHM** goes from slow long notes to busy 16ths (on
+  voicing or drum pattern, and turning back brings one back. Every power-on sets each lane's MELODY at random, so
+  Espada starts with a new song each time (a saved set keeps everything else). **RHYTHM** goes from slow long notes to busy 16ths (on
   the other lanes: sparser or busier). **PITCH** goes from small steps to wide leaps and a higher register (the bass
   jumps octaves, the pad's chords open up, the drums bring in the timpani). **CHANGE** says how soon new material
   comes: FROZEN (the same 16 bars over and over), 64, 32 or 16 bars. Every change is heard at once, from the next

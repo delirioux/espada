@@ -53,6 +53,8 @@ static void fm1_glow_all(void) { web_glow64 = (1ull << 41) - 1u; }
 static void fm1_glow_none(void) { web_glow64 = 0; }
 typedef struct { uint32_t stack_free, stack_size, irq_free, irq_size, ram_free, pool_free, known; } sysmem_t;
 static void sys_mem(sysmem_t *m) { m->known = 0; }   /* no FM-1 memory map here */
+static uint32_t web_seed_v;                      /* from the page (web_seed), before web_boot */
+static uint32_t sys_seed(void) { return web_seed_v; }
 
 /* ---- the screen: as the panel gets it (high byte first); gfx.c's canvases are already in that order */
 static uint16_t web_fb[240 * 240];
@@ -178,6 +180,7 @@ EXPORT void web_boot(void)
     web_booted = 1;
 }
 /* MASTER: 0..1023 as the pot reads (the FM-1 applies it after the app; here the same) */
+EXPORT void web_seed(uint32_t v) { web_seed_v = v; }
 EXPORT void web_master(uint32_t v) { web_master_q8 = (v > 1023u ? 1023u : v) * 360u / 1023u; }
 EXPORT uint32_t web_sample_rate(void) { return FS; }
 EXPORT uint32_t web_now_ms(void) { return fm1_ms; }

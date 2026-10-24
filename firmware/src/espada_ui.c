@@ -1108,6 +1108,13 @@ static void app_boot(void)
     uint32_t t_splash;
     defaults();
     do_load();
+    {                                                               /* every power-on a new song: MELODY at random */
+        rng_t r;
+        uint32_t l;
+        r.a = sys_seed() | 1u;
+        for (l = 0; l < NLANE; l++) ln[l].mel = (uint8_t)((rnd(&r) >> 16) * 100u >> 16);
+        form_rng.a ^= r.a;                                          /* and the INTRO's order */
+    }
     form_arm();                                                     /* the first INTRO, shown before PLAY */
     splash();
     t_splash = fm1_ms;
