@@ -176,7 +176,7 @@ typedef struct {
 static lane_t ln[NLANE];
 static const int32_t LBASE[NLANE] = {62, 50, 38, 0, 62}, LLO[NLANE] = {58, 45, 24, 0, 0}, LHI[NLANE] = {98, 86, 64, 0, 0};
 static const int32_t LORDER[NLANE] = {3, 2, 1, 0, 4};           /* blend order: drums first; sfx follows the bass */
-static int32_t target = 1, blend = 0, launch_bar = -1;
+static int32_t target = 2, blend = 0, launch_bar = -1;           /* FUSION queued, as it plays */
 
 static int32_t eff_prof(int32_t l, int32_t b)
 {
@@ -946,7 +946,8 @@ static void music_init(void)
     uint32_t s, l, i;
     for (s = 0; s < NSLOT; s++) { bars[s][0].num = -1; bars[s][1].num = -1; }
     for (l = 0; l < NLANE; l++) {
-        ln[l].prof = 0; ln[l].lock = 0; ln[l].dens = 50; ln[l].oct = 0;
+        ln[l].prof = 2; ln[l].lock = 0;                 /* it starts with FUSION */
+        ln[l].dens = 50; ln[l].oct = 0;
         ln[l].mel = 0; ln[l].rhy = 50; ln[l].pit = 50; ln[l].chg = 40; ln[l].mute = 0;
         ln[l].up.on = 0; ln[l].up.bars = 1;
         for (i = 0; i < 32u; i++) { ln[l].up.k[i] = EMPTY; ln[l].up.len[i] = 1; ln[l].up.kinds[i] = 0; }
