@@ -175,7 +175,7 @@ static int32_t save_pending, gen_count[NLANE];
 static void toast(const char *s) { uint32_t i; for (i = 0; i < 47u && s[i]; i++) toast_s[i] = s[i]; toast_s[i] = 0; toast_until = fm1_ms + 1600u; }
 static const char *const NN[12] = {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
 static const char *const WOBN[6] = {"OFF", "1/1", "1/2", "1/4", "1/8", "1/16"};
-static const char *const DKN[NDK] = {"K", "S", "H", "T", "C"};
+static const char *const DKN[NDK] = {"K", "S", "H", "T", "C", "X", "O", "M", "R"};   /* EDIT rows: kick, snare, hat, timpani, crash, clap, open hat, tom, rim */
 static const char *const PSHORT[10] = {"EPIC", "HYPER", "FUSION", "OLDSKOOL", "SYMPHONY", "TROPIC", "STEEL", "DRIFT", "FUNK", "RAVE"};
 static const char *const SSHORT[13] = {"AUTO", "MAJOR", "MINOR", "DORIAN", "PHRYGIAN", "LYDIAN", "MIXOLYD", "LOCRIAN",
                                        "HARM MIN", "MEL MIN", "MAJ PENT", "MIN PENT", "BLUES"};
@@ -470,7 +470,7 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
             if (x > 240 || x < -64) continue;
             if (HITS(l)) {
                 int32_t kind = e->note[0], row, rows, w, yy, len = 0;
-                if (l == L_DRUMS) { rows = 3; row = kind == DK_SNARE ? 1 : kind == DK_HAT || kind == DK_CRASH ? 2 : 0; w = kind == DK_KETTLE || kind == DK_CRASH ? 6 : 3; }
+                if (l == L_DRUMS) { rows = 3; row = kind == DK_SNARE || kind == DK_CLAP || kind == DK_RIM ? 1 : kind == DK_HAT || kind == DK_CRASH || kind == DK_OHAT ? 2 : 0; w = kind == DK_KETTLE || kind == DK_CRASH || kind == DK_TOM ? 6 : kind == DK_OHAT || kind == DK_CLAP ? 4 : kind == DK_RIM ? 2 : 3; }
                 else { rows = NSX; row = kind; w = 3; if (SX_LONG(kind)) len = e->len * PPS - 1; }
                 yy = y + h - 4 - hh - row * (h - 6 - hh) / (rows - 1);
                 if (len) {                                          /* the long sfx: a band; the riser grows */
@@ -736,7 +736,7 @@ static uint32_t frames, fps_t0, fps;
 static int32_t last_drawn_pos = -1;
 static void draw_frame(int force)
 {
-    int32_t l, k, ns, y0, h0, view = edit_on ? 1 : grp == G_SONG && rowi[G_SONG] == SR_KEY ? 2 : grp == G_SONG && rowi[G_SONG] == SR_ARC ? 3 : 0;
+    int32_t l, k, ns, y0, h0, view = edit_on ? 1 : setup_on ? 0 : grp == G_SONG && rowi[G_SONG] == SR_KEY ? 2 : grp == G_SONG && rowi[G_SONG] == SR_ARC ? 3 : 0;
     pos16 = cur_step() * 65536 + (seq_playing ? (int32_t)vis_frac : 0);
     draw_knobs(force);
     if (!edit_on) draw_title(force);
@@ -864,7 +864,7 @@ static void edit_key(int32_t k, int32_t sel_held_now)
     int32_t n = U->bars * 16, wi = white_index(k);
     if (HITS(sel)) {
         int32_t nk = sel == L_DRUMS ? NDK : NSX;
-        if (wi >= 0 && wi < nk) { U->kinds[cursor] ^= (uint8_t)(1u << wi); if (!seq_playing) audition((uint32_t)sel, (uint32_t)wi, sel == L_SFX ? 0u : fxu[L_DRUMS].inst >= 0 ? (uint32_t)fxu[L_DRUMS].inst : PROF[ln[L_DRUMS].prof].inst[L_DRUMS]); }
+        if (wi >= 0 && wi < nk) { U->kinds[cursor] ^= (uint16_t)(1u << wi); if (!seq_playing) audition((uint32_t)sel, (uint32_t)wi, sel == L_SFX ? 0u : fxu[L_DRUMS].inst >= 0 ? (uint32_t)fxu[L_DRUMS].inst : PROF[ln[L_DRUMS].prof].inst[L_DRUMS]); }
         else cursor = fmodp(cursor + 1, n);
         U->on = 1; invalidate_now(); return;
     }

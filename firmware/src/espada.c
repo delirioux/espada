@@ -68,7 +68,7 @@ typedef struct {
 static bar_t bars[NSLOT][2] __attribute__((section(".pool")));
 static volatile uint8_t bar_sel[NSLOT];
 
-enum { DK_KICK = 0, DK_SNARE, DK_HAT, DK_KETTLE, DK_CRASH, NDK };
+enum { DK_KICK = 0, DK_SNARE, DK_HAT, DK_KETTLE, DK_CRASH, DK_CLAP, DK_OHAT, DK_TOM, DK_RIM, NDK };   /* at most 16: a bit each */
 enum { SX_WASH = 0, SX_RISER, SX_IMPACT, SX_ZAP, SX_CRACKLE, SX_BITS, SX_SURF, SX_GALE, NSX };   /* the sfx lane's sounds (at most 8: a bit each) */
 #define SX_LONG(k) ((k) == SX_WASH || (k) == SX_RISER || (k) == SX_CRACKLE || (k) == SX_SURF || (k) == SX_GALE)   /* held over steps */
 

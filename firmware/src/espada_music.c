@@ -167,7 +167,7 @@ static void chord_of(int32_t s, int32_t deg, int32_t *root, int8_t *tones)
 
 /* ---- lanes and mixing */
 #define EMPTY (-128)
-typedef struct { int8_t k[32]; uint8_t len[32]; uint8_t kinds[32]; uint8_t on, bars; } upat_t;
+typedef struct { int8_t k[32]; uint8_t len[32]; uint16_t kinds[32]; uint8_t on, bars; } upat_t;   /* kinds: a bit per drum or sfx sound */
 typedef struct {
     uint8_t prof, lock, dens; int8_t oct; upat_t up;
     uint8_t mel, rhy, pit, chg;     /* MELODY 0..99 (which idea), RHYTHM, PITCH, CHANGE 0..100 */
@@ -581,12 +581,17 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
     case S_DTROPIC: {           /* the one and the three, rim shots on two and four with a push, congas, shaker 8ths */
         static const int8_t K[16] = {100, 0, 30, 20, 0, 0, 30, 0, 90, 0, 40, 0, 0, 0, 25, 0}, SN[16] = {0, 0, 0, 0, 90, 0, 0, 45, 0, 35, 0, 0, 90, 0, 25, 30},
                             H[16] = {50, 0, 85, 0, 50, 0, 85, 0, 50, 0, 85, 0, 50, 0, 85, 0}, TT[16] = {0, 0, 0, 45, 0, 0, 55, 0, 0, 0, 0, 45, 0, 0, 55, 0};
-        hits(G, r, DK_KICK, K); hits(G, r, DK_SNARE, SN); hits(G, r, DK_HAT, H); hits(G, r, DK_KETTLE, TT);
+        hits(G, r, DK_KICK, K); hits(G, r, DK_RIM, SN); hits(G, r, DK_HAT, H); hits(G, r, DK_KETTLE, TT);
         break; }
     case S_DSTEEL: {            /* double kick on the gallop, the snare on two and four, the ride on 8ths */
         static const int8_t K[16] = {100, 0, 0, 85, 90, 0, 0, 85, 100, 0, 0, 85, 90, 0, 0, 85}, SN[16] = {0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 100, 0, 0, 20},
                             H[16] = {90, 0, 90, 0, 90, 0, 90, 0, 90, 0, 90, 0, 90, 0, 90, 0};
-        hits(G, r, DK_KICK, K); hits(G, r, DK_SNARE, SN); hits(G, r, DK_HAT, H);
+        if (b % 4 == 3 && chance(r, 70)) {                          /* a tom fill down into the phrase */
+            static const int8_t K2[16] = {100, 0, 0, 85, 90, 0, 0, 85, 100, 0, 0, 85, 0, 0, 0, 0}, SN2[16] = {0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+            hits(G, r, DK_KICK, K2); hits(G, r, DK_SNARE, SN2);
+            for (s = 0; s < 12; s += 2) DRUM(G, s, DK_HAT);
+            for (s = 12; s < 16; s++) DRUM(G, s, DK_TOM);
+        } else { hits(G, r, DK_KICK, K); hits(G, r, DK_SNARE, SN); hits(G, r, DK_HAT, H); }
         if (b % 4 == 0) DRUM(G, 0, DK_CRASH);
         break; }
     case S_DDRIFT: {            /* no snare: a soft heartbeat kick, sparse hats, a low drum into the phrase */
@@ -594,38 +599,45 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
         for (s = 0; s < 16; s++) if (K[s] && chance(r, K[s])) { ev_t *e = DRUM(G, s, DK_KICK); if (e && s) e->flags = EV_ACC1; }
         for (s = 0; s < 16; s++) if (H[s] && chance(r, H[s])) { ev_t *e = DRUM(G, s, DK_HAT); if (e) e->flags = EV_ACC2; }
         if (b % 4 == 3) DRUM(G, 12, DK_KETTLE);
+        else if (chance(r, 35)) { ev_t *e = DRUM(G, 12, DK_RIM); if (e) e->flags = EV_ACC2; }   /* a soft rim, never a snare */
         break; }
     case S_DFUNK: {             /* the kick on the one and off the beat, the snare on two and four with ghosts, 16th hats */
         static const int8_t K[16] = {100, 0, 0, 50, 0, 0, 0, 30, 0, 0, 75, 0, 0, 25, 0, 0}, SN[16] = {0, 0, 0, 0, 0, 0, 0, 35, 0, 40, 0, 0, 0, 0, 0, 35},
                             H[16] = {85, 55, 85, 55, 85, 55, 85, 55, 85, 55, 85, 55, 85, 55, 85, 55};
-        hits(G, r, DK_KICK, K); hits(G, r, DK_HAT, H);
+        hits(G, r, DK_KICK, K);
+        for (s = 0; s < 16; s++) if (H[s] && chance(r, H[s])) DRUM(G, s, s == 14 && chance(r, 60) ? DK_OHAT : DK_HAT);   /* the hat opens before the one */
         DRUM(G, 4, DK_SNARE); DRUM(G, 12, DK_SNARE);
+        if (chance(r, 30)) { ev_t *e = DRUM(G, 10, DK_RIM); if (e) e->flags = EV_ACC2; }
         for (s = 0; s < 16; s++) if (SN[s] && chance(r, SN[s])) { ev_t *e = DRUM(G, s, DK_SNARE); if (e) e->flags = EV_ACC2; }
         break; }
     case S_DRAVE: {             /* four on the floor, a clap on two and four, the open hat on the off-beats */
         static const int8_t H[16] = {0, 0, 100, 0, 0, 0, 100, 0, 0, 0, 100, 0, 0, 0, 100, 0}, H2[16] = {0, 40, 0, 40, 0, 40, 0, 40, 0, 40, 0, 40, 0, 40, 0, 40};
         for (s = 0; s < 16; s += 4) DRUM(G, s, DK_KICK);
-        DRUM(G, 4, DK_SNARE); DRUM(G, 12, DK_SNARE);
-        hits(G, r, DK_HAT, H);
+        DRUM(G, 4, DK_CLAP); DRUM(G, 12, DK_CLAP);
+        if (chance(r, 40)) DRUM(G, 12, DK_SNARE);
+        hits(G, r, DK_OHAT, H);
         for (s = 0; s < 16; s++) if (H2[s] && chance(r, H2[s])) { ev_t *e = DRUM(G, s, DK_HAT); if (e) e->flags = EV_ACC2; }
         if (b % 8 == 0) DRUM(G, 0, DK_CRASH);
         break; }
     case S_DEPIC: {
         static const int8_t K[16] = {100, 0, 20, 0, 0, 0, 20, 0, 100, 0, 20, 0, 36, 0, 0, 0}, TT[16] = {60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45, 0, 40, 25},
                             SN[16] = {0, 0, 0, 0, 92, 0, 0, 20, 0, 0, 0, 0, 92, 0, 35, 20}, H[16] = {75, 38, 75, 38, 75, 38, 75, 38, 75, 38, 75, 38, 75, 38, 75, 38};
-        hits(G, r, DK_KICK, K); hits(G, r, DK_KETTLE, TT); hits(G, r, DK_SNARE, SN); hits(G, r, DK_HAT, H);
+        hits(G, r, DK_KICK, K); hits(G, r, DK_KETTLE, TT); hits(G, r, DK_HAT, H);
+        if (b % 8 == 7) { DRUM(G, 4, DK_SNARE); for (s = 10; s < 16; s++) DRUM(G, s, DK_TOM); }   /* toms down into the second phrase */
+        else hits(G, r, DK_SNARE, SN);
         if (b % 4 == 0) DRUM(G, 0, DK_CRASH);
         break; }
     case S_DTECH: {
         static const int8_t K[16] = {100, 0, 25, 0, 50, 0, 25, 0, 100, 0, 25, 0, 75, 0, 25, 0}, SN[16] = {0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0},
                             H[16] = {95, 60, 95, 60, 95, 60, 95, 60, 95, 60, 95, 60, 95, 60, 95, 60};
         hits(G, r, DK_KICK, K); hits(G, r, DK_SNARE, SN); hits(G, r, DK_HAT, H);
+        if (b % 2) DRUM(G, 12, DK_CLAP);                            /* a clap on the snare, every other bar */
         if (b % 8 == 0) DRUM(G, 0, DK_CRASH);
         break; }
     case S_DFUSION: {
         static const int8_t K[16] = {100, 0, 0, 0, 100, 0, 0, 0, 100, 0, 0, 0, 100, 0, 0, 0}, SN[16] = {0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 100, 0, 0, 30},
-                            H[16] = {85, 85, 85, 85, 85, 85, 85, 0, 85, 85, 85, 85, 85, 85, 85, 0};
-        hits(G, r, DK_KICK, K); hits(G, r, DK_SNARE, SN); hits(G, r, DK_HAT, H);
+                            H[16] = {85, 85, 85, 85, 85, 85, 85, 0, 85, 85, 85, 85, 85, 85, 85, 0}, OH[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 70};
+        hits(G, r, DK_KICK, K); hits(G, r, DK_SNARE, SN); hits(G, r, DK_HAT, H); hits(G, r, DK_OHAT, OH);
         if (b % 4 == 0) DRUM(G, 0, DK_CRASH);
         break; }
     default: {
@@ -757,7 +769,10 @@ static void densify(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t b, 
         for (s = 0; s < 16; s++) ADD(s, DK_HAT, x * 90 / 100);                       /* 16th hats */
         for (i = 0; i < 7; i++) ADD(KS[i], DK_KICK, x * 35 / 100);                  /* syncopated kicks */
         for (i = 0; i < 6; i++) ADD(GS[i], DK_SNARE, x * 25 / 100);                 /* ghost snares */
-        if (b % 4 == 3) { for (s = 12; s < 16; s++) ADD(s, DK_SNARE, x * 80 / 100); ADD(14, DK_KETTLE, x * 50 / 100); }   /* a fill into the phrase */
+        if (b % 4 == 3) {                                                            /* a fill into the phrase: snares or toms */
+            if (chance(r, 50)) { for (s = 12; s < 16; s++) ADD(s, DK_SNARE, x * 80 / 100); ADD(14, DK_KETTLE, x * 50 / 100); }
+            else for (s = 12; s < 16; s++) ADD(s, DK_TOM, x * 80 / 100);
+        }
 #undef ADD
         g_sort(G);
         return;
@@ -1091,7 +1106,7 @@ static void pat_fresh(int32_t l)
         else generate(PROF[p].st[l], &G, &r, &T, bi, PROF[p].st[l] == S_RIFF ? (int32_t)(seed & 1023u) + 4 : p);
         for (i = 0; i < G.n; i++) {
             uint32_t s = (uint32_t)bi * 16u + G.ev[i].st;
-            if (HITS(l)) U->kinds[s] |= (uint8_t)(1u << G.ev[i].note[0]);
+            if (HITS(l)) U->kinds[s] |= (uint16_t)(1u << G.ev[i].note[0]);
             else { U->k[s] = (int8_t)note_to_k(&T, G.ev[i].note[0]); U->len[s] = G.ev[i].len; }
         }
     }
@@ -1106,10 +1121,10 @@ static void pat_vary(int32_t l)
     for (c = 0; c < changes; c++) {
         int32_t s = (int32_t)((rnd(&ui_rng) >> 16) * (uint32_t)n >> 16), op = (int32_t)((rnd(&ui_rng) >> 16) * 100u >> 16);
         if (HITS(l)) {
-            static const int8_t K[6] = {DK_HAT, DK_HAT, DK_KICK, DK_SNARE, DK_SNARE, DK_KETTLE}, X[6] = {SX_ZAP, SX_BITS, SX_SURF, SX_GALE, SX_CRACKLE, SX_IMPACT};
+            static const int8_t K[6] = {DK_HAT, DK_OHAT, DK_KICK, DK_SNARE, DK_CLAP, DK_RIM}, X[6] = {SX_ZAP, SX_BITS, SX_SURF, SX_GALE, SX_CRACKLE, SX_IMPACT};
             int32_t k = (l == L_SFX ? X : K)[(rnd(&ui_rng) >> 16) * 6u >> 16];
             if (l == L_DRUMS && s % 16 == 0 && k == DK_KICK) continue;   /* keep the kick on the one */
-            U->kinds[s] ^= (uint8_t)(1u << k);
+            U->kinds[s] ^= (uint16_t)(1u << k);
             continue;
         }
         if (op < 45) {                                              /* move a note */
@@ -1157,17 +1172,17 @@ static void pat_copy(int32_t from, int32_t to)
     if (HITS(from) != HITS(to))
         for (i = 0; i < 32; i++) {
             if (HITS(to)) {
-                uint8_t k = 0;
-                if (S.k[i] != EMPTY) k = (uint8_t)(to == L_DRUMS ? 1u << (i % 4 == 0 ? DK_KICK : DK_HAT) : 1u << (i % 4 == 0 ? SX_ZAP : SX_BITS));
+                uint16_t k = 0;
+                if (S.k[i] != EMPTY) k = (uint16_t)(to == L_DRUMS ? 1u << (i % 4 == 0 ? DK_KICK : DK_HAT) : 1u << (i % 4 == 0 ? SX_ZAP : SX_BITS));
                 U->kinds[i] = k; U->k[i] = EMPTY; U->len[i] = 1;
             } else {
-                uint8_t k = S.kinds[i];
+                uint16_t k = S.kinds[i];
                 U->kinds[i] = 0; U->len[i] = 1;
-                U->k[i] = !k ? EMPTY : from == L_DRUMS && (k & (1u << DK_KICK)) ? 0 : from == L_DRUMS && (k & (1u << DK_SNARE)) ? 4 : 7;
+                U->k[i] = !k ? EMPTY : from == L_DRUMS && (k & (1u << DK_KICK)) ? 0 : from == L_DRUMS && (k & (1u << DK_SNARE | 1u << DK_CLAP)) ? 4 : 7;
             }
         }
     else if (HITS(to) && from != to)                                /* drums and sfx: their own kinds */
-        for (i = 0; i < 32; i++) U->kinds[i] = S.kinds[i] ? (uint8_t)(to == L_DRUMS ? 1u << (i % 4 == 0 ? DK_KICK : DK_HAT) : 1u << SX_BITS) : 0;
+        for (i = 0; i < 32; i++) U->kinds[i] = S.kinds[i] ? (uint16_t)(to == L_DRUMS ? 1u << (i % 4 == 0 ? DK_KICK : DK_HAT) : 1u << SX_BITS) : 0;
     U->on = 1;
     invalidate_now();
 }
@@ -1183,7 +1198,7 @@ static void pat_grab(int32_t l)                                 /* what the lane
     for (i = 0; i < 32; i++) { U->k[i] = EMPTY; U->len[i] = 1; U->kinds[i] = 0; }
     for (i = 0; i < B->cnt[l]; i++) {
         const ev_t *e = &B->ev[l][i];
-        if (HITS(l)) U->kinds[e->st] |= (uint8_t)(1u << e->note[0]);
+        if (HITS(l)) U->kinds[e->st] |= (uint16_t)(1u << e->note[0]);
         else { U->k[e->st] = (int8_t)note_to_k(&T, e->note[0]); U->len[e->st] = e->len; }
     }
     U->bars = 1; U->on = 1;

@@ -34,8 +34,12 @@ the kind of setting, PRESETS steps through them.
 <td align="center"><img src="docs/screens/live.png" width="240" alt="SONG, LIVE"><br><b>LIVE</b>: the next of ten styles, blend, energy and space; SEQ launches it at once, with its tempo. (SONG's last rows: the sfx lane.)</td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT"><br><b>EDIT</b>: the lane's own part, step by step, in scale steps from the chord root. PRESETS: FILL it from any style (LFO), COPY another lane's (SEQ).</td>
-<td colspan="2">
+<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT, the drums"><br><b>EDIT</b>: the lane's own part, step by step, in scale steps from the chord root; the drums' nine hits by row. PRESETS: FILL it from any style (LFO), COPY another lane's (SEQ).</td>
+<td align="center"><img src="docs/screens/setup.png" width="240" alt="SETUP, LOOK"><br><b>SETUP</b> (hold HOME): the palette, the screen's level and the lights; the lanes' MIDI channels; back to defaults.</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="3">
 
 | Control | Does |
 | --- | --- |
@@ -56,8 +60,9 @@ the kind of setting, PRESETS steps through them.
 ## How it plays
 
 - **Lanes.** Notes scroll from right to left past a fixed "now" line. Solid blocks are what a lane plays; outlined
-  blocks are a preview of the queued style. All five are always on screen; the white mark is the lane the buttons
-  and keys act on. Every setting is on a knob, the keys only play.
+  blocks are a preview of the queued style. Stopped, the lanes show the INTRO that PLAY will start. All five are
+  always on screen; the white mark is the lane the buttons and keys act on. Every setting is on a knob, the keys
+  only play.
 - **SFX.** The fifth lane: a gale of noise into every drop, the impact on it, washes, surf, laser zaps, crackle and
   8-bit noise, following the arc and the style.
 - **Ten styles**, to change the mood in one move: EPIC (orchestral minor), HYPERSPACE (techno minor with power
@@ -65,6 +70,8 @@ the kind of setting, PRESETS steps through them.
   (the orchestra), TROPIC (off-beat chords, congas, a flute), STEEL (power chords, a galloping bass, double kick),
   DRIFT (sus chords, swells, no snare), FUNK (slap bass, clav, ghost notes) and RAVE (four on the floor, an acid bass).
   Each brings its chords, parts, instruments, tempo and way of playing.
+- **Drums.** Kick, snare, hats open and closed, clap, toms that step down in a fill, rim shot, kettle drum and crash,
+  in three kits; each style has its own grooves and fills.
 - **Played by hand.** Lead notes glide in from the last one, long chords swell in or fade out, the lead has an echo
   channel, as in the trackers; strings carry bow noise and the drums ring as recorded ones.
 - **The music of a lane.** MELODY (which idea), RHYTHM, PITCH and CHANGE (how soon new material comes, from frozen

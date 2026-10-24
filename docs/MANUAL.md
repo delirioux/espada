@@ -111,7 +111,8 @@ lane faded out, a save waiting, the keys' octave off 0.
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.
 - **Sound** (PLAY): AUTO follows the style; or one of seventeen FM patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
   STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS, VIOLINS, CELLOS), or one of three drum kits (STANDARD,
-  TRACKER, ELECTRO). RAZOR is a cutting, saw-like lead; PULSE a hollow one; PIANO and E.PIANO ring out. CHAOS is
+  TRACKER, ELECTRO). A kit has nine hits: kick, snare, hat, kettle drum, crash, clap (three quick bursts and a
+  tail), open hat (the closed hat cuts it off), tom (toms in a row step down, as in a fill) and rim shot. RAZOR is a cutting, saw-like lead; PULSE a hollow one; PIANO and E.PIANO ring out. CHAOS is
   three sounds in one: a light saw lead, a heavy pad under it (two detuned oscillators, one an octave down, fading
   in slowly and out late) and brown noise that breathes with the pad. STRINGS, VIOLINS, CELLOS, BRASS and FLUTE carry
   a little noise in the tone (bow, breath), as recorded ones do; the kits' snares and cymbals ring darker and longer.
@@ -145,16 +146,16 @@ lane faded out, a save waiting, the keys' octave off 0.
 
 | Style | Tempo | What it is |
 | --- | --- | --- |
-| EPIC | 125 | orchestral minor: long lead lines over strings, a driving bass, toms and timpani |
-| HYPERSPACE | 130 | techno minor: power chords, a chopped pad, chord stabs, straight drums |
-| FUSION | 125 | melodic major with a chromatic turn: a riff through every chord, a pedal bass, lush chords |
+| EPIC | 125 | orchestral minor: long lead lines over strings, a driving bass, timpani, a tom fill every other phrase |
+| HYPERSPACE | 130 | techno minor: power chords, a chopped pad, chord stabs, straight drums, a clap every other bar |
+| FUSION | 125 | melodic major with a chromatic turn: a riff through every chord, a pedal bass, lush chords, the hat opening into the one |
 | OLDSKOOL | 125 | the 4-channel sound: arpeggio chords, an octave bass, a busy lead with an echo |
 | SYMPHONY | 110 | the orchestra: two bars a chord, swelling strings, a violin line, cellos, timpani |
-| TROPIC | 110 | sunny mixolydian: chords on the off-beat, a deep bass with rests, congas, a flute |
-| STEEL | 140 | heavy: power chords, a galloping bass, double kick, a saw lead that glides |
-| DRIFT | 96 | floating: sus chords resolving, two bars a chord, swells, a breathy lead with a long echo, no snare |
-| FUNK | 112 | a major vamp with a diminished passing chord: slap bass, clav stabs, ghost notes |
-| RAVE | 138 | four on the floor: an acid bass that slides, organ chords, brass stabs, gusts of noise |
+| TROPIC | 110 | sunny mixolydian: chords on the off-beat, a deep bass with rests, rim shots, congas, a flute |
+| STEEL | 140 | heavy: power chords, a galloping bass, double kick, tom fills, a saw lead that glides |
+| DRIFT | 96 | floating: sus chords resolving, two bars a chord, swells, a breathy lead with a long echo, no snare, a soft rim |
+| FUNK | 112 | a major vamp with a diminished passing chord: slap bass, clav stabs, ghost notes, an open hat, a rim |
+| RAVE | 138 | four on the floor, claps, open hats: an acid bass that slides, organ chords, brass stabs, gusts of noise |
 
 - **How a style plays.** As a tracker musician plays the notes by hand: some lead notes glide in from the last one
   (STEEL most, DRIFT and FUSION often), long chords swell in or fade out (DRIFT and SYMPHONY most), and the lead
@@ -192,17 +193,18 @@ switch WASH, RISER, IMPACT, ZAP, CRACKLE, BITS, SURF and GALE at the cursor.
 ## Keys
 
 - The keys play the marked lane, live, from F3 to G5 shifted by OCT- / OCT+: a note
-  sounds as long as you hold it, with the lane's sound. On DRUMS the first five white keys play kick, snare, hat,
-  kettle drum and crash; on SFX the first six its sounds. The keys of the tonic are lit, and the keys you hold.
+  sounds as long as you hold it, with the lane's sound. On DRUMS the first nine white keys (F3 .. G4) play kick,
+  snare, hat, kettle drum, crash, clap, open hat, tom and rim shot; on SFX the first eight its sounds. The keys of the tonic are lit, and the keys you hold.
 - They change no settings: the key of the music is SONG, KEY.
 - On EDIT the white keys are scale steps counted from the chord root: C4 is the root, D4 the next step, and
   so on (OCT- / OCT+ shift by a scale octave). A note goes in at the cursor with the set length, and the cursor moves
-  on. Black keys: a rest; SEL + a black key: tie. On the DRUMS lane the first five white keys (F3 G3 A3 B3 C4) switch
-  kick, snare, hat, kettle drum and crash at the cursor; a black key moves the cursor on.
+  on. Black keys: a rest; SEL + a black key: tie. On the DRUMS lane the first nine white keys (F3 .. G4) switch
+  kick, snare, hat, kettle drum, crash, clap, open hat, tom and rim shot at the cursor (the rows K S H T C X O M R);
+  a black key moves the cursor on. Patterns saved before the clap came in are not read: enter them again.
 
 Your patterns follow the chords, as the generated parts do: they are written in scale steps, not fixed notes.
 
 ## MIDI
 
 USB-MIDI out: lead, pad and bass on channels 1 to 3, the drums on channel 10 (kick 36, snare 38, hat 42,
-tom 47, crash 49); SETUP, MIDI changes the channels or turns a lane off. MIDI in: start, continue and stop.
+kettle drum 47, crash 49, clap 39, open hat 46, toms 50 48 47 45 43 as they step down, rim shot 37); SETUP, MIDI changes the channels or turns a lane off. MIDI in: start, continue and stop.
