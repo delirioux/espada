@@ -153,7 +153,7 @@ lane faded out, a save waiting, the keys' octave off 0.
 | STEEL | 140 | heavy: power chords, a galloping bass, double kick, a saw lead that glides |
 | DRIFT | 96 | floating: sus chords resolving, two bars a chord, swells, a breathy lead with a long echo, no snare |
 | FUNK | 112 | a major vamp with a diminished passing chord: slap bass, clav stabs, ghost notes |
-| RAVE | 138 | four on the floor: an acid bass that slides, organ chords, brass stabs, risers |
+| RAVE | 138 | four on the floor: an acid bass that slides, organ chords, brass stabs, gusts of noise |
 
 - **How a style plays.** As a tracker musician plays the notes by hand: some lead notes glide in from the last one
   (STEEL most, DRIFT and FUSION often), long chords swell in or fade out (DRIFT and SYMPHONY most), and the lead
@@ -174,16 +174,19 @@ lane faded out, a save waiting, the keys' octave off 0.
 
 The fifth lane plays noise, no notes. Its sounds: **WASH** (filtered white noise with a slow sweep), **RISER**
 (noise opening up under a tone that climbs four octaves), **IMPACT** (a falling sub and a noise burst), **ZAP** (a
-laser: a sine falling fast), **CRACKLE** (vinyl clicks and hiss) and **BITS** (1-bit periodic noise, the metallic
-8-bit kind, on the chord's root).
+laser: a sine falling fast), **CRACKLE** (vinyl clicks and hiss), **BITS** (1-bit periodic noise, the metallic
+8-bit kind, on the chord's root), **SURF** (dark brown noise in waves, brighter on each crest) and **GALE** (white
+noise through a narrow band that wanders, a wind in gusts).
 
-On **AUTO** (the default) it follows the arc: a riser fills the bar before each drop, the impact lands on it, and in
-between it plays what fits the style: washes for EPIC, FUSION, TROPIC and DRIFT, zaps and bits for HYPERSPACE, crackle
-and bits for OLDSKOOL, crackle for FUNK, impacts for STEEL, zaps and a riser every phrase for RAVE, more as the
-energy and the density rise. With the arc off: a riser every 8th bar, an impact after it.
-Turn **SOUND** (SONG, SFX) to one of the six to hear only that one, in its own pattern. SFX FX and SFX FX 2 give it
-the effects of any lane (a filter sweep over a wash, echo on the zaps). On EDIT the first six white keys (F3 .. D4) switch
-WASH, RISER, IMPACT, ZAP, CRACKLE and BITS at the cursor.
+On **AUTO** (the default) it follows the arc: a gale fills the bar before each drop, the impact lands on it, and in
+between it plays what fits the style: washes and surf for FUSION and DRIFT, surf and washes for TROPIC, washes and a
+gale for EPIC, a cymbal swell and a far wind for SYMPHONY, zaps, gusts and bits for HYPERSPACE, crackle and bits for
+OLDSKOOL, crackle for FUNK, impacts and a storm for STEEL, zaps and a gust into every phrase for RAVE, more as the
+energy and the density rise. With the arc off: a gale every 8th bar, an impact after it. The RISER is never chosen
+on AUTO; turn it on yourself.
+Turn **SOUND** (SONG, SFX) to one of the eight to hear only that one, in its own pattern. SFX FX and SFX FX 2 give it
+the effects of any lane (a filter sweep over a wash, echo on the zaps). On EDIT the first eight white keys (F3 .. F4)
+switch WASH, RISER, IMPACT, ZAP, CRACKLE, BITS, SURF and GALE at the cursor.
 
 ## Keys
 

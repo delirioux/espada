@@ -646,40 +646,47 @@ static void gen_sfx(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, 
         int32_t e = A->mode == A_OFF ? 154 : A->e;
         int drop = A->drop || (A->mode == A_OFF && b > 0 && b % 8 == 0), pre = next_drop || (A->mode == A_OFF && b % 8 == 7);
         if (drop) SFX(G, 0, 2, SX_IMPACT, root);
-        if (pre) { SFX(G, 0, 16, SX_RISER, root); return; }        /* the bar before the drop: the riser, alone */
+        if (pre) { SFX(G, 0, 16, SX_GALE, root); return; }         /* the bar before the drop: a gale, alone */
         switch (p) {
-        case 0:                                                     /* EPIC: washes, a few zaps at the top */
+        case 0:                                                     /* EPIC: washes, a gale mid-phrase, a few zaps at the top */
             if (b % 4 == 0 && !drop && chance(r, x)) SFX(G, 0, 16, SX_WASH, root);
+            if (b % 8 == 5 && chance(r, x * 60 / 100)) SFX(G, 0, 16, SX_GALE, root);
             if (e > 200) for (i = 0; i < 4; i++) if (chance(r, x * 15 / 100)) SFX(G, OFF[i] + 1, 1, SX_ZAP, root + 12);
             break;
-        case 1:                                                     /* HYPERSPACE: zaps, bits at the top */
+        case 1:                                                     /* HYPERSPACE: zaps, gusts, bits at the top */
+            if (b % 4 == 2 && chance(r, x * 40 / 100)) SFX(G, 0, 16, SX_GALE, root);
             for (i = 0; i < 4; i++) if (chance(r, x * e / 256 * 40 / 100)) SFX(G, OFF[i], 1, SX_ZAP, root + PICK(r, 0, 7, 12));
             if (e > 200) for (s = 1; s < 16; s += 2) if (chance(r, x * 30 / 100)) SFX(G, s, 1, SX_BITS, root);
             break;
-        case 2:                                                     /* FUSION: a soft wash a phrase */
+        case 2:                                                     /* FUSION: a soft wash a phrase, surf in between */
             if (b % 4 == 0 && !drop && chance(r, x * 80 / 100)) SFX(G, 0, 16, SX_WASH, root);
+            if (b % 4 == 2 && chance(r, x * 60 / 100)) SFX(G, 0, 16, SX_SURF, root);
             if (e > 200 && chance(r, x * 20 / 100)) SFX(G, 14, 1, SX_ZAP, root + 12);
             break;
-        case 4:                                                     /* SYMPHONY: a cymbal swell into each phrase */
+        case 4:                                                     /* SYMPHONY: a cymbal swell into each phrase, a far wind */
             if (b % 4 == 3 && !drop && chance(r, x)) SFX(G, 8, 8, SX_WASH, root);
+            if (b % 8 == 1 && chance(r, x * 40 / 100)) SFX(G, 0, 16, SX_GALE, root);
             break;
-        case 5:                                                     /* TROPIC: waves, a long wash every other phrase */
+        case 5:                                                     /* TROPIC: the surf, a long wash every other phrase */
             if (b % 8 == 0 && !drop && chance(r, x)) SFX(G, 0, 16, SX_WASH, root);
+            if (b % 2 == 1 && chance(r, x)) SFX(G, 0, 16, SX_SURF, root);
             break;
-        case 6:                                                     /* STEEL: an impact on the phrase, bits at the top */
+        case 6:                                                     /* STEEL: an impact on the phrase, a storm, bits at the top */
+            if (b % 4 == 1 && chance(r, x * 50 / 100)) SFX(G, 0, 16, SX_GALE, root);
             if (b % 4 == 0 && !drop && chance(r, x * 60 / 100)) SFX(G, 0, 2, SX_IMPACT, root);
             if (e > 200) for (i = 0; i < 4; i++) if (chance(r, x * 20 / 100)) SFX(G, OFF[i], 1, SX_BITS, root);
             break;
-        case 7:                                                     /* DRIFT: long washes, a rare zap far off */
+        case 7:                                                     /* DRIFT: long washes and surf, a rare zap far off */
             if (b % 2 == 0 && !drop && chance(r, x)) SFX(G, 0, 16, SX_WASH, root);
+            else if (b % 2 == 1 && chance(r, x * 70 / 100)) SFX(G, 0, 16, SX_SURF, root);
             if (chance(r, x * 10 / 100)) SFX(G, 10, 1, SX_ZAP, root + 24);
             break;
         case 8:                                                     /* FUNK: vinyl crackle under it all */
             if (chance(r, x)) SFX(G, 0, 16, SX_CRACKLE, root);
             break;
-        case 9:                                                     /* RAVE: zaps on the off-beats, a riser every phrase */
+        case 9:                                                     /* RAVE: zaps on the off-beats, a gust into every phrase */
             for (i = 0; i < 4; i++) if (chance(r, x * 35 / 100)) SFX(G, OFF[i], 1, SX_ZAP, root + PICK(r, 12, 19, 24));
-            if (b % 4 == 3 && !drop) SFX(G, 8, 8, SX_RISER, root);
+            if (b % 4 == 3 && !drop) SFX(G, 8, 8, SX_GALE, root);
             break;
         default:                                                    /* OLDSKOOL: crackle under everything, bits */
             if (chance(r, x)) SFX(G, 0, 16, SX_CRACKLE, root);
@@ -690,7 +697,7 @@ static void gen_sfx(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, 
         return;
     }
     switch (only) {                                                 /* one sound */
-    case SX_WASH: case SX_CRACKLE: if (chance(r, x)) SFX(G, 0, 16, only, root); break;
+    case SX_WASH: case SX_CRACKLE: case SX_SURF: case SX_GALE: if (chance(r, x)) SFX(G, 0, 16, only, root); break;
     case SX_RISER: if (next_drop || b % 4 == 3) SFX(G, 0, 16, SX_RISER, root); break;
     case SX_IMPACT: if (A->drop || b % 4 == 0) SFX(G, 0, 2, SX_IMPACT, root); break;
     case SX_ZAP: for (i = 0; i < 4; i++) if (chance(r, x * 45 / 100)) SFX(G, OFF[i], 1, SX_ZAP, root + PICK(r, 0, 7, 12)); break;
@@ -708,7 +715,7 @@ static void user_bar(int32_t l, gen_t *G, const tools_t *T, int32_t b)
         if (l == L_DRUMS) { for (k = 0; k < NDK; k++) if (U->kinds[off + s] >> k & 1u) DRUM(G, s, k); continue; }
         if (l == L_SFX) {
             for (k = 0; k < NSX; k++) if (U->kinds[off + s] >> k & 1u)
-                SFX(G, s, k == SX_WASH || k == SX_RISER || k == SX_CRACKLE ? 16 - s : 1, k, ct(T, 0));
+                SFX(G, s, SX_LONG(k) ? 16 - s : 1, k, ct(T, 0));
             continue;
         }
         if (U->k[off + s] == EMPTY) continue;
@@ -1096,7 +1103,7 @@ static void pat_vary(int32_t l)
     for (c = 0; c < changes; c++) {
         int32_t s = (int32_t)((rnd(&ui_rng) >> 16) * (uint32_t)n >> 16), op = (int32_t)((rnd(&ui_rng) >> 16) * 100u >> 16);
         if (HITS(l)) {
-            static const int8_t K[6] = {DK_HAT, DK_HAT, DK_KICK, DK_SNARE, DK_SNARE, DK_KETTLE}, X[6] = {SX_ZAP, SX_ZAP, SX_BITS, SX_BITS, SX_CRACKLE, SX_IMPACT};
+            static const int8_t K[6] = {DK_HAT, DK_HAT, DK_KICK, DK_SNARE, DK_SNARE, DK_KETTLE}, X[6] = {SX_ZAP, SX_BITS, SX_SURF, SX_GALE, SX_CRACKLE, SX_IMPACT};
             int32_t k = (l == L_SFX ? X : K)[(rnd(&ui_rng) >> 16) * 6u >> 16];
             if (l == L_DRUMS && s % 16 == 0 && k == DK_KICK) continue;   /* keep the kick on the one */
             U->kinds[s] ^= (uint8_t)(1u << k);

@@ -58,8 +58,8 @@ the kind of setting, PRESETS steps through them.
 - **Lanes.** Notes scroll from right to left past a fixed "now" line. Solid blocks are what a lane plays; outlined
   blocks are a preview of the queued style. All five are always on screen; the white mark is the lane the buttons
   and keys act on. Every setting is on a knob, the keys only play.
-- **SFX.** The fifth lane: a noise riser into every drop, the impact on it, washes, laser zaps, crackle and 8-bit
-  noise, following the arc and the style.
+- **SFX.** The fifth lane: a gale of noise into every drop, the impact on it, washes, surf, laser zaps, crackle and
+  8-bit noise, following the arc and the style.
 - **Ten styles**, to change the mood in one move: EPIC (orchestral minor), HYPERSPACE (techno minor with power
   chords), FUSION (melodic major with a chromatic turn), OLDSKOOL (the 4-channel sound with arpeggio chords), SYMPHONY
   (the orchestra), TROPIC (off-beat chords, congas, a flute), STEEL (power chords, a galloping bass, double kick),

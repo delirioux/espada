@@ -8,7 +8,8 @@
  *   drum voices   kick and kettle drum (a swept sine), snare (band-passed noise + a tone), hat, crash
  *   sfx voices    wash (filtered noise, a slow sweep), riser (noise opening up + a tone climbing four octaves),
  *                 impact (a falling sub + a noise burst), zap (a sine falling fast), crackle (clicks + hiss),
- *                 bits (1-bit periodic noise, the 8-bit metallic kind)
+ *                 bits (1-bit periodic noise, the 8-bit metallic kind), surf (brown noise in slow waves, brighter
+ *                 on each crest), gale (white noise through a resonant band-pass that wanders, in gusts)
  *   lanes         each lane renders into its own bus: drive, a state-variable filter (low- or high-pass)
  *                 with a tempo-synced wobble, the bit crusher, the level; then the mix, in stereo: each lane
  *                 has its place (as a tracker's channels sit left and right) and a send to the room
@@ -84,7 +85,7 @@ static const kit_t KITS[] = {
 /* ---- voices */
 #define CTRL 32u                                /* control rate: envelopes every 32 samples */
 enum { V_OFF = 0, V_FM, V_KICK, V_SNARE, V_HAT, V_CRASH, V_KETTLE,
-       V_WASH, V_RISER, V_IMPACT, V_ZAP, V_CRACKLE, V_BITS };          /* V_WASH + SX_x = the sfx voices */
+       V_WASH, V_RISER, V_IMPACT, V_ZAP, V_CRACKLE, V_BITS, V_SURF, V_GALE };          /* V_WASH + SX_x = the sfx voices */
 typedef struct {
     uint8_t kind, lane, stage, square;          /* stage: 0 attack, 1 decay/sustain, 2 release */
     uint8_t midi, midi_ch, arp_n, arp_i;
@@ -335,6 +336,18 @@ static void start_sfx(uint32_t kind, uint32_t pitch, uint32_t dur, uint32_t lvl)
         v->att = v->peak * (int32_t)CTRL / 900; if (v->att < 1) v->att = 1;
         v->gate = dur; v->rel_k = tau_k(150);
         break;
+    case V_SURF:                                    /* waves of brown noise: in over a quarter, out over 1.2 s */
+        v->peak = (int32_t)((11000u * lvl) >> 8); v->amp = 0; v->stage = 0; v->brown = 0;
+        v->att = (int32_t)((uint32_t)v->peak * CTRL / (dur / 4u + CTRL)); if (v->att < 1) v->att = 1;
+        v->tph = 0xC0000000u;                       /* the first wave from its trough */
+        v->gate = dur; v->rel_k = tau_k(1200);
+        break;
+    case V_GALE:                                    /* a wind: in over half its time, out over 0.9 s */
+        v->peak = (int32_t)((20000u * lvl) >> 8); v->amp = 0; v->stage = 0;
+        v->att = (int32_t)((uint32_t)v->peak * CTRL / (dur / 2u + CTRL)); if (v->att < 1) v->att = 1;
+        v->tph = noise_s; v->pph1 = noise_s << 7;   /* each gale its own course */
+        v->gate = dur; v->rel_k = tau_k(900);
+        break;
     default:                                        /* V_BITS */
         v->amp = (int32_t)((7000u * lvl) >> 8); v->dec_k = tau_k(160);
         v->inc = note_inc((int32_t)pitch + 12); v->s1 = 0x7FFF;
@@ -457,10 +470,12 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                 if (v->arp_n > 1u && (v->arp_t += CTRL) >= 1852u) { v->arp_t = 0; v->arp_i = (uint8_t)((v->arp_i + 1u) % v->arp_n); v->inc = v->target = v->arp[v->arp_i]; }
             } else if (v->kind >= V_WASH) {                               /* sfx */
                 switch (v->kind) {
-                case V_WASH: case V_CRACKLE: case V_RISER:
+                case V_WASH: case V_CRACKLE: case V_RISER: case V_SURF: case V_GALE:
                     if (v->stage == 0u) { v->amp += v->att; if (v->amp >= v->peak) { v->amp = v->peak; v->stage = 1; } }
                     else if (v->stage == 2u) v->amp = (v->amp * v->rel_k) >> 15;
                     if (v->kind == V_WASH) v->tph += 3000u * CTRL;                         /* the sweep: 0.03 Hz.. */
+                    if (v->kind == V_SURF) v->tph += 58400u * CTRL;                        /* a wave every 1.7 s */
+                    if (v->kind == V_GALE) { v->tph += 10700u * CTRL; v->pph1 += 36000u * CTRL; }   /* 0.11 and 0.37 Hz */
                     if (v->kind == V_RISER) {
                         v->inc += (v->inc >> 16) * (uint32_t)v->idx;
                         if (v->inc > 400000000u) v->inc = 400000000u;
@@ -580,6 +595,21 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
             if (((noise_s >> 9) & 1023u) == 0u) v->s1 = x * 2;         /* a click, ~43 a second */
             v->s1 = (v->s1 * 26000) >> 15;
             s = ((v->s1 + (x >> 5)) * v->amp) >> 15;
+            break; }
+        case V_SURF: {                                                  /* brown noise, low-passed, swelling in waves */
+            int32_t w = (SIN[v->tph >> 22] + 32768) >> 1, c = 900 + (w >> 3), a;   /* w 0..32767; brighter on the crest */
+            v->brown += (noise() >> 3) - (v->brown >> 5);
+            v->s1 += ((v->brown - v->s1) * c) >> 15;
+            a = (v->amp * (6000 + ((w * 26767) >> 15))) >> 15;
+            s = (v->s1 * a) >> 14;
+            break; }
+        case V_GALE: {                                                  /* white noise in a resonant band-pass that wanders */
+            int32_t g = (SIN[v->tph >> 22] + SIN[v->pph1 >> 22] + 65536) >> 2, f, hp;   /* 0..32767 */
+            f = (350 + (g * 1300 >> 15)) * 467 / 100;                   /* 350 .. 1650 Hz */
+            v->s1 += (f * v->s2) >> 15;
+            hp = noise() - v->s1 - ((9000 * v->s2) >> 15);              /* low damping: it whistles */
+            v->s2 += (f * hp) >> 15;
+            s = (((v->s2 >> 1) * v->amp) >> 15) * (8000 + (g * 24767 >> 15)) >> 15;
             break; }
         case V_BITS: {
             uint32_t was = v->ph;

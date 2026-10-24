@@ -69,7 +69,8 @@ static bar_t bars[NSLOT][2] __attribute__((section(".pool")));
 static volatile uint8_t bar_sel[NSLOT];
 
 enum { DK_KICK = 0, DK_SNARE, DK_HAT, DK_KETTLE, DK_CRASH, NDK };
-enum { SX_WASH = 0, SX_RISER, SX_IMPACT, SX_ZAP, SX_CRACKLE, SX_BITS, NSX };   /* the sfx lane's sounds */
+enum { SX_WASH = 0, SX_RISER, SX_IMPACT, SX_ZAP, SX_CRACKLE, SX_BITS, SX_SURF, SX_GALE, NSX };   /* the sfx lane's sounds (at most 8: a bit each) */
+#define SX_LONG(k) ((k) == SX_WASH || (k) == SX_RISER || (k) == SX_CRACKLE || (k) == SX_SURF || (k) == SX_GALE)   /* held over steps */
 
 static volatile int32_t key_off;    /* the key: semitones from D, -6..5 (the kettle drum is tuned to it) */
 

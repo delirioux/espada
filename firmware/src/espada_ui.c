@@ -19,7 +19,7 @@
 #define SW(c) ((uint16_t)(((c) >> 8) | ((c) << 8)))
 static const uint16_t LCOL[NLANE] = {RGBC(0x5fe3e8), RGBC(0xb49bff), RGBC(0xffb04a), RGBC(0xf0e07a), RGBC(0xff7a9a)};
 static const char *const LNAME[NLANE] = {"LEAD", "PAD", "BASS", "DRUMS", "SFX"};
-static const char *const SXNAME[NSX] = {"WASH", "RISER", "IMPACT", "ZAP", "CRACKLE", "BITS"};
+static const char *const SXNAME[NSX] = {"WASH", "RISER", "IMPACT", "ZAP", "CRACKLE", "BITS", "SURF", "GALE"};
 #define C_BG RGBC(0x020404)
 #define C_FOOT RGBC(0x0b1414)
 #define C_CYAN RGBC(0x3fe0e0)
@@ -471,7 +471,7 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
             if (HITS(l)) {
                 int32_t kind = e->note[0], row, rows, w, yy, len = 0;
                 if (l == L_DRUMS) { rows = 3; row = kind == DK_SNARE ? 1 : kind == DK_HAT || kind == DK_CRASH ? 2 : 0; w = kind == DK_KETTLE || kind == DK_CRASH ? 6 : 3; }
-                else { rows = NSX; row = kind; w = 3; if (kind == SX_WASH || kind == SX_RISER || kind == SX_CRACKLE) len = e->len * PPS - 1; }
+                else { rows = NSX; row = kind; w = 3; if (SX_LONG(kind)) len = e->len * PPS - 1; }
                 yy = y + h - 4 - hh - row * (h - 6 - hh) / (rows - 1);
                 if (len) {                                          /* the long sfx: a band; the riser grows */
                     int32_t past = x + len < NOWX;
