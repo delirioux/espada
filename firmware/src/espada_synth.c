@@ -118,10 +118,9 @@ static const uint8_t BUS_LANE[NBUS] = {0, 1, 2, 3, 4, L_PAD, L_SFX, L_DRUMS};   
 static int32_t bus[NBUS][HALF_FRAMES];
 static int32_t sendb[HALF_FRAMES];                      /* the lanes' sends to the room */
 static volatile int32_t space = 35;                     /* 0..100: the room (MAIN) */
-/* where each lane sits (Q8 left, right) and how much of it goes to the room (Q8): lead a little right, pad and
- * sfx mostly in the room, bass and drums in the middle and dry */
+/* where each lane sits (Q8 left, right): lead a little right, pad and sfx spread, bass and drums in the middle. How
+ * much of each goes to the room is the lane's REVERB (fx.send) */
 static const uint16_t PAN_L[NBUS] = {150, 256, 256, 256, 256, 80, 90, 130}, PAN_R[NBUS] = {256, 80, 256, 256, 90, 256, 256, 256};
-static const uint16_t SEND[NBUS] = {90, 150, 8, 45, 160, 150, 160, 45};
 
 /* ---- the room: Schroeder / Moorer, at 22 kHz; comb and allpass lines in the pool */
 #define RV_C0 557u
@@ -205,8 +204,9 @@ static void synth_init(void)
 {
     uint32_t i;
     for (i = 0; i < 1024u; i++) SIN[i] = (int16_t)sine_q15(i << 22);
-    for (i = 0; i < NLANE; i++) { fx[i].level = 80; fx[i].bright = 25; fx[i].rtg_rate = 1; fx[i].inst = -1; fx[i].res = 30; }
-    fx[L_SFX].level = 60;
+    static const uint8_t SEND0[NLANE] = {35, 60, 3, 18, 100};      /* REVERB: lead some, pad much, bass hardly, drums a little, sfx all */
+    for (i = 0; i < NLANE; i++) { fx[i].level = 80; fx[i].bright = 25; fx[i].rtg_rate = 1; fx[i].inst = -1; fx[i].res = 30; fx[i].send = SEND0[i]; }
+    fx[L_SFX].level = 30;
 }
 
 static inline int32_t noise(void) { noise_s = noise_s * 1664525u + 1013904223u; return (int32_t)noise_s >> 17; }
@@ -765,7 +765,7 @@ static void app_audio(int32_t *out, uint32_t n)
     }
     for (k = 0; k < n; k++) sendb[k] = 0;
     for (l = 0; l < NBUS; l++) {
-        int32_t lv = fx[BUS_LANE[l]].level * 480 / 100, pl = PAN_L[l], pr = PAN_R[l], sd = SEND[l];   /* Q8: 80 -> 1.5 */
+        int32_t lv = fx[BUS_LANE[l]].level * 480 / 100, pl = PAN_L[l], pr = PAN_R[l], sd = fx[BUS_LANE[l]].send * 256 / 100;   /* Q8: 80 -> 1.5 */
         lane_fx(l, bus[l], n);
         for (k = 0; k < n; k++) {
             int32_t s = (bus[l][k] * lv) >> 8;

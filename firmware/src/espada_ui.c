@@ -216,6 +216,8 @@ static void t_bright(int32_t d) { if (!HITS(sel)) fxu[sel].bright = clampi(fxu[s
 static void v_bright(char *o) { if (HITS(sel)) s_cat(o, "--"); else s_pct(o, fxu[sel].bright); }
 static void t_drive(int32_t d) { fxu[sel].drive = clampi(fxu[sel].drive + d, 0, 100); }
 static void v_drive(char *o) { s_pct(o, fxu[sel].drive); }
+static void t_send(int32_t d) { fxu[sel].send = clampi(fxu[sel].send + d, 0, 100); }
+static void v_send(char *o) { s_pct(o, fxu[sel].send); }
 static void t_vary(int32_t d) { fxu[sel].vary = clampi(fxu[sel].vary + d, 0, 100); }
 static void v_vary(char *o) { s_pct(o, fxu[sel].vary); }
 static void s_vary(char *o) { if (fxu[sel].vary) s_cat(o, VARYN[vary_char[sel]]); }
@@ -321,7 +323,7 @@ static const card_t ROW_PLAY[] = {
     {"LEVEL", t_level, v_level, 0}};
 static const card_t ROW_SOUND[] = {
     {"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0},
-    {"BRIGHT", t_bright, v_bright, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary}};
+    {"BRIGHT", t_bright, v_bright, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary}, {"REVERB", t_send, v_send, 0}};
 static const card_t ROW_TRK[] = {
     {"SLIDE", t_slide, v_slide, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}, {"ECHO", t_echo, v_echo, 0}};
 typedef struct { const char *name; int8_t lane; card_t c[4]; } srow_t;     /* lane: -1 the song, else that lane's */
@@ -334,6 +336,7 @@ static const srow_t ROW_SONG[] = {
     {"SFX PART", L_SFX, {{"STYLE", t_lprof, v_lprof, 0}, {"DENSITY", t_dens, v_dens, 0}, {"MELODY", t_mel, v_mel, 0}, {"VARY", t_vary, v_vary, s_vary}}},
     {"SFX FX", L_SFX, {{"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0}}},
     {"SFX FX 2", L_SFX, {{"CRUSH", t_crush, v_crush, 0}, {"ECHO", t_echo, v_echo, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}}},
+    {"SFX ROOM", L_SFX, {{"REVERB", t_send, v_send, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
 };
 static const card_t ROW_EDIT[2][4] = {
     {{"STEP", t_step, v_step, 0}, {"LENGTH", t_len, v_len, 0}, {"BARS", t_bars, v_bars, 0}, {"PATTERN", t_use, v_use, 0}},
@@ -709,7 +712,7 @@ static void draw_frame(int force)
 /* ---- saving: settings (256 B) and patterns (their own sector), only while stopped (an erase stalls the sound) */
 typedef struct {
     uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy; uint8_t space;
-    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute; } l[NLANE];
+    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send; } l[NLANE];
 } save_t;
 typedef struct { upat_t p[NLANE]; } pats_t;
 static void do_save(void)
@@ -717,14 +720,14 @@ static void do_save(void)
     static save_t S;
     static pats_t P;
     int32_t l, rc;
-    S.ver = 6; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
+    S.ver = 7; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
     for (l = 0; l < (int32_t)NLANE; l++) {
         S.l[l].prof = ln[l].prof; S.l[l].lock = ln[l].lock; S.l[l].dens = ln[l].dens; S.l[l].oct = ln[l].oct; S.l[l].filt = (int8_t)fxu[l].filt;
         S.l[l].res = (uint8_t)fxu[l].res; S.l[l].wob = (uint8_t)fxu[l].wob; S.l[l].bright = (uint8_t)fxu[l].bright; S.l[l].drive = (uint8_t)fxu[l].drive;
         S.l[l].slide = (uint8_t)fxu[l].slide; S.l[l].retrig = (uint8_t)fxu[l].retrig; S.l[l].rate = (uint8_t)fxu[l].rtg_rate; S.l[l].crush = (uint8_t)fxu[l].crush;
         S.l[l].echo = (uint8_t)fxu[l].echo; S.l[l].level = (uint8_t)fxu[l].level; S.l[l].inst = (int8_t)fxu[l].inst; S.l[l].vary = (uint8_t)fxu[l].vary;
-        S.l[l].mel = ln[l].mel; S.l[l].rhy = ln[l].rhy; S.l[l].pit = ln[l].pit; S.l[l].chg = ln[l].chg; S.l[l].mute = ln[l].mute;
+        S.l[l].mel = ln[l].mel; S.l[l].rhy = ln[l].rhy; S.l[l].pit = ln[l].pit; S.l[l].chg = ln[l].chg; S.l[l].mute = ln[l].mute; S.l[l].send = (uint8_t)fxu[l].send;
         P.p[l] = ln[l].up;
     }
     rc = settings_save(&S, sizeof S);
@@ -736,7 +739,7 @@ static void do_load(void)
     static save_t S;
     static pats_t P;
     int32_t l;
-    if (settings_load(&S, sizeof S) == 0 && S.ver == 6) {
+    if (settings_load(&S, sizeof S) == 0 && S.ver == 7) {
         energy = clampi(S.energy, -50, 50); space = clampi(S.space, 0, 100);
         set_key(S.key % 12u); scale_sel = S.scale < NSCALE ? S.scale : 0; prog_sel = S.prog <= NPROG ? S.prog : 0; bpc = clampi(S.bpc, 1, 4);
         arc_on = S.arc != 0; build_ph = clampi(S.build, 2, 16); if (arc_on) arc_restart(0); peak_ph = clampi(S.peak, 1, 8); auto_drop = S.autod != 0; target = S.target % NPROF; set_bpm(S.bpm);
@@ -747,7 +750,7 @@ static void do_load(void)
             fxu[l].crush = clampi(S.l[l].crush, 0, 100); fxu[l].echo = clampi(S.l[l].echo, 0, 100); fxu[l].level = clampi(S.l[l].level, 0, 100);
             fxu[l].vary = clampi(S.l[l].vary, 0, 100);
             ln[l].mel = (uint8_t)(S.l[l].mel % 100u); ln[l].rhy = (uint8_t)clampi(S.l[l].rhy, 0, 100); ln[l].pit = (uint8_t)clampi(S.l[l].pit, 0, 100);
-            ln[l].chg = (uint8_t)clampi(S.l[l].chg, 0, 100); ln[l].mute = S.l[l].mute != 0;
+            ln[l].chg = (uint8_t)clampi(S.l[l].chg, 0, 100); ln[l].mute = S.l[l].mute != 0; fxu[l].send = clampi(S.l[l].send, 0, 100);
             fxu[l].inst = clampi(S.l[l].inst, -1, l == L_SFX ? (int32_t)NSX - 1 : l == L_DRUMS ? (int32_t)NKIT - 1 : (int32_t)NPATCH - 1);
         }
     }

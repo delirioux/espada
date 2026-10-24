@@ -1038,7 +1038,7 @@ static void fx_apply(void)
             int32_t to = ln[l].mute || form_gone(l, cur_bar()) ? 0 : 256, st = dt * 256 / bar_ms + 1;   /* ENV, END */
             fade_q8[l] = fade_q8[l] < to ? (fade_q8[l] + st > to ? to : fade_q8[l] + st) : (fade_q8[l] - st < to ? to : fade_q8[l] - st);
         }
-        F->level = U->level * fade_q8[l] >> 8; F->inst = U->inst; F->vary = v;
+        F->level = U->level * fade_q8[l] >> 8; F->inst = U->inst; F->vary = v; F->send = U->send;
         vary_char[l] = c;
     }
 }

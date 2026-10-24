@@ -37,7 +37,7 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | Group | Button | Settings (KNOB 1..4 = LEAD, PAD, BASS, DRUMS) |
 | --- | --- | --- |
 | PLAY | HOME | melody, rhythm, pitch, change, density, octave, style, sound, level |
-| SOUND | FX | filter, resonance, wobble, drive, brightness, crush, vary |
+| SOUND | FX | filter, resonance, wobble, drive, brightness, crush, vary, reverb |
 | TRACKER | ARP | slide, retrigger, rate, echo |
 
 | SONG (GLO) | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
@@ -49,6 +49,7 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | SFX PART | style | density | melody | vary |
 | SFX FX | filter | resonance | wobble | drive |
 | SFX FX 2 | crush | echo | retrigger | rate |
+| SFX ROOM | reverb | | | |
 
 | EDIT | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
@@ -88,7 +89,9 @@ lane faded out, a save waiting, the keys' octave off 0.
   B section (its pairs swapped), so 8 chords make a 16-chord form.
 
 - **Energy** (SONG, LIVE) adds to or takes from every lane's density at once: one knob for a build or a breakdown.
-- **Space** (SONG, LIVE) is the room: a stereo reverb the lanes send to, the pad and sfx most, the bass hardly.
+- **Space** (SONG, LIVE) is the room, a stereo reverb, and how loud it is. **Reverb** (SOUND, and SFX ROOM for the
+  sfx lane) is how much of each lane goes into it. It starts with the sfx all the way in (100), the pad much (60),
+  the lead some (35), the drums a little (18) and the bass hardly (3). The sfx lane starts at level 30.
 - **The arc** is off until you turn it on (SONG, ARC, knob 1). On: it starts with a few drum hits and builds bass,
   pad and lead in as the energy rises, breaks, drops and builds again; the ARC row draws it. DROP works without it.
 - **Blend** moves lanes to the queued style from the bottom up: drums, then bass, pad, lead (the word under it
