@@ -284,7 +284,7 @@ static void t_space(int32_t d) { space = clampi(space + d, 0, 100); }
 static void v_space(char *o) { s_pct(o, space); }
 static void s_blend(char *o) { static const char *const W[5] = {"", "DRUMS", "+BASS", "+PAD", "ALL"}; s_cat(o, W[blend]); }
 /* the four musical knobs of a channel (as Tuna's): MELODY which idea, RHYTHM sparse..busy, PITCH narrow..wide and
- * high, CHANGE how soon it brings new material; from the next bar */
+ * high, CHANGE how soon it brings new material; at once, from the next step */
 static void t_mel(int32_t d) { ln[sel].mel = (uint8_t)fmodp(ln[sel].mel + d, 100); invalidate(); }
 static void v_mel(char *o) { s_int(o, ln[sel].mel); }
 static void t_rhy(int32_t d) { ln[sel].rhy = (uint8_t)clampi(ln[sel].rhy + d, 0, 100); invalidate(); }
@@ -886,7 +886,7 @@ static void input(void)
         area_dirty = 1;
     }
     if (b & (1u << BTN_LFO)) {
-        if (!edit_on) {                                             /* a new idea from the next bar */
+        if (!edit_on) {                                             /* a new idea, at once */
             char t[32], *o;
             ln[sel].mel = (uint8_t)fmodp(ln[sel].mel + 1 + (int32_t)(fm1_ms % 13u), 100); invalidate();
             o = s_cat(t, LNAME[sel]); o = s_cat(o, ": MELODY "); s_int(o, ln[sel].mel); toast(t);

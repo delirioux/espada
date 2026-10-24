@@ -853,7 +853,7 @@ static void invalidate_from(int32_t from)
     uint32_t s;
     for (s = 0; s < NSLOT; s++) if (bars[s][bar_sel[s]].num >= from) stale[s] = 1;
 }
-static void invalidate(void) { invalidate_from(cur_bar() + 1); }        /* changes land on the next bar */
+static void invalidate(void) { invalidate_from(cur_bar()); }            /* changes land at once: the rest of this bar is written again */
 static void invalidate_now(void) { invalidate_from(cur_bar()); }
 static const bar_t *bar_get(int32_t b)
 {

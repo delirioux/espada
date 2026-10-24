@@ -67,7 +67,7 @@ Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on
 | SEQ | LAUNCH: every unlocked lane moves to the queued style on the next phrase, at the style's tempo (again: cancel). SEL + SEQ: launch and keep your tempo. On EDIT: COPY the pattern of the lane set on EDIT 2 into this one |
 | REC | DROP, while playing: tap = a break from the next bar and the drop on the next phrase; hold = a break while held, the drop on the bar after you let go. The marked lane plays alone in the break. On EDIT: GRAB (what the lane plays now becomes its pattern); SEL + REC: clear it |
 | ENV | fade the lane out over a bar; again: back in. SEL + ENV: LOCK (it keeps its style when you blend or launch). On EDIT: TIE |
-| LFO | a new idea for the lane from the next bar (MELODY moves on). On EDIT: GENERATE a pattern: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
+| LFO | a new idea for the lane, at once (MELODY moves on). On EDIT: GENERATE a pattern: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
 | OCT- / OCT+ | the keys' octave; both together: back to 0. On EDIT: the octave you enter in |
 | SAVE | keep everything (settings and patterns); while playing it waits until you stop. SEL + SAVE: the audio interrupt's time in the header |
 
@@ -80,7 +80,8 @@ lane faded out, a save waiting, the keys' octave off 0.
   voicing or drum pattern, and turning back brings one back. **RHYTHM** goes from slow long notes to busy 16ths (on
   the other lanes: sparser or busier). **PITCH** goes from small steps to wide leaps and a higher register (the bass
   jumps octaves, the pad's chords open up, the drums bring in the timpani). **CHANGE** says how soon new material
-  comes: FROZEN (the same 16 bars over and over), 64, 32 or 16 bars. All of it from the next bar.
+  comes: FROZEN (the same 16 bars over and over), 64, 32 or 16 bars. Every change is heard at once, from the next
+  16th: the rest of the bar is written again.
 - **Long arcs.** The lead thinks in 16-bar sections of two 8-bar periods: the motif stated, answered upside down,
   sequenced a step up and closed open on the third or fifth; then stated again, driven to the period's highest
   notes and closed on the root. The second period climbs higher. Every second time round the progression comes as a
@@ -142,7 +143,8 @@ lane faded out, a save waiting, the keys' octave off 0.
 - **The lead** follows the chords: every beat is a chord tone, the notes between lead into the next one by scale
   steps, and each 4-bar phrase states a motif, answers it, varies it and lands on the root or third. Density adds a
   16th into a beat, never a stray note.
-- Style, blend, density, octave and the SONG settings change on the next bar; SOUND and TRACKER act at once.
+- Every setting acts at once: the music changes from the next 16th (a note already sounding plays on). Only
+  LAUNCH waits, for the next phrase.
 
 ## SFX
 
