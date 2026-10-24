@@ -4,7 +4,8 @@
  *   FM voices     two operators (a modulator into a carrier's phase), an index envelope, an amplitude
  *                 envelope, slide, vibrato, the tracker arpeggio (a chord cycled every 42 ms), square option;
  *                 CHAOS layers a light saw lead, a heavy pad (two detuned oscillators, one an octave down,
- *                 fading in slowly and out late) and brown noise breathing with the pad
+ *                 fading in slowly and out late) and brown noise breathing with the pad; SUPERSAW is seven saws,
+ *                 detuned around the note, through a soft high cut
  *   drum voices   kick and kettle drum (a swept sine), snare (band-passed noise + a tone), hat, crash, clap (three
  *                 quick bursts of band-passed noise and a tail), open hat (choked by the closed one), tom (a swept
  *                 sine; hits in a row step down, as a fill does), rim shot (two sines and a click)
@@ -52,7 +53,8 @@ typedef struct {
     uint8_t vib, square;
     uint16_t d_ms;              /* decay toward the sustain (0 = 80 ms); with sus 0 a long one rings out, as a piano */
     uint8_t chaos;              /* 1: add the pad and the brown noise under the lead (CHAOS); 2: an ensemble, two
-                                 * more detuned oscillators with the note (strings and brass as sections) */
+                                 * more detuned oscillators with the note (strings and brass as sections);
+                                 * 3: no FM, seven detuned saws (SUPERSAW) */
     uint8_t breath;             /* noise in the tone, following the note's level: bow, breath (0 = a clean FM tone) */
 } patch_t;
 static const patch_t PATCH[] = {
@@ -73,6 +75,7 @@ static const patch_t PATCH[] = {
     {"CHAOS",   16,  520, 380, 400,   4, 3800,  230, 500, 1, 0,    0, 1},   /* a light saw + a heavy pad + brown noise */
     {"VIOLINS", 16,  680, 500, 400,  60, 1800,  230, 350, 1, 0,    0, 2, 80},   /* a section, singing: the symphony's lead */
     {"CELLOS",  16,  700, 450, 300,  90, 2700,  220, 300, 1, 0,    0, 2, 70},   /* cellos and basses, bowed */
+    {"SUPERSAW", 16,   0,   0, 100,   6, 3000,  235, 380, 0, 0,    0, 3},   /* seven saws, wide and bright */
 };
 #define NPATCH (sizeof PATCH / sizeof PATCH[0])
 
@@ -81,6 +84,7 @@ static const kit_t KITS[] = {
     {"STANDARD", 150, 45, 320, 1700, 700, 8000, 60},     /* snares with a body and a tail, as recorded ones */
     {"TRACKER",  220, 60, 180, 2300, 520, 6000, 90},
     {"ELECTRO",  120, 38, 600, 1200, 600, 10000, 35},
+    {"DEEP",     140, 33, 750, 1500, 620, 7500, 70},     /* a kick that drops very low and rings long, a dry kit around it */
 };
 #define NKIT (sizeof KITS / sizeof KITS[0])
 
@@ -103,6 +107,7 @@ typedef struct {
     uint8_t chaos;                              /* CHAOS: the pad and the noise */
     uint8_t breath;                             /* the patch's noise in the tone (s1: its low-pass state) */
     uint32_t pph1, pph2;                        /* the pad's two oscillators */
+    uint32_t ss[6];                             /* SUPERSAW: the six detuned saws' phases */
     int32_t pamp, brown;                        /* the pad's level (Q15, slow), the brown noise */
 } voice_t;
 #define NVOICE 30u
@@ -270,6 +275,7 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
     v->midi = (uint8_t)midi; v->midi_ch = midi_chan[lane];
     v->chaos = P->chaos; v->pph1 = 0x40000000u; v->pph2 = 0; v->pamp = 0; v->brown = 0;
     v->breath = P->breath; v->s1 = 0;
+    if (P->chaos == 3u) for (i = 0; i < 6u; i++) { (void)noise(); v->ss[i] = noise_s; }   /* free-running: each note starts elsewhere */
     if (midi) mo_push(0x90u | v->midi_ch, midi, 100);
 }
 
@@ -549,6 +555,16 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
             if (v->vib && v->ctr > 15435u) {                            /* vibrato after 0.35 s: 5.6 Hz, 0.7 % */
                 v->vph += 545400u;
                 inc += (uint32_t)(((int32_t)(inc >> 16) * SIN[v->vph >> 22]) >> 6);
+            }
+            if (v->chaos == 3u) {                                       /* SUPERSAW: the note's saw and six around it */
+                static const int16_t DT[6] = {-2180, -1230, -420, 420, 1230, 2180};   /* Q16: -3.3 % .. +3.3 % */
+                int32_t q = (int32_t)(inc >> 16), sum, j;
+                v->ph += inc;
+                sum = ((int32_t)(v->ph >> 16) - 32768) * 3 / 2;         /* the middle one a little louder */
+                for (j = 0; j < 6; j++) { v->ss[j] += inc + (uint32_t)(q * DT[j]); sum += (int32_t)(v->ss[j] >> 16) - 32768; }
+                v->s1 += (((sum >> 2) - v->s1) * 21000) >> 15;          /* a soft high cut: less fizz, less aliasing */
+                s = (v->s1 * v->amp) >> 15;
+                break;
             }
             v->mph += (inc >> 4) * v->ratio16;
             off = (uint32_t)(SIN[v->mph >> 22] * v->idx) << 6;

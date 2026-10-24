@@ -1,11 +1,11 @@
 Espada 0.1: the first version of a generative groovebox for the M-VAVE FM-1 in the style of early-90s PC tracker music.
 
-- Five lanes (lead, pad, bass, drums, sfx) with FM voices, a synthesized drum kit of nine hits (kick, snare, hat, open hat, clap, tom, rim shot, kettle drum, crash) and eight noise effects (wash, surf, gale, crackle, bits, impact, zap, riser); notes scroll past a fixed play line.
+- Five lanes (lead, pad, bass, drums, sfx) with FM voices, four synthesized drum kits of nine hits (kick, snare, hat, open hat, clap, tom, rim shot, kettle drum, crash) and eight noise effects (wash, surf, gale, crackle, bits, impact, zap, riser); notes scroll past a fixed play line.
 - Ten styles: EPIC, HYPERSPACE, FUSION, OLDSKOOL, SYMPHONY, TROPIC, STEEL, DRIFT, FUNK, RAVE, each with its chords, parts, instruments, tempo and way of playing. Queue, blend lane by lane, launch at once, lock a lane. Every change is heard at once.
 - Played as in a tracker: lead notes glide in, long chords swell and fade, an echo channel on the lead; strings with bow noise, darker and longer snares and cymbals.
 - One screen as a mixing desk: a group button (PLAY, SOUND, TRACKER, SONG), PRESETS through its settings, KNOB 1-4 the setting for lead, pad, bass and drums side by side.
 - MELODY, RHYTHM, PITCH and CHANGE per lane. The lead plays 16-bar arcs of two 8-bar periods, closed on the root.
-- Instruments including piano, strings, violins, cellos, brass and a chaos instrument; stereo voices and a room (SPACE).
+- Instruments including piano, strings, violins, cellos, brass, a supersaw and a chaos instrument; stereo voices and a room (SPACE).
 - Density from sparse to busy, inside the chord and its scale; ENERGY for all lanes at once.
 - Per lane: filter with a tempo-synced wobble, FM brightness, drive, crush, level; slide, retrigger, echo; VARY changes the character per phrase.
 - ENV fades a lane out and in; LEVEL sets it.

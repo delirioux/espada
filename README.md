@@ -71,7 +71,8 @@ the kind of setting, PRESETS steps through them.
   DRIFT (sus chords, swells, no snare), FUNK (slap bass, clav, ghost notes) and RAVE (four on the floor, an acid bass).
   Each brings its chords, parts, instruments, tempo and way of playing.
 - **Drums.** Kick, snare, hats open and closed, clap, toms that step down in a fill, rim shot, kettle drum and crash,
-  in three kits; each style has its own grooves and fills.
+  in four kits (DEEP: a very low, long kick); each style has its own grooves and fills. SUPERSAW, seven detuned
+  saws, for big chords and leads.
 - **Played by hand.** Lead notes glide in from the last one, long chords swell in or fade out, the lead has an echo
   channel, as in the trackers; strings carry bow noise and the drums ring as recorded ones.
 - **The music of a lane.** MELODY (which idea), RHYTHM, PITCH and CHANGE (how soon new material comes, from frozen
