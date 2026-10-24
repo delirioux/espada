@@ -63,9 +63,9 @@ Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on
 | --- | --- |
 | HOME, FX, ARP, GLO | the groups PLAY, SOUND, TRACKER, SONG; pressed again: the next setting. From EDIT: back |
 | EDIT | the lane's own pattern, step by step (again: back) |
-| PLAY | start / stop. SEL + PLAY: from the top |
+| PLAY | stopped: start from the top with an INTRO (SEL + PLAY: everything at once). Playing: the END (SEL + PLAY, or PLAY again during the END: stop now) |
 | SEQ | LAUNCH: every unlocked lane moves to the queued style at once, at the style's tempo. SEL + SEQ: launch and keep your tempo. On EDIT: COPY the pattern of the lane set on EDIT 2 into this one |
-| REC | DROP, while playing: the break starts at once. Tap = the drop on the next phrase; hold = the break while held, the drop the moment you let go (with a crash and an impact). The marked lane plays alone in the break. On EDIT: GRAB (what the lane plays now becomes its pattern); SEL + REC: clear it |
+| REC | while playing, the marked lane alone at once. Tap = INTER (it plays alone for two bars, then the others come back one by one); hold = DROP (alone while held, everything back the moment you let go, with a crash and an impact). On EDIT: GRAB (what the lane plays now becomes its pattern); SEL + REC: clear it |
 | ENV | fade the lane out over a bar; again: back in. SEL + ENV: LOCK (it keeps its style when you blend or launch). On EDIT: TIE |
 | LFO | a new idea for the lane, at once (MELODY moves on). On EDIT: GENERATE a pattern: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
 | OCT- / OCT+ | the keys' octave; both together: back to 0. On EDIT: the octave you enter in |
@@ -115,6 +115,15 @@ lane faded out, a save waiting, the keys' octave off 0.
   middle. STRINGS and BRASS play as sections (two more players a little out of tune) and the strings swell in.
   HYPERSPACE's pad is chopped: the chord struck every 16th with an accent pattern, as a tracker re-strikes a long
   pad sample.
+- **The form.** A piece has an INTRO, INTERs and an END, played by hand:
+  - **INTRO** (PLAY): pad, drums or bass starts alone, chosen at random; the other two follow two bars apart, then
+    the lead and the sfx. All in after six bars.
+  - **INTER** (a tap on REC): the marked lane alone for two bars, then the others back one by one, a bar apart, in a
+    random order.
+  - **DROP** (holding REC): the marked lane alone for as long as you hold; everything back at once when you let go.
+  - **END** (PLAY while playing): lead, sfx and pad fade out one by one, a bar apart, then bass or drums; the one
+    left (chosen at random) plays alone two bars and fades last. Then Espada stops. The title says INTRO, INTER or
+    END while one is running.
 - **The ten styles.** Each is a chord progression, a part for each lane, an instrument for each, a tempo, and a way
   of playing. Change the mood with STYLE (SONG, LIVE) and SEQ.
 

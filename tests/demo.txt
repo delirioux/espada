@@ -3,6 +3,7 @@
 # encoders: 0 SELECT, 1 ALGORITHM, 2..5 KNOB1..4, 6 PRESETS; keys: bit 0 = F3 .. bit 26 = G5
 # (the first 1.5 s are the splash: the tour starts after it)
 2000 btn 12
+# (PLAY starts with an INTRO: the lanes come in one by one)
 # PLAY, MELODY: a new idea for the pad and the bass
 3000 enc 3 7
 3100 enc 4 3
@@ -57,7 +58,7 @@
 26000 shot
 26200 btn 6
 32000 shot
-# drop: the pad alone
+# INTER (a tap on REC): the pad alone for two bars, then the others back one by one
 33000 btn 13
 33100 rel 13
 36000 shot

@@ -462,7 +462,7 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
         if (big) { int32_t ty = clampi(lp ? yc + 3 : yc - 13, y + 2, y + h - 12); fill(213, ty - 2, 20, 14, C_BG); text(215, ty, lp ? "LP" : "HP", col, 1); }
     }
     if (Bc && Bc->muted[l]) darken(0, y, NOWX, h, 140);
-    if (ln[l].mute) darken(0, y, 240, h, 90);                       /* ENV: faded out */
+    if (ln[l].mute || form_gone(l, cur_bar())) darken(0, y, 240, h, 90);   /* ENV, END: faded out */
     if (!big) {                                                     /* the overview: the name; locked: inverted */
         int lock = ln[l].lock && l != L_SFX;
         fill(2, y + (h - 14) / 2, tw(LNAME[l], 1) + 5, 14, lock ? C_CREAM : C_BG);
@@ -594,6 +594,7 @@ static uint16_t status(char *o)
         if (N.until >= 0) { o = s_cat(o, "DROP IN "); s_int(o, N.until - cb); } else s_cat(o, "LET GO: DROP");
         return (pos16 >> 17) % 2 ? C_WHITE : RGBC(0xffb04a);
     }
+    { const char *f = seq_playing ? form_name(cb) : 0; if (f) { s_cat(o, f); return RGBC(0xffb04a); } }
     if (ln[sel].mute) { o = s_cat(o, LNAME[sel]); s_cat(o, " OFF"); return C_CREAM; }
     if (ln[sel].lock && sel != L_SFX) { o = s_cat(o, LNAME[sel]); s_cat(o, " LOCK"); return C_CREAM; }
     if (target != ln[L_BASS].prof || blend) { o = s_cat(o, "NEXT "); s_cat(o, PSHORT[target]); return blend ? C_CYAN : C_DIMG; }
@@ -765,11 +766,25 @@ static int is_black(int32_t k) { return (0x54Au >> ((53 + k) % 12)) & 1u; }
 static int32_t white_index(int32_t k) { int32_t i, w = 0; for (i = 0; i < k; i++) if (!is_black(i)) w++; return is_black(k) ? -1 : w; }
 static void start_stop(int from_top)
 {
-    if (seq_playing && !from_top) { frozen_step = (int32_t)vis_step; seq_stop_req = 1; return; }
+    if (seq_playing && !from_top) { frozen_step = 0; seq_stop_req = 1; form_reset(); invalidate_from(0); return; }   /* the next PLAY starts from the top */
     if (from_top) { if (seq_playing) { seq_stop_req = 1; while (seq_playing) platform_poll(); } frozen_step = 0; launch_bar = -1; arc_restart(0); invalidate_from(0); }
     while (bars_update()) ;                                         /* the first bars exist before the clock starts */
     seq_start_step = frozen_step;
     seq_start_req = 1;
+}
+/* PLAY: stopped, it starts from the top with an INTRO (SEL + PLAY: everything at once); playing, it begins the END
+ * (SEL + PLAY, or PLAY again during the END: stop now) */
+static void play_button(int held)
+{
+    if (!seq_playing) {
+        form_reset();
+        if (!held && !arc_on) form_intro(0);
+        start_stop(1);
+        toast(held || arc_on ? "PLAY" : "INTRO");
+        return;
+    }
+    if (held || end_from >= 0) { start_stop(0); toast("STOPPED"); return; }
+    form_end(cur_bar()); toast("END: THE LANES FADE OUT");
 }
 /* a group button: the group; pressed again, its next setting. From EDIT: back to the group. */
 static void group_btn(int32_t g)
@@ -857,7 +872,7 @@ static void input(void)
             area_dirty = 1;
         }
     }
-    if (b & (1u << BTN_PLAY)) start_stop(held);
+    if (b & (1u << BTN_PLAY)) play_button(held);
     if (b & (1u << BTN_HOME)) group_btn(G_PLAY);
     if (b & (1u << BTN_FX)) group_btn(G_SOUND);
     if (b & (1u << BTN_ARP)) group_btn(G_TRK);
@@ -883,9 +898,9 @@ static void input(void)
     if (b & (1u << BTN_REC)) {
         if (edit_on) { if (held) clear_pattern(); else { pat_grab(sel); toast("GRABBED THIS BAR"); } }
         else if (!seq_playing) toast("DROP: PRESS PLAY FIRST");
-        else { drop_press(sel); { char t[40], *o = s_cat(t, "BREAK: "); o = s_cat(o, LNAME[sel]); s_cat(o, " ALONE"); toast(t); } }
+        else { drop_press(sel); { char t[40], *o = s_cat(t, LNAME[sel]); s_cat(o, " ALONE"); toast(t); } }
     }
-    if (rel & (1u << BTN_REC)) drop_release();
+    if (rel & (1u << BTN_REC) && drop_seg >= 0) { drop_release(); toast(drop_tapped ? "INTER" : "DROP"); }
     if (b & (1u << BTN_ENV)) {
         if (edit_on) edit_key(1, 1);                                /* tie (key 1 = F#3, a black key) */
         else if (held) { if (sel != L_SFX) { ln[sel].lock = (uint8_t)!ln[sel].lock; toast(ln[sel].lock ? "LOCKED: KEEPS ITS PROFILE" : "UNLOCKED"); invalidate(); } }
@@ -996,12 +1011,13 @@ static void app_pass(void)
     platform_poll();
     input();
     while (midi_get(&st, &d1, &d2)) {                           /* MIDI in: start / stop / continue */
-        if (st == 0xFA) { if (!seq_playing) start_stop(1); }
+        if (st == 0xFA) { if (!seq_playing) { form_reset(); start_stop(1); } }      /* MIDI start: everything at once */
         else if (st == 0xFB) { if (!seq_playing) start_stop(0); }
         else if (st == 0xFC) { if (seq_playing) start_stop(0); }
     }
     while (esp_mq_r != esp_mq_w) { uint32_t m = esp_mq[esp_mq_r % 64u]; esp_mq_r++; midi_send(m & 0xFFu, m >> 8 & 0xFFu, m >> 16 & 0xFFu); }
     if (launch_bar >= 0 && cur_bar() >= launch_bar) { commit_launch(); toast("LAUNCHED"); }
+    if (seq_playing && end_from >= 0 && cur_bar() >= end_from + END_LEN) { start_stop(0); toast("THE END"); }
     fx_apply();
     bars_update();
     bars_update();

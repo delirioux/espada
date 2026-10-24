@@ -44,7 +44,7 @@ the kind of setting, PRESETS steps through them.
 | KNOB 1-4 | that setting for LEAD, PAD, BASS, DRUMS (SONG: the four shown) |
 | ALGORITHM | the lane the buttons and keys act on (turning its knob picks it too) |
 | SELECT | tempo |
-| PLAY / SEQ / REC | start-stop, launch the next style (EDIT: copy a lane), DROP (tap or hold) |
+| PLAY / SEQ / REC | INTRO and END, launch the next style (EDIT: copy a lane), INTER (tap) or DROP (hold) |
 | ENV / LFO / EDIT | fade the lane out and in (SEL+ENV: lock), a new idea, its steps |
 | SAVE, OCT- / OCT+ | save; the keys' octave |
 | Keys | play the lane live; on EDIT they enter steps |
@@ -78,8 +78,10 @@ the kind of setting, PRESETS steps through them.
   answered and closed. VARY gives each phrase a different character (echo, slide, bite, filter, stutter).
 - **Density.** 50 % is the part as the style writes it. Lower thins it out; higher adds notes inside the chord and
   its scale, 16th hats, ghost snares and fills.
-- **DROP.** REC breaks at once (the marked lane plays alone). Tap it and the drop comes on the next phrase with
-  a crash and an impact; hold it and the drop comes the moment you let go. ENERGY (SONG) turns every lane's density up or down at
+- **Song form.** PLAY starts with an INTRO: pad, drums or bass alone, the other lanes in one by one. A tap on REC
+  is an INTER: one lane alone for two bars, the others back one by one. Holding REC is a DROP: one lane alone while
+  you hold, everything back with a crash the moment you let go. PLAY again is the END: the lanes fade out one by
+  one, bass or drums last, and Espada stops. ENERGY (SONG) turns every lane's density up or down at
   once.
 - **Stereo and a room.** The voices spread left and right as a tracker's channels do, strings and brass play as
   sections, and a stereo reverb (SPACE) puts it all in a hall.

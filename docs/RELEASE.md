@@ -11,6 +11,7 @@ Espada 0.1: the first version of a generative groovebox for the M-VAVE FM-1 in t
 - ENV fades a lane out and in; LEVEL sets it.
 - Your own parts on the EDIT page, entered in scale steps so they follow the chords; FILL from any style, COPY from another lane, GRAB what plays.
 - SONG: key, scale, suggested progressions, bars per chord.
+- Song form by hand: an INTRO from one lane, INTERs (one lane alone, the rest back one by one), DROPs and an END that fades the lanes out to bass or drums and stops.
 - The arc (off until you turn it on): builds from the drums, a break, the drop, and again; DROP by hand (tap or hold).
 - USB-MIDI out (lead, pad and bass on channels 1 to 3, drums on 10), MIDI start / stop in.
 - Playable in the browser: the same code, compiled to WebAssembly.

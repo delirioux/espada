@@ -258,6 +258,68 @@ static int lane_active(const arc_t *A, int32_t l)
     return A->e >= ENTER[l];
 }
 
+/* ---- the form: INTRO (PLAY: one of pad, drums or bass alone, the other lanes in one by one, two bars apart),
+ * INTER (a tap on REC: the marked lane alone for two bars, then the others back one by one, a bar apart) and END
+ * (PLAY again: the lanes fade out one by one, a bar apart, down to bass or drums alone, which fades last; then it
+ * stops). Ranks are drawn at random each time. */
+static int32_t intro_from = -1, intro_rank[NLANE];
+static int32_t inter_from = -1, inter_rank[NLANE];             /* rank 0: the lane alone */
+static int32_t end_from = -1, end_bar[NLANE];                    /* the bar each lane fades out in */
+#define INTRO_BARS 2
+#define END_LEN 8                                               /* bars from END to the stop */
+static rng_t form_rng = {0x7b3d91u};
+static void shuffle(int32_t *a, int32_t n)
+{
+    int32_t i;
+    for (i = n - 1; i > 0; i--) { int32_t j = (int32_t)((rnd(&form_rng) >> 16) * (uint32_t)(i + 1) >> 16), t = a[i]; a[i] = a[j]; a[j] = t; }
+}
+static void form_reset(void) { intro_from = inter_from = end_from = -1; }
+static void form_intro(int32_t from)
+{
+    int32_t base[3] = {L_PAD, L_DRUMS, L_BASS}, i;
+    form_rng.a ^= fm1_ms * 2654435761u;
+    shuffle(base, 3);
+    for (i = 0; i < 3; i++) intro_rank[base[i]] = i;
+    intro_rank[L_LEAD] = 3; intro_rank[L_SFX] = 3;               /* the lead (and the sfx) last */
+    intro_from = from;
+}
+static void form_inter(int32_t lane, int32_t from)
+{
+    int32_t rest[NLANE], n = 0, l;
+    form_rng.a ^= fm1_ms * 40503u;
+    for (l = 0; l < (int32_t)NLANE; l++) if (l != lane) rest[n++] = l;
+    shuffle(rest, n);
+    inter_rank[lane] = 0;
+    for (l = 0; l < n; l++) inter_rank[rest[l]] = l + 1;
+    inter_from = from;
+}
+static void form_end(int32_t from)
+{
+    int32_t first[3] = {L_LEAD, L_SFX, L_PAD}, last = chance(&form_rng, 50) ? L_BASS : L_DRUMS, i;
+    form_rng.a ^= fm1_ms * 97u;
+    shuffle(first, 3);
+    for (i = 0; i < 3; i++) end_bar[first[i]] = from + i;
+    end_bar[last == L_BASS ? L_DRUMS : L_BASS] = from + 3;
+    end_bar[last] = from + 6;                                   /* alone for two bars, then it fades too */
+    end_from = from;
+}
+/* does lane l play in bar b (INTRO and INTER; END fades, see fx_apply) */
+static int form_plays(int32_t l, int32_t b)
+{
+    if (intro_from >= 0 && b >= intro_from && b < intro_from + INTRO_BARS * intro_rank[l]) return 0;
+    if (inter_from >= 0 && b >= inter_from && inter_rank[l] && b < inter_from + 1 + inter_rank[l]) return 0;
+    return 1;
+}
+static int form_gone(int32_t l, int32_t b) { return end_from >= 0 && b >= end_bar[l]; }
+static const char *form_name(int32_t b)
+{
+    int32_t l, on = 0;
+    if (end_from >= 0) return "END";
+    for (l = 0; l < (int32_t)NLANE; l++) on += form_plays(l, b);
+    if (on == (int32_t)NLANE) return 0;
+    return inter_from >= 0 && b >= inter_from ? "INTER" : "INTRO";
+}
+
 /* ---- generating: events into a small buffer */
 typedef struct { ev_t ev[MAXEV]; uint32_t n; } gen_t;
 static ev_t *g_add(gen_t *G, int32_t st, int32_t len, int32_t n, int32_t a, int32_t b, int32_t c, uint32_t flags)
@@ -819,7 +881,7 @@ static void gen_bar(int32_t b, bar_t *B)
         r.a = hash3(g_bk, l, p) ^ ((uint32_t)GL->mel * 2654435761u);
         tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
         B->prof[l] = (uint8_t)p; B->inst[l] = PROF[p].inst[l]; B->user[l] = ln[l].up.on; B->cnt[l] = 0;
-        B->muted[l] = (uint8_t)!lane_active(&A, l);
+        B->muted[l] = (uint8_t)(!lane_active(&A, l) || !form_plays(l, b));
         if (B->muted[l]) continue;
         if (ln[l].up.on) user_bar(l, &G, &T, b);
         else if (l == L_SFX) gen_sfx(&G, &r, &T, b, p, dens, &A, next_drop);
@@ -900,9 +962,9 @@ static void commit_launch(void)
     blend = 0; launch_bar = -1;
 }
 
-/* ---- DROP: the break starts at once (the rest of this bar is written again). Tap = the drop on the next phrase;
- * hold = the drop the moment you let go (a crash and an impact then, the bar written again). The lane selected when
- * DROP goes down plays alone in the break. */
+/* ---- DROP: the break starts at once (the rest of this bar is written again). Hold = the drop the moment you let
+ * go (a crash and an impact then, the bar written again); tap = INTER (the form, above). The lane selected when DROP
+ * goes down plays alone. */
 static int32_t drop_down_ms, drop_seg = -1;
 static void arc_restart(int32_t from) { segs[0].mode = A_BUILD; segs[0].from = from; segs[0].e0 = 0; segs[0].until = -1; nsegs = 1; }
 static void drop_press(int32_t lane)
@@ -919,19 +981,24 @@ static void drop_press(int32_t lane)
     invalidate();
 }
 static void drop_hit(void);                                     /* the crash and the impact, now (the UI's) */
+static int32_t drop_tapped;                                     /* the last release was a tap: an INTER (the UI says so) */
 static void drop_release(void)
 {
     seg_t *s;
     int tap = (int32_t)fm1_ms - drop_down_ms < 350, now = 0;
     if (drop_seg < 0) return;
-    if (!arc_on) {
-        if (tap) brk_until = (brk_from + 1 + 3) / 4 * 4;                                       /* tap: on the phrase */
-        else { brk_until = cur_bar() > brk_from ? cur_bar() : brk_from + 1; now = brk_until == cur_bar(); }   /* hold: now */
-    } else {
-        s = &segs[drop_seg];
-        if (tap) s->until = (s->from + 1 + 3) / 4 * 4;
-        else { s->until = cur_bar() > s->from ? cur_bar() : s->from + 1; now = s->until == cur_bar(); }
+    drop_tapped = tap;
+    if (tap) {                                                  /* a tap: INTER, from the bar the break began in */
+        int32_t from = arc_on ? segs[drop_seg].from : brk_from, lane = arc_on ? segs[drop_seg].lane : brk_lane;
+        if (arc_on) { if (drop_seg == nsegs - 1) nsegs--; else segs[drop_seg].until = segs[drop_seg].from; }
+        else { brk_from = brk_until = -1; }
+        form_inter(lane, from);
+        drop_seg = -1;
+        invalidate();
+        return;
     }
+    if (!arc_on) { brk_until = cur_bar() > brk_from ? cur_bar() : brk_from + 1; now = brk_until == cur_bar(); }   /* hold: now */
+    else { s = &segs[drop_seg]; s->until = cur_bar() > s->from ? cur_bar() : s->from + 1; now = s->until == cur_bar(); }
     drop_seg = -1;
     invalidate();
     if (now) drop_hit();
@@ -968,7 +1035,7 @@ static void fx_apply(void)
         F->bright = clamp100(bright); F->drive = clamp100(drive); F->slide = clamp100(slide);
         F->retrig = clamp100(retrig); F->rtg_rate = rate; F->crush = U->crush; F->echo = clamp100(echo);
         {
-            int32_t to = ln[l].mute ? 0 : 256, st = dt * 256 / bar_ms + 1;
+            int32_t to = ln[l].mute || form_gone(l, cur_bar()) ? 0 : 256, st = dt * 256 / bar_ms + 1;   /* ENV, END */
             fade_q8[l] = fade_q8[l] < to ? (fade_q8[l] + st > to ? to : fade_q8[l] + st) : (fade_q8[l] - st < to ? to : fade_q8[l] - st);
         }
         F->level = U->level * fade_q8[l] >> 8; F->inst = U->inst; F->vary = v;
