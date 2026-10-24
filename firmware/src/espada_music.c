@@ -468,8 +468,8 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
         for (i = 0; i < 6 && pt[i] >= 0; i++)
             g_add(G, pt[i], (i + 1 < 6 && pt[i + 1] >= 0) ? 1 : 2, 3, ct(T, 0), ct(T, 1), ct(T, 2), 0);
         break; }
-    case S_RIFF: {              /* a 2-beat 16th riff, the same for the whole profile, carried through every chord */
-        rng_t m = {hash3(777, 0, p)};
+    case S_RIFF: {              /* a 2-beat 16th riff, one per MELODY for the whole piece, carried through every chord */
+        rng_t m = {hash3(777, GL->mel, p)};
         int32_t ms[8], mk[8], nm = 0, o = PICK(&m, 2, 4), h;
         for (s = 0; s < 8; s++) {
             if (s == 0 || chance(&m, 80)) { ms[nm] = s; mk[nm] = o; nm++; }
