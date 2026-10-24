@@ -750,8 +750,9 @@ static void draw_knobs(int force)
                 for (pct = 0, i = 0; i < n; i++) if (val[i] >= '0' && val[i] <= '9') pct = pct * 10 + val[i] - '0';
             }
             if (val[0] == '-' && val[1] == '-') { textc(cx, KNOB_Y + 34, "-", C_DIMG, 2); continue; }    /* not for this lane */
-            big = n <= 3;
-            for (i = 0; i < n; i++) if (val[i] >= 'a' && val[i] <= 'z') big = 0;   /* FONT_L has capitals only */
+            /* large: short numbers and note names; every word in the small font, so words never jump in size */
+            big = n <= 3 && ((val[0] >= '0' && val[0] <= '9') || ((val[0] == '-' || val[0] == '+') && val[1] >= '0' && val[1] <= '9')
+                             || (val[0] >= 'A' && val[0] <= 'G' && (n == 1 || (n == 2 && val[1] == '#'))));
             if (big) textc(cx, KNOB_Y + 30, val, hot ? C_WHITE : C_CREAM, 2);
             else { if (n > 8) val[8] = 0; text7(cx - tw7(val) / 2, KNOB_Y + 35, val, hot ? C_WHITE : C_CREAM); }
             if (pct >= 0) { fill(x + 6, KNOB_Y + 60, COL_W - 12, 4, C_GRID); fill(x + 6, KNOB_Y + 60, (COL_W - 12) * clampi(pct, 0, 100) / 100, 4, col); }
