@@ -7,7 +7,7 @@
 Five lanes (lead, pad, bass, drums and sfx) play parts that are composed live in one of ten styles: chords, bass
 lines, melodies, drum patterns and noise in the manner of the S3M scene, played as a tracker musician plays them, with
 glides, swells and an echo channel. You do not program steps; you mix styles. Queue the next style, blend it in lane by
-lane from the bottom up, or launch it on the next phrase with its own tempo. Shape each lane with a
+lane from the bottom up, or launch it at once with its own tempo. Shape each lane with a
 filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, retrigger, a bit crusher and
 echo. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
 
@@ -31,7 +31,7 @@ the kind of setting, PRESETS steps through them.
 <tr>
 <td align="center"><img src="docs/screens/song.png" width="240" alt="SONG, KEY"><br><b>SONG</b> (GLO): the knobs are four settings of their own. KEY: key, scale, chords, bars per chord, the chord playing lit.</td>
 <td align="center"><img src="docs/screens/arc.png" width="240" alt="SONG, ARC"><br><b>ARC</b> (off until you turn it on): the energy over the coming bars, build, break, peak and down.</td>
-<td align="center"><img src="docs/screens/live.png" width="240" alt="SONG, LIVE"><br><b>LIVE</b>: the next of ten styles, blend, energy and space; SEQ launches it on the phrase with its tempo. (SONG's last rows: the sfx lane.)</td>
+<td align="center"><img src="docs/screens/live.png" width="240" alt="SONG, LIVE"><br><b>LIVE</b>: the next of ten styles, blend, energy and space; SEQ launches it at once, with its tempo. (SONG's last rows: the sfx lane.)</td>
 </tr>
 <tr>
 <td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT"><br><b>EDIT</b>: the lane's own part, step by step, in scale steps from the chord root. PRESETS: FILL it from any style (LFO), COPY another lane's (SEQ).</td>
@@ -44,7 +44,7 @@ the kind of setting, PRESETS steps through them.
 | KNOB 1-4 | that setting for LEAD, PAD, BASS, DRUMS (SONG: the four shown) |
 | ALGORITHM | the lane the buttons and keys act on (turning its knob picks it too) |
 | SELECT | tempo |
-| PLAY / SEQ / REC | start-stop, launch the next style on the phrase (EDIT: copy a lane), DROP (tap or hold) |
+| PLAY / SEQ / REC | start-stop, launch the next style (EDIT: copy a lane), DROP (tap or hold) |
 | ENV / LFO / EDIT | fade the lane out and in (SEL+ENV: lock), a new idea, its steps |
 | SAVE, OCT- / OCT+ | save; the keys' octave |
 | Keys | play the lane live; on EDIT they enter steps |
@@ -78,8 +78,8 @@ the kind of setting, PRESETS steps through them.
   answered and closed. VARY gives each phrase a different character (echo, slide, bite, filter, stutter).
 - **Density.** 50 % is the part as the style writes it. Lower thins it out; higher adds notes inside the chord and
   its scale, 16th hats, ghost snares and fills.
-- **DROP.** Tap REC for a break (the marked lane plays alone) that drops on the next phrase with a crash and
-  an impact, or hold it and let go when you want the drop. ENERGY (SONG) turns every lane's density up or down at
+- **DROP.** REC breaks at once (the marked lane plays alone). Tap it and the drop comes on the next phrase with
+  a crash and an impact; hold it and the drop comes the moment you let go. ENERGY (SONG) turns every lane's density up or down at
   once.
 - **Stereo and a room.** The voices spread left and right as a tracker's channels do, strings and brass play as
   sections, and a stereo reverb (SPACE) puts it all in a hall.

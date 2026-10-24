@@ -900,13 +900,14 @@ static void commit_launch(void)
     blend = 0; launch_bar = -1;
 }
 
-/* ---- DROP: tap = a break until the next phrase, then the drop; hold = a break while held, the drop on the
- * bar after release. The lane selected when DROP goes down plays alone in the break. */
+/* ---- DROP: the break starts at once (the rest of this bar is written again). Tap = the drop on the next phrase;
+ * hold = the drop the moment you let go (a crash and an impact then, the bar written again). The lane selected when
+ * DROP goes down plays alone in the break. */
 static int32_t drop_down_ms, drop_seg = -1;
 static void arc_restart(int32_t from) { segs[0].mode = A_BUILD; segs[0].from = from; segs[0].e0 = 0; segs[0].until = -1; nsegs = 1; }
 static void drop_press(int32_t lane)
 {
-    int32_t nb = cur_bar() + 1, i, j;
+    int32_t nb = cur_bar(), i, j;
     arc_t A = arc_at(cur_bar());
     if (!arc_on) { brk_from = nb; brk_until = -1; brk_lane = lane; drop_seg = 0; drop_down_ms = (int32_t)fm1_ms; invalidate(); return; }
     for (i = 0, j = 0; i < nsegs; i++) if (segs[i].from < nb) segs[j++] = segs[i];
@@ -917,21 +918,23 @@ static void drop_press(int32_t lane)
     drop_down_ms = (int32_t)fm1_ms;
     invalidate();
 }
+static void drop_hit(void);                                     /* the crash and the impact, now (the UI's) */
 static void drop_release(void)
 {
     seg_t *s;
+    int tap = (int32_t)fm1_ms - drop_down_ms < 350, now = 0;
     if (drop_seg < 0) return;
     if (!arc_on) {
-        if ((int32_t)fm1_ms - drop_down_ms < 350) brk_until = (brk_from + 1 + 3) / 4 * 4;             /* tap */
-        else { int32_t nb = cur_bar() + 1; brk_until = nb > brk_from + 1 ? nb : brk_from + 1; }   /* hold */
-        drop_seg = -1; invalidate();
-        return;
+        if (tap) brk_until = (brk_from + 1 + 3) / 4 * 4;                                       /* tap: on the phrase */
+        else { brk_until = cur_bar() > brk_from ? cur_bar() : brk_from + 1; now = brk_until == cur_bar(); }   /* hold: now */
+    } else {
+        s = &segs[drop_seg];
+        if (tap) s->until = (s->from + 1 + 3) / 4 * 4;
+        else { s->until = cur_bar() > s->from ? cur_bar() : s->from + 1; now = s->until == cur_bar(); }
     }
-    s = &segs[drop_seg];
-    if ((int32_t)fm1_ms - drop_down_ms < 350) s->until = (s->from + 1 + 3) / 4 * 4;          /* tap */
-    else { int32_t nb = cur_bar() + 1; s->until = nb > s->from + 1 ? nb : s->from + 1; }      /* hold */
     drop_seg = -1;
     invalidate();
+    if (now) drop_hit();
 }
 
 /* ---- VARY: each 4-bar phrase gives a lane a character on top of your settings (as far as its VARY reaches):

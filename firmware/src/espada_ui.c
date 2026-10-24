@@ -754,6 +754,13 @@ static void do_load(void)
         for (l = 0; l < (int32_t)NLANE; l++) { ln[l].up = P.p[l]; if (ln[l].up.bars < 1 || ln[l].up.bars > 2) ln[l].up.bars = 1; }
 }
 
+/* the drop, the moment DROP is let go: its one has passed, so the crash and the impact come now */
+static void drop_hit(void)
+{
+    live_push(L_DRUMS, DK_CRASH, 26, 1, (uint32_t)inst_eff(L_DRUMS));
+    live_push(L_DRUMS, DK_KICK, 26, 1, (uint32_t)inst_eff(L_DRUMS));
+    live_push(L_SFX, SX_IMPACT, 26, 1, 0);
+}
 static int is_black(int32_t k) { return (0x54Au >> ((53 + k) % 12)) & 1u; }
 static int32_t white_index(int32_t k) { int32_t i, w = 0; for (i = 0; i < k; i++) if (!is_black(i)) w++; return is_black(k) ? -1 : w; }
 static void start_stop(int from_top)
@@ -865,11 +872,11 @@ static void input(void)
             if (copy_src == sel) toast("COPY: PICK ANOTHER LANE (EDIT 2)");
             else if (pat_empty(copy_src)) { o = s_cat(t, LNAME[copy_src]); s_cat(o, " HAS NO PART: FILL IT FIRST"); toast(t); }
             else { pat_copy(copy_src, sel); o = s_cat(t, LNAME[copy_src]); o = s_cat(o, " COPIED TO "); s_cat(o, LNAME[sel]); toast(t); }
-        } else if (launch_bar >= 0) { launch_bar = -1; toast("LAUNCH CANCELLED"); }
-        else {
+        } else {                                                    /* LAUNCH: the queued style, at once */
             char t[40], *o;
-            launch_bar = (cur_bar() / 4 + 1) * 4; launch_tempo = !held;
-            o = s_cat(t, "LAUNCH "); o = s_cat(o, PSHORT[target]); s_cat(o, held ? ", YOUR TEMPO" : " ON THE PHRASE"); toast(t);
+            launch_tempo = !held;
+            commit_launch();
+            o = s_cat(t, PSHORT[target]); s_cat(o, held ? ", YOUR TEMPO" : ""); toast(t);
         }
         invalidate();
     }

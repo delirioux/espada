@@ -64,8 +64,8 @@ Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on
 | HOME, FX, ARP, GLO | the groups PLAY, SOUND, TRACKER, SONG; pressed again: the next setting. From EDIT: back |
 | EDIT | the lane's own pattern, step by step (again: back) |
 | PLAY | start / stop. SEL + PLAY: from the top |
-| SEQ | LAUNCH: every unlocked lane moves to the queued style on the next phrase, at the style's tempo (again: cancel). SEL + SEQ: launch and keep your tempo. On EDIT: COPY the pattern of the lane set on EDIT 2 into this one |
-| REC | DROP, while playing: tap = a break from the next bar and the drop on the next phrase; hold = a break while held, the drop on the bar after you let go. The marked lane plays alone in the break. On EDIT: GRAB (what the lane plays now becomes its pattern); SEL + REC: clear it |
+| SEQ | LAUNCH: every unlocked lane moves to the queued style at once, at the style's tempo. SEL + SEQ: launch and keep your tempo. On EDIT: COPY the pattern of the lane set on EDIT 2 into this one |
+| REC | DROP, while playing: the break starts at once. Tap = the drop on the next phrase; hold = the break while held, the drop the moment you let go (with a crash and an impact). The marked lane plays alone in the break. On EDIT: GRAB (what the lane plays now becomes its pattern); SEL + REC: clear it |
 | ENV | fade the lane out over a bar; again: back in. SEL + ENV: LOCK (it keeps its style when you blend or launch). On EDIT: TIE |
 | LFO | a new idea for the lane, at once (MELODY moves on). On EDIT: GENERATE a pattern: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
 | OCT- / OCT+ | the keys' octave; both together: back to 0. On EDIT: the octave you enter in |
@@ -143,8 +143,8 @@ lane faded out, a save waiting, the keys' octave off 0.
 - **The lead** follows the chords: every beat is a chord tone, the notes between lead into the next one by scale
   steps, and each 4-bar phrase states a motif, answers it, varies it and lands on the root or third. Density adds a
   16th into a beat, never a stray note.
-- Every setting acts at once: the music changes from the next 16th (a note already sounding plays on). Only
-  LAUNCH waits, for the next phrase.
+- Every setting acts at once: the music changes from the next 16th (a note already sounding plays on). LAUNCH and
+  DROP too. Only ENV takes a bar: it fades.
 
 ## SFX
 
