@@ -223,6 +223,12 @@ static void fm1_glow_all(void)
             if (FM1_KEYMAP[r][p] >= 0) fm1_led_dim[p] |= (uint8_t)(1u << r);
 }
 
+static void fm1_glow_none(void)                 /* the glow off (the app's LIGHTS setting) */
+{
+    uint32_t p;
+    for (p = 0; p < FM1_NCOL; p++) fm1_led_dim[p] = 0;
+}
+
 static void midi_send(uint32_t st, uint32_t d1, uint32_t d2)   /* from the main loop only */
 {
     midi_out_event((st >> 4) | st << 8 | (d1 & 0x7Fu) << 16 | (d2 & 0x7Fu) << 24);

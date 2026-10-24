@@ -56,13 +56,25 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | the lane's steps | step | length | bars | pattern (yours or the style's) |
 | EDIT 2 (PRESETS) | fill (the style LFO fills from) | copy (the lane SEQ copies from) | | |
 
+## Setup
+
+Hold **HOME** for SETUP; HOME (or any group button, or EDIT) leaves it. PRESETS steps through its rows:
+
+| SETUP | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
+| --- | --- | --- | --- | --- |
+| LOOK | palette: ESPADA (its colours), AMBER, GREEN, CYAN, RED, MONO | screen: 100, 75, 50 or 25 % | lights: the keys' and buttons' glow on or off | |
+| MIDI | the lead's channel | the pad's | the bass's | the drums' (1..16 or OFF) |
+| RESET | defaults: five clicks to the right puts everything back as it comes (patterns cleared); SAVE keeps it | | | |
+
+SAVE keeps the setup with everything else.
+
 ## Buttons
 
 Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on the marked lane.
 
 | Button | Does |
 | --- | --- |
-| HOME, FX, ARP, GLO | the groups PLAY, SOUND, TRACKER, SONG; pressed again: the next setting. From EDIT: back |
+| HOME, FX, ARP, GLO | the groups PLAY, SOUND, TRACKER, SONG; pressed again: the next setting. From EDIT: back. Hold HOME: SETUP |
 | EDIT | the lane's own pattern, step by step (again: back) |
 | PLAY | stopped: start from the top with an INTRO (SEL + PLAY: everything at once). Playing: the END (SEL + PLAY, or PLAY again during the END: stop now) |
 | SEQ | LAUNCH: every unlocked lane moves to the queued style at once, at the style's tempo. SEL + SEQ: launch and keep your tempo. On EDIT: COPY the pattern of the lane set on EDIT 2 into this one |
@@ -189,4 +201,4 @@ Your patterns follow the chords, as the generated parts do: they are written in 
 ## MIDI
 
 USB-MIDI out: lead, pad and bass on channels 1 to 3, the drums on channel 10 (kick 36, snare 38, hat 42,
-tom 47, crash 49). MIDI in: start, continue and stop.
+tom 47, crash 49); SETUP, MIDI changes the channels or turns a lane off. MIDI in: start, continue and stop.

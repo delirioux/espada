@@ -43,6 +43,22 @@ static const char *const SXNAME[NSX] = {"WASH", "RISER", "IMPACT", "ZAP", "CRACK
 #define COL_W 60
 static int32_t pan_y = LANE_Y, pan_h = LANES_H;    /* where the step grid, the song and the arc draw */
 
+/* ---- the look (SETUP): a palette (ESPADA in its colours, or one colour in shades, as Felucca's) and the screen's
+ * level. Every colour drawn passes through paint(). */
+static const char *const PALN[6] = {"ESPADA", "AMBER", "GREEN", "CYAN", "RED", "MONO"};
+static const uint8_t PALC[6][3] = {{0, 0, 0}, {255, 166, 40}, {120, 255, 146}, {140, 222, 255}, {255, 112, 92}, {226, 226, 226}};
+static int32_t palette, screen_lvl = 100, glow_on = 1;
+static uint16_t paint(uint16_t c)
+{
+    int32_t r = (c >> 11) << 3, g = ((c >> 5) & 63) << 2, b = (c & 31) << 3;
+    if (palette > 0 && palette < 6) {
+        int32_t y = (r * 77 + g * 150 + b * 29) >> 8;
+        r = PALC[palette][0] * y / 255; g = PALC[palette][1] * y / 255; b = PALC[palette][2] * y / 255;
+    }
+    if (screen_lvl < 100) { r = r * screen_lvl / 100; g = g * screen_lvl / 100; b = b * screen_lvl / 100; }
+    return (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+}
+
 /* ---- the strip canvas */
 #define STRIP_H 46u
 static uint16_t cvb[2][240u * STRIP_H] __attribute__((section(".pool")));
@@ -52,7 +68,7 @@ static uint32_t cvn;
 static void cs_begin(int32_t y0, int32_t h, uint16_t bg)
 {
     uint32_t i, n = 240u * (uint32_t)h;
-    uint16_t s = SW(bg);
+    uint16_t s = SW(paint(bg));
     cvp = cvb[cvn++ & 1u]; cy0 = y0; chh = h;
     for (i = 0; i < n; i++) cvp[i] = s;
 }
@@ -60,7 +76,7 @@ static void cs_end(void) { lcd_blit(0, (uint32_t)cy0, 240, (uint32_t)chh, cvp); 
 static void fill(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
 {
     int32_t i, j, x1 = x + w, y1 = y + h;
-    uint16_t s = SW(c);
+    uint16_t s = SW(paint(c));
     if (x < 0) x = 0;
     if (x1 > 240) x1 = 240;
     if (y < cy0) y = cy0;
@@ -101,7 +117,7 @@ static int32_t text(int32_t x, int32_t y, const char *s, uint16_t c, int32_t sc)
 {
     const felucca_font_t *f = sc > 1 ? &FONT_L : &FONT_S;
     int32_t top = y - (sc > 1 ? 4 : 2);
-    uint16_t sw = SW(c);
+    uint16_t sw = SW(paint(c));
     for (; *s; s++) {
         uint32_t gi = glyph(f, (uint8_t)*s), w = f->bw[gi], bpr = (w + 1u) / 2u, gx, gy;
         const uint8_t *gd = f->data + f->off[gi];
@@ -342,17 +358,52 @@ static const card_t ROW_EDIT[2][4] = {
     {{"STEP", t_step, v_step, 0}, {"LENGTH", t_len, v_len, 0}, {"BARS", t_bars, v_bars, 0}, {"PATTERN", t_use, v_use, 0}},
     {{"FILL", t_fill, v_fill, s_fill}, {"COPY", t_csrc, v_csrc, s_csrc}, {0, 0, 0, 0}, {0, 0, 0, 0}}};
 static int32_t edit_row;
+/* SETUP (hold HOME): the look, the MIDI channels, the defaults */
+static int32_t setup_on, setup_row, reset_turns;
+static void defaults(void);
+static void t_pal(int32_t d) { palette = fmodp(palette + (d > 0 ? 1 : -1), 6); area_dirty = 1; }
+static void v_pal(char *o) { s_cat(o, PALN[palette]); }
+static void t_scr(int32_t d) { screen_lvl = clampi(screen_lvl + (d > 0 ? 25 : -25), 25, 100); area_dirty = 1; }
+static void v_scr(char *o) { s_pct(o, screen_lvl); }
+static void t_glow(int32_t d) { glow_on = d > 0; if (glow_on) fm1_glow_all(); else fm1_glow_none(); }
+static void v_glow(char *o) { s_cat(o, glow_on ? "GLOW" : "OFF"); }
+static void s_glow(char *o) { s_cat(o, "THE KEYS"); }
+static void t_ch(int32_t l, int32_t d) { midi_chan[l] = (uint8_t)clampi(midi_chan[l] + (d > 0 ? 1 : -1), 0, 16); }
+static void v_ch(char *o, int32_t l) { if (midi_chan[l] > 15u) s_cat(o, "OFF"); else s_int(o, midi_chan[l] + 1); }
+static void t_ch0(int32_t d) { t_ch(L_LEAD, d); }
+static void t_ch1(int32_t d) { t_ch(L_PAD, d); }
+static void t_ch2(int32_t d) { t_ch(L_BASS, d); }
+static void t_ch3(int32_t d) { t_ch(L_DRUMS, d); }
+static void v_ch0(char *o) { v_ch(o, L_LEAD); }
+static void v_ch1(char *o) { v_ch(o, L_PAD); }
+static void v_ch2(char *o) { v_ch(o, L_BASS); }
+static void v_ch3(char *o) { v_ch(o, L_DRUMS); }
+static void s_ch(char *o) { s_cat(o, "CHANNEL"); }
+static void t_reset(int32_t d)                                  /* five clicks to the right: the defaults */
+{
+    reset_turns = clampi(reset_turns + (d > 0 ? 1 : -1), 0, 5);
+    if (reset_turns == 5) { reset_turns = 0; defaults(); toast("DEFAULTS: SAVE TO KEEP"); }
+}
+static void v_reset(char *o) { if (!reset_turns) s_cat(o, "TURN"); else { o = s_int(o, 5 - reset_turns); s_cat(o, " MORE"); } }
+static void s_reset(char *o) { s_cat(o, "5 RIGHT"); }
+static const srow_t ROW_SETUP[] = {
+    {"LOOK", -1, {{"PALETTE", t_pal, v_pal, 0}, {"SCREEN", t_scr, v_scr, 0}, {"LIGHTS", t_glow, v_glow, s_glow}, {0, 0, 0, 0}}},
+    {"MIDI", -1, {{"LEAD", t_ch0, v_ch0, s_ch}, {"PAD", t_ch1, v_ch1, s_ch}, {"BASS", t_ch2, v_ch2, s_ch}, {"DRUMS", t_ch3, v_ch3, s_ch}}},
+    {"RESET", -1, {{"DEFAULTS", t_reset, v_reset, s_reset}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+};
 #define NROWS_OF(a) ((int32_t)(sizeof(a) / sizeof(a[0])))
 static int32_t nrows(int32_t g) { return g == G_PLAY ? NROWS_OF(ROW_PLAY) : g == G_SOUND ? NROWS_OF(ROW_SOUND) : g == G_TRK ? NROWS_OF(ROW_TRK) : NROWS_OF(ROW_SONG); }
 static const char *row_name(void)
 {
     int32_t r = rowi[grp];
+    if (setup_on) return ROW_SETUP[setup_row].name;
     return grp == G_PLAY ? ROW_PLAY[r].name : grp == G_SOUND ? ROW_SOUND[r].name : grp == G_TRK ? ROW_TRK[r].name : ROW_SONG[r].name;
 }
 /* what KNOB c does now, and for which lane (-1: the song) */
 static const card_t *knob_card(int32_t c, int32_t *lane)
 {
     int32_t r = rowi[grp];
+    if (setup_on) { *lane = -1; return &ROW_SETUP[setup_row].c[c]; }
     if (edit_on) { *lane = sel; return &ROW_EDIT[edit_row][c]; }
     if (grp == G_SONG) { *lane = ROW_SONG[r].lane; return &ROW_SONG[r].c[c]; }
     *lane = c;
@@ -368,8 +419,8 @@ static void card_text(const card_t *C, int32_t lane, char *v, char *sb)
     if (C->sub) C->sub(sb);
     sel = keep;
 }
-static uint16_t knob_col(int32_t c, int32_t lane) { return edit_on ? LCOL[sel] : grp == G_SONG ? (lane >= 0 ? LCOL[lane] : GCOL[G_SONG]) : LCOL[c]; }
-static uint16_t head_col(void) { return edit_on ? LCOL[sel] : GCOL[grp]; }
+static uint16_t knob_col(int32_t c, int32_t lane) { return setup_on ? C_LIGHT : edit_on ? LCOL[sel] : grp == G_SONG ? (lane >= 0 ? LCOL[lane] : GCOL[G_SONG]) : LCOL[c]; }
+static uint16_t head_col(void) { return setup_on ? C_LIGHT : edit_on ? LCOL[sel] : GCOL[grp]; }
 
 /* ---- drawing: the lanes */
 static int32_t pos16;                                       /* the play head, in steps Q16 */
@@ -566,7 +617,8 @@ static void draw_header(void)
     int32_t cb = cur_bar(), cw, i, x;
     uint16_t hc = head_col();
     wh[0] = 0;
-    if (edit_on) { char *o = s_cat(wh, "EDIT "); s_cat(o, LNAME[sel]); } else s_cat(wh, GNAME[grp]);
+    if (setup_on) s_cat(wh, "SETUP");
+    else if (edit_on) { char *o = s_cat(wh, "EDIT "); s_cat(o, LNAME[sel]); } else s_cat(wh, GNAME[grp]);
     cw = tw(wh, 1) + 6;
     cs_begin(0, HEAD_H + 2, C_BG);
     fill(0, 0, cw, 15, hc);
@@ -610,18 +662,18 @@ static void draw_title(int force)
     char st[24];
     const char *name = row_name();
     uint16_t sc = status(st);
-    int32_t n = nrows(grp), i, toast_on = fm1_ms < toast_until;
+    int32_t n = setup_on ? NROWS_OF(ROW_SETUP) : nrows(grp), i, toast_on = fm1_ms < toast_until;
     uint32_t h = 2166136261u;
     for (i = 0; st[i]; i++) h = (h ^ (uint8_t)st[i]) * 16777619u;
     for (i = 0; toast_on && toast_s[i]; i++) h = (h ^ (uint8_t)toast_s[i]) * 16777619u;
-    h ^= (uint32_t)(grp * 977 + rowi[grp] * 31 + toast_on * 7) + sc;
+    h ^= (uint32_t)(grp * 977 + rowi[grp] * 31 + toast_on * 7 + setup_on * 4099 + setup_row * 13) + sc;
     if (!force && h == title_hash) return;
     title_hash = h;
     cs_begin(TITLE_Y, TITLE_H, C_BG);
     if (toast_on) { fill(0, TITLE_Y + 4, 240, 26, C_FOOT); textc(120, TITLE_Y + 12, toast_s, C_WHITE, 1); }
     else {
         text(4, TITLE_Y + 8, name, C_CREAM, 2);
-        for (i = 0; i < n; i++) fill(236 - (n - i) * 7 + 2, TITLE_Y + 6, 5, 5, i == rowi[grp] ? head_col() : RGBC(0x2d4040));
+        for (i = 0; i < n; i++) fill(236 - (n - i) * 7 + 2, TITLE_Y + 6, 5, 5, i == (setup_on ? setup_row : rowi[grp]) ? head_col() : RGBC(0x2d4040));
         textr(238, TITLE_Y + 18, st, sc, 1);
     }
     cs_end();
@@ -641,7 +693,7 @@ static void draw_knobs(int force)
         for (i = 0; sb[c][i]; i++) h = (h ^ (uint8_t)sb[c][i]) * 16777619u;
         h = (h ^ (uint32_t)(uintptr_t)C ^ (uint32_t)(lane >= 0 ? ln[lane].mute : 0) << 3) * 16777619u;
     }
-    h ^= (uint32_t)(last_enc * 131 + (fm1_ms - last_enc_ms < 1500u) + sel * 7919 + grp * 31 + edit_on * 101);
+    h ^= (uint32_t)(last_enc * 131 + (fm1_ms - last_enc_ms < 1500u) + sel * 7919 + grp * 31 + edit_on * 101 + setup_on * 3001 + setup_row * 17);
     if (!force && h == knobs_hash) return;
     knobs_hash = h;
     for (k = 0; k < 2; k++) {
@@ -656,9 +708,9 @@ static void draw_knobs(int force)
             if (c) fill(x, KNOB_Y + 1, 1, KNOB_H - 1, C_GRID);
             if (!C->name) continue;
             off = !edit_on && lane >= 0 && ln[lane].mute;
-            if (grp != G_SONG && !edit_on ? c == sel : hot) fill(x + 1, KNOB_Y + 1, COL_W - 1, KNOB_H - 1, cscale(col, 40));
+            if (grp != G_SONG && !edit_on && !setup_on ? c == sel : hot) fill(x + 1, KNOB_Y + 1, COL_W - 1, KNOB_H - 1, cscale(col, 40));
             fill(x + 4, KNOB_Y + 1, COL_W - 7, 2, hot ? C_WHITE : cscale(col, off ? 70 : 150));
-            label = grp != G_SONG && !edit_on ? LNAME[c] : C->name;
+            label = grp != G_SONG && !edit_on && !setup_on ? LNAME[c] : C->name;
             if (tw(label, 1) <= COL_W - 2) textc(cx, KNOB_Y + 8, label, off ? cscale(col, 100) : col, 1);
             else text7(cx - tw7(label) / 2, KNOB_Y + 8, label, col);
             for (n = 0; val[n]; n++) ;
@@ -712,7 +764,8 @@ static void draw_frame(int force)
 /* ---- saving: settings (256 B) and patterns (their own sector), only while stopped (an erase stalls the sound) */
 typedef struct {
     uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy; uint8_t space;
-    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send; } l[NLANE];
+    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; } l[NLANE];
+    uint8_t palette, screen, glow;
 } save_t;
 typedef struct { upat_t p[NLANE]; } pats_t;
 static void do_save(void)
@@ -720,14 +773,14 @@ static void do_save(void)
     static save_t S;
     static pats_t P;
     int32_t l, rc;
-    S.ver = 7; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
+    S.ver = 8; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
     for (l = 0; l < (int32_t)NLANE; l++) {
         S.l[l].prof = ln[l].prof; S.l[l].lock = ln[l].lock; S.l[l].dens = ln[l].dens; S.l[l].oct = ln[l].oct; S.l[l].filt = (int8_t)fxu[l].filt;
         S.l[l].res = (uint8_t)fxu[l].res; S.l[l].wob = (uint8_t)fxu[l].wob; S.l[l].bright = (uint8_t)fxu[l].bright; S.l[l].drive = (uint8_t)fxu[l].drive;
         S.l[l].slide = (uint8_t)fxu[l].slide; S.l[l].retrig = (uint8_t)fxu[l].retrig; S.l[l].rate = (uint8_t)fxu[l].rtg_rate; S.l[l].crush = (uint8_t)fxu[l].crush;
         S.l[l].echo = (uint8_t)fxu[l].echo; S.l[l].level = (uint8_t)fxu[l].level; S.l[l].inst = (int8_t)fxu[l].inst; S.l[l].vary = (uint8_t)fxu[l].vary;
-        S.l[l].mel = ln[l].mel; S.l[l].rhy = ln[l].rhy; S.l[l].pit = ln[l].pit; S.l[l].chg = ln[l].chg; S.l[l].mute = ln[l].mute; S.l[l].send = (uint8_t)fxu[l].send;
+        S.l[l].mel = ln[l].mel; S.l[l].rhy = ln[l].rhy; S.l[l].pit = ln[l].pit; S.l[l].chg = ln[l].chg; S.l[l].mute = ln[l].mute; S.l[l].send = (uint8_t)fxu[l].send; S.l[l].midi = midi_chan[l];
         P.p[l] = ln[l].up;
     }
     rc = settings_save(&S, sizeof S);
@@ -739,7 +792,8 @@ static void do_load(void)
     static save_t S;
     static pats_t P;
     int32_t l;
-    if (settings_load(&S, sizeof S) == 0 && S.ver == 7) {
+    if (settings_load(&S, sizeof S) == 0 && S.ver == 8) {
+        palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0;
         energy = clampi(S.energy, -50, 50); space = clampi(S.space, 0, 100);
         set_key(S.key % 12u); scale_sel = S.scale < NSCALE ? S.scale : 0; prog_sel = S.prog <= NPROG ? S.prog : 0; bpc = clampi(S.bpc, 1, 4);
         arc_on = S.arc != 0; build_ph = clampi(S.build, 2, 16); if (arc_on) arc_restart(0); peak_ph = clampi(S.peak, 1, 8); auto_drop = S.autod != 0; target = S.target % NPROF; set_bpm(S.bpm);
@@ -750,7 +804,7 @@ static void do_load(void)
             fxu[l].crush = clampi(S.l[l].crush, 0, 100); fxu[l].echo = clampi(S.l[l].echo, 0, 100); fxu[l].level = clampi(S.l[l].level, 0, 100);
             fxu[l].vary = clampi(S.l[l].vary, 0, 100);
             ln[l].mel = (uint8_t)(S.l[l].mel % 100u); ln[l].rhy = (uint8_t)clampi(S.l[l].rhy, 0, 100); ln[l].pit = (uint8_t)clampi(S.l[l].pit, 0, 100);
-            ln[l].chg = (uint8_t)clampi(S.l[l].chg, 0, 100); ln[l].mute = S.l[l].mute != 0; fxu[l].send = clampi(S.l[l].send, 0, 100);
+            ln[l].chg = (uint8_t)clampi(S.l[l].chg, 0, 100); ln[l].mute = S.l[l].mute != 0; fxu[l].send = clampi(S.l[l].send, 0, 100); midi_chan[l] = (uint8_t)(S.l[l].midi > 16u ? 16u : S.l[l].midi);
             fxu[l].inst = clampi(S.l[l].inst, -1, l == L_SFX ? (int32_t)NSX - 1 : l == L_DRUMS ? (int32_t)NKIT - 1 : (int32_t)NPATCH - 1);
         }
     }
@@ -792,7 +846,8 @@ static void play_button(int held)
 /* a group button: the group; pressed again, its next setting. From EDIT: back to the group. */
 static void group_btn(int32_t g)
 {
-    if (edit_on) edit_on = 0;
+    if (setup_on) setup_on = 0;
+    else if (edit_on) edit_on = 0;
     else if (grp == g) rowi[g] = fmodp(rowi[g] + 1, nrows(g));
     grp = g;
     area_dirty = 1;
@@ -861,7 +916,8 @@ static void input(void)
         if (e == ENC_SELECT) { set_bpm(seq_bpm + d); area_dirty = 1; continue; }              /* SELECT: tempo */
         if (e == ENC_ALGORITHM) { set_sel(sel + (d > 0 ? 1 : -1)); continue; }              /* the lane */
         if (e == ENC_PRESETS) {                                         /* the setting in the group */
-            if (!edit_on) rowi[grp] = fmodp(rowi[grp] + (d > 0 ? 1 : -1), nrows(grp));
+            if (setup_on) { setup_row = fmodp(setup_row + (d > 0 ? 1 : -1), NROWS_OF(ROW_SETUP)); reset_turns = 0; }
+            else if (!edit_on) rowi[grp] = fmodp(rowi[grp] + (d > 0 ? 1 : -1), nrows(grp));
             else edit_row = !edit_row;                                  /* EDIT: the steps, or FILL and COPY */
             area_dirty = 1; continue;
         }
@@ -876,11 +932,18 @@ static void input(void)
         }
     }
     if (b & (1u << BTN_PLAY)) play_button(held);
-    if (b & (1u << BTN_HOME)) group_btn(G_PLAY);
+    {                                                               /* HOME: tap = the PLAY group; hold = SETUP */
+        static uint32_t home_ms;
+        static int home_held, home_used;
+        if (b & (1u << BTN_HOME)) { home_ms = fm1_ms; home_held = 1; home_used = 0; }
+        if (home_held && !home_used && fm1_ms - home_ms >= 600u) { home_used = 1; setup_on = 1; edit_on = 0; reset_turns = 0; area_dirty = 1; }
+        if (rel & (1u << BTN_HOME)) { if (home_held && !home_used) group_btn(G_PLAY); home_held = 0; }
+    }
     if (b & (1u << BTN_FX)) group_btn(G_SOUND);
     if (b & (1u << BTN_ARP)) group_btn(G_TRK);
     if (b & (1u << BTN_GLO)) group_btn(G_SONG);
-    if (b & (1u << BTN_EDIT)) {
+    if (b & (1u << BTN_EDIT) && setup_on) { setup_on = 0; area_dirty = 1; }
+    else if (b & (1u << BTN_EDIT)) {
         if (held && edit_on) clear_pattern();
         else { edit_on = !edit_on; cursor = clampi(cursor, 0, ln[sel].up.bars * 16 - 1); area_dirty = 1; }
     }
@@ -954,7 +1017,7 @@ static void leds(void)
     arc_t A = arc_at(cur_bar());
     m |= (uint32_t)seq_playing << BTN_PLAY;
     m |= (uint32_t)(A.mode == A_BREAK || drop_seg >= 0) << BTN_REC;
-    m |= (uint32_t)(!edit_on && grp == G_PLAY) << BTN_HOME | (uint32_t)(!edit_on && grp == G_SOUND) << BTN_FX | (uint32_t)(!edit_on && grp == G_TRK) << BTN_ARP;
+    m |= (uint32_t)(setup_on || (!edit_on && grp == G_PLAY)) << BTN_HOME | (uint32_t)(!edit_on && grp == G_SOUND) << BTN_FX | (uint32_t)(!edit_on && grp == G_TRK) << BTN_ARP;
     m |= (uint32_t)edit_on << BTN_EDIT | (uint32_t)(!edit_on && grp == G_SONG) << BTN_GLO;
     m |= (uint32_t)(launch_bar >= 0) << BTN_SEQ | (uint32_t)ln[sel].mute << BTN_ENV | (uint32_t)save_pending << BTN_SAVE;
     m |= (uint32_t)(edit_on ? entry_oct < 0 : kb_oct < 0) << BTN_OCT_DOWN | (uint32_t)(edit_on ? entry_oct > 0 : kb_oct > 0) << BTN_OCT_UP;
@@ -993,20 +1056,31 @@ static void splash(void)
 
 /* the boot, then the main loop a pass at a time (the browser build runs the passes as its audio asks for time) */
 static uint32_t t_frame;
+/* everything as it comes: the lanes, the effects, the song, the look, the MIDI channels (patterns cleared) */
+static void defaults(void)
+{
+    static const uint8_t CH0[NLANE] = {0, 1, 2, 9, 16};
+    uint32_t l;
+    synth_init();
+    music_init();
+    for (l = 0; l < NLANE; l++) { fxu[l] = fx[l]; midi_chan[l] = CH0[l]; }
+    fxu[L_LEAD].vary = 40;
+    set_key(2); set_bpm(125); scale_sel = 0; prog_sel = 0; bpc = 1; energy = 0; space = 35;
+    arc_on = 0; build_ph = 6; peak_ph = 4; auto_drop = 1; target = 2; blend = 0;
+    palette = 0; screen_lvl = 100; glow_on = 1; fm1_glow_all();
+    invalidate_from(cur_bar());
+    area_dirty = 1;
+}
 static void app_boot(void)
 {
     uint32_t t_splash;
-    synth_init();
-    music_init();
-    { uint32_t l; for (l = 0; l < NLANE; l++) fxu[l] = fx[l]; fxu[L_LEAD].vary = 40; }
-    set_key(2);
-    set_bpm(125);
+    defaults();
     do_load();
     splash();
     t_splash = fm1_ms;
     while (fm1_ms - t_splash < 1500u) platform_poll();
     lcd_fill(0, 0, 240, 240, C_BG);
-    fm1_glow_all();
+    if (glow_on) fm1_glow_all(); else fm1_glow_none();
 }
 static void app_pass(void)
 {

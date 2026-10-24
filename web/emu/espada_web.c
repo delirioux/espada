@@ -50,6 +50,7 @@ static void fm1_led_key(uint32_t id, int on)
     web_lit = (uint32_t)web_lit64;
 }
 static void fm1_glow_all(void) { web_glow64 = (1ull << 41) - 1u; }
+static void fm1_glow_none(void) { web_glow64 = 0; }
 
 /* ---- the screen: as the panel gets it (high byte first); gfx.c's canvases are already in that order */
 static uint16_t web_fb[240 * 240];

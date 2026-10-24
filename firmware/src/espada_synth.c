@@ -199,6 +199,8 @@ static void mo_push(uint32_t st, uint32_t d1, uint32_t d2)
     if (esp_mq_w - esp_mq_r < 64u) { esp_mq[esp_mq_w % 64u] = st | d1 << 8 | d2 << 16; RING_PUBLISH(); esp_mq_w++; }
 }
 static const uint8_t GM_DRUM[NDK] = {36, 38, 42, 47, 49};
+/* the MIDI channel of each lane (0..15; 16 = off): lead 1, pad 2, bass 3, drums 10 (SETUP, MIDI); the sfx sends none */
+static volatile uint8_t midi_chan[NLANE] = {0, 1, 2, 9, 16};
 
 static void synth_init(void)
 {
@@ -261,10 +263,11 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
     v->vib = P->vib; v->vph = 0;
     v->arp_n = (uint8_t)arp_n; v->arp_i = 0; v->arp_t = 0;
     for (i = 0; i < arp_n && i < 3u; i++) v->arp[i] = arp[i];
-    v->midi = (uint8_t)midi; v->midi_ch = (uint8_t)lane;
+    if (midi_chan[lane] > 15u) midi = 0;                            /* this lane sends no MIDI */
+    v->midi = (uint8_t)midi; v->midi_ch = midi_chan[lane];
     v->chaos = P->chaos; v->pph1 = 0x40000000u; v->pph2 = 0; v->pamp = 0; v->brown = 0;
     v->breath = P->breath; v->s1 = 0;
-    if (midi) mo_push(0x90u | lane, midi, 100);
+    if (midi) mo_push(0x90u | v->midi_ch, midi, 100);
 }
 
 static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_orig)
@@ -295,7 +298,7 @@ static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_ori
         break;
     }
     v->peak = v->amp;
-    if (is_orig) { v->midi = GM_DRUM[kind < NDK ? kind : 0]; v->midi_ch = 9; mo_push(0x99u, v->midi, 100); }
+    if (is_orig && midi_chan[L_DRUMS] <= 15u) { v->midi = GM_DRUM[kind < NDK ? kind : 0]; v->midi_ch = midi_chan[L_DRUMS]; mo_push(0x90u | v->midi_ch, v->midi, 100); }
 }
 
 /* an sfx sound: kind SX_x, pitch a MIDI note (riser start, bits), dur in samples (wash, riser, crackle) */
@@ -488,7 +491,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                 }
             }
             if (v->amp < 4 && (v->stage == 2u || (v->kind != V_FM && v->kind < V_WASH)) && (v->chaos != 1u || v->pamp < 4)) {
-                if (v->midi) { mo_push((v->kind == V_FM ? 0x80u | v->midi_ch : 0x89u), v->midi, 0); v->midi = 0; }
+                if (v->midi) { mo_push(0x80u | v->midi_ch, v->midi, 0); v->midi = 0; }
                 v->kind = V_OFF; return;
             }
         }
@@ -671,7 +674,7 @@ static void all_off(void)
 {
     uint32_t v;
     for (v = 0; v < NVOICE; v++) {
-        if (vc[v].kind != V_OFF && vc[v].midi) mo_push(vc[v].kind == V_FM ? 0x80u | vc[v].midi_ch : 0x89u, vc[v].midi, 0);
+        if (vc[v].kind != V_OFF && vc[v].midi) mo_push(0x80u | vc[v].midi_ch, vc[v].midi, 0);
         if (vc[v].kind == V_FM) { vc[v].stage = 2; vc[v].gate = 0; vc[v].midi = 0; }
     }
     npend = 0;
