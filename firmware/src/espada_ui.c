@@ -506,8 +506,9 @@ static uint16_t knob_col(int32_t c, int32_t lane) { return setup_on ? C_LIGHT : 
 static uint16_t head_col(void) { return setup_on ? C_LIGHT : edit_on ? LCOL[sel] : GCOL[grp]; }
 
 /* ---- drawing: the lanes */
-static int32_t pos16;                                       /* the play head, in steps Q16 */
-static int32_t sx(int32_t step_q16) { return NOWX + (int32_t)(((int64_t)(int32_t)((uint32_t)step_q16 - (uint32_t)pos16) * PPS) >> 16); }
+static uint32_t pos16;                                      /* the play head, in steps Q16: it wraps after 65536 steps (65 minutes at
+                                                              * 125), so it is only ever used as a difference or in its low bits */
+static int32_t sx(uint32_t step_q16) { return NOWX + (int32_t)(((int64_t)(int32_t)(step_q16 - pos16) * PPS) >> 16); }
 static int rt_on(int32_t l, const ev_t *e) { return fxu[l].retrig > 0 && (int32_t)(e->rv * 100u >> 8) < fxu[l].retrig; }
 static void shape(int32_t x, int32_t y, int32_t w, int32_t h, int past, int ghost, int on, uint16_t col)
 {
@@ -534,10 +535,10 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
         int32_t a = (big ? 44 : l == sel ? 48 : 22) + flash * 56, tri = 256 - (r > h / 2 ? r - h / 2 : h / 2 - r) * 256 / (h / 2);
         fill(0, y + r, 240, 1, cscale(col, a * tri >> 8));
     }
-    b0 = (pos16 >> 16) / 16 - 1; if (b0 < 0) b0 = 0;
-    b1 = ((pos16 >> 16) + (240 - NOWX) / PPS) / 16 + 1;
+    b0 = cur_step() / 16 - 1; if (b0 < 0) b0 = 0;                  /* the bars from the step count, which does not wrap */
+    b1 = (cur_step() + (240 - NOWX) / PPS) / 16 + 1;
     for (b = b0; b <= b1; b++) {                                    /* bar and phrase lines */
-        int32_t x = sx(b * 16 << 16);
+        int32_t x = sx((uint32_t)b * 16u << 16);
         if (b == launch_bar) { int32_t k; for (k = 0; k < h; k += 4) fill(x, y + k, 1, 2, C_WHITE); }
         else fill(x, y, 1, h, cscale(RGBC(0x9fb3b0), b % 4 == 0 ? 82 : 31));
     }
@@ -549,7 +550,7 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
         ghost = l != L_SFX && B->prof[l] != ln[l].prof && !B->user[l];
         for (i = 0; i < B->cnt[l]; i++) {
             const ev_t *e = &B->ev[l][i];
-            int32_t x = sx((b * 16 + e->st) << 16), rt = rt_on(l, e), k;
+            int32_t x = sx(((uint32_t)b * 16u + e->st) << 16), rt = rt_on(l, e), k;
             if (x > 240 || x < -64) continue;
             if (HITS(l)) {
                 int32_t kind = e->note[0], row, rows, w, yy, len = 0;
@@ -652,7 +653,7 @@ static void draw_edit_area(void)
     if ((cursor >> 4) >= U->bars) { fill(46, top + h / 2 - 9, 160, 18, C_BG); textc(126, top + h / 2 - 5, "NEW BAR: WRITE TO ADD", C_MUTE, 1); }
     pb = cur_bar();                                                 /* the bar playing, if it is this one of yours */
     pb = pb < U->bars ? pb : U->after == AF_LOOP ? pb % (U->bars ? U->bars : 1) : -1;
-    if (seq_playing && U->on && pb == (cursor >> 4)) fill(CX((pos16 >> 16) % n) + (((pos16 & 0xFFFF) * (cwq >> 8)) >> 16), top, 1, h, C_CYAN);
+    if (seq_playing && U->on && pb == (cursor >> 4)) fill(CX((int32_t)((pos16 >> 16) % (uint32_t)n)) + (int32_t)(((pos16 & 0xFFFFu) * (uint32_t)(cwq >> 8)) >> 16), top, 1, h, C_CYAN);
 #undef CX
 }
 static void draw_song_area(void)
@@ -821,11 +822,11 @@ static void draw_knobs(int force)
 
 /* ---- the frame: the header, the title, the lanes (or the grid, the chords, the arc) in strips, the knobs */
 static uint32_t frames, fps_t0, fps;
-static int32_t last_drawn_pos = -1;
+static uint32_t last_drawn_pos = 0xFFFFFFFFu;
 static void draw_frame(int force)
 {
     int32_t l, k, ns, y0, h0, view = edit_on ? 1 : setup_on ? 0 : grp == G_SONG && rowi[G_SONG] == SR_KEY ? 2 : grp == G_SONG && rowi[G_SONG] == SR_ARC ? 3 : 0;
-    pos16 = cur_step() * 65536 + (seq_playing ? (int32_t)vis_frac : 0);
+    pos16 = (uint32_t)cur_step() * 65536u + (seq_playing ? (uint32_t)vis_frac : 0u);
     draw_knobs(force);
     if (!edit_on) draw_title(force);
     if (!force && pos16 == last_drawn_pos && !area_dirty && !seq_playing) return;
