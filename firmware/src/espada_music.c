@@ -923,6 +923,9 @@ static void invalidate_from(int32_t from)
     for (s = 0; s < NSLOT; s++) if (bars[s][bar_sel[s]].num >= from) stale[s] = 1;
 }
 static void invalidate(void) { invalidate_from(cur_bar()); }            /* changes land at once: the rest of this bar is written again */
+/* stopped: the INTRO that PLAY will start is chosen now, so the lanes show what will play (with the arc on, the arc
+ * starts the piece instead) */
+static void form_arm(void) { form_reset(); if (!arc_on) form_intro(0); invalidate_from(0); }
 static void invalidate_now(void) { invalidate_from(cur_bar()); }
 static const bar_t *bar_get(int32_t b)
 {

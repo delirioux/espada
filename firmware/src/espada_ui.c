@@ -289,7 +289,7 @@ static void t_prog(int32_t d)
 static void v_prog(char *o) { if (!prog_sel) s_cat(o, "AUTO"); else { o = s_int(o, prog_sel); o = s_cat(o, " OF "); s_int(o, NPROG); } }
 static void t_bpc(int32_t d) { bpc = clampi(bpc + (d > 0 ? 1 : -1), 1, 4); invalidate(); }
 static void v_bpc(char *o) { s_int(o, bpc); }
-static void t_arc(int32_t d) { int32_t was = arc_on; arc_on = d > 0; if (arc_on && !was) arc_restart(cur_bar() + 1); invalidate(); }
+static void t_arc(int32_t d) { int32_t was = arc_on; arc_on = d > 0; if (arc_on && !was) arc_restart(cur_bar() + 1); if (seq_playing) invalidate(); else form_arm(); }
 static void v_arc(char *o) { s_cat(o, arc_on ? "ON" : "OFF"); }
 static void t_build(int32_t d) { build_ph = clampi(build_ph + (d > 0 ? 1 : -1), 2, 16); invalidate(); }
 static void v_build(char *o) { s_int(o, build_ph); }
@@ -823,7 +823,7 @@ static int is_black(int32_t k) { return (0x54Au >> ((53 + k) % 12)) & 1u; }
 static int32_t white_index(int32_t k) { int32_t i, w = 0; for (i = 0; i < k; i++) if (!is_black(i)) w++; return is_black(k) ? -1 : w; }
 static void start_stop(int from_top)
 {
-    if (seq_playing && !from_top) { frozen_step = 0; seq_stop_req = 1; form_reset(); invalidate_from(0); return; }   /* the next PLAY starts from the top */
+    if (seq_playing && !from_top) { frozen_step = 0; seq_stop_req = 1; form_arm(); return; }   /* the next PLAY starts from the top, with a new INTRO */
     if (from_top) { if (seq_playing) { seq_stop_req = 1; while (seq_playing) platform_poll(); } frozen_step = 0; launch_bar = -1; arc_restart(0); invalidate_from(0); }
     while (bars_update()) ;                                         /* the first bars exist before the clock starts */
     seq_start_step = frozen_step;
@@ -834,8 +834,8 @@ static void start_stop(int from_top)
 static void play_button(int held)
 {
     if (!seq_playing) {
-        form_reset();
-        if (!held && !arc_on) form_intro(0);
+        if (held || arc_on) form_reset();
+        else if (intro_from < 0) form_intro(0);                     /* normally chosen already while stopped (form_arm) */
         start_stop(1);
         toast(held || arc_on ? "PLAY" : "INTRO");
         return;
@@ -1068,7 +1068,7 @@ static void defaults(void)
     set_key(2); set_bpm(125); scale_sel = 0; prog_sel = 0; bpc = 1; energy = 0; space = 35;
     arc_on = 0; build_ph = 6; peak_ph = 4; auto_drop = 1; target = 2; blend = 0;
     palette = 0; screen_lvl = 100; glow_on = 1; fm1_glow_all();
-    invalidate_from(cur_bar());
+    if (seq_playing) invalidate_from(cur_bar()); else form_arm();
     area_dirty = 1;
 }
 static void app_boot(void)
@@ -1076,6 +1076,7 @@ static void app_boot(void)
     uint32_t t_splash;
     defaults();
     do_load();
+    form_arm();                                                     /* the first INTRO, shown before PLAY */
     splash();
     t_splash = fm1_ms;
     while (fm1_ms - t_splash < 1500u) platform_poll();

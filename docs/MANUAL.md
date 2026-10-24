@@ -132,7 +132,8 @@ lane faded out, a save waiting, the keys' octave off 0.
   pad sample.
 - **The form.** A piece has an INTRO, INTERs and an END, played by hand:
   - **INTRO** (PLAY): pad, drums or bass starts alone, chosen at random; the other two follow two bars apart, then
-    the lead and the sfx. All in after six bars.
+    the lead and the sfx. All in after six bars. While Espada is stopped the lanes already show the INTRO that
+    PLAY will start; each stop picks a new one.
   - **INTER** (a tap on REC): the marked lane alone for two bars, then the others back one by one, a bar apart, in a
     random order.
   - **DROP** (holding REC): the marked lane alone for as long as you hold; everything back at once when you let go.
