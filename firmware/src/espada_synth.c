@@ -229,7 +229,8 @@ static void synth_init(void)
     static const uint8_t SEND0[NLANE] = {35, 60, 3, 18, 100, 45};  /* REVERB: lead some, pad much, bass hardly, drums a little, sfx all, arp some */
     for (i = 0; i < NLANE; i++) { fx[i].level = 80; fx[i].bright = 25; fx[i].rtg_rate = 1; fx[i].inst = -1; fx[i].res = 30; fx[i].send = SEND0[i]; }
     fx[L_SFX].level = 30;
-    fx[L_ARP].level = 60;                                         /* the arp sits under the lead */
+    fx[L_LEAD].level = 60;                                        /* the lead: the ear hears its range most; 60 sits it in the mix */
+    fx[L_ARP].level = 60;                                         /* the arp beside it */
     fx[L_LEAD].pan = 45; fx[L_ARP].pan = -45;                      /* lead a little right, the arp a little left */
 }
 
