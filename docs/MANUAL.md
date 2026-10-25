@@ -166,7 +166,7 @@ lane faded out, a save waiting, the keys' octave off 0.
     left (chosen at random) plays alone two bars and fades last. Then Makohai stops. The title says INTRO, INTER or
     END while one is running.
 - **The ten styles.** Each is a chord progression, a part for each lane, an instrument for each, a tempo, and a way
-  of playing. Change the mood with STYLE (SONG, LIVE) and SEQ.
+  of playing. Change the mood with STYLE (SONG, LIVE) and SEQ. Without a saved set Makohai starts with OLDSKOOL.
 
 | Style | Tempo | What it is |
 | --- | --- | --- |
