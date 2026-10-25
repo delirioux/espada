@@ -54,7 +54,8 @@ typedef struct {
     uint16_t d_ms;              /* decay toward the sustain (0 = 80 ms); with sus 0 a long one rings out, as a piano */
     uint8_t chaos;              /* 1: add the pad and the brown noise under the lead (CHAOS); 2: an ensemble, two
                                  * more detuned oscillators with the note (strings and brass as sections);
-                                 * 3: no FM, seven detuned saws (SUPERSAW) */
+                                 * 3: no FM, seven detuned saws (SUPERSAW); 4: the orchestra hit, the note with
+                                 * its fifth, octave and tenth in one brassy stab (ORCH HIT) */
     uint8_t breath;             /* noise in the tone, following the note's level: bow, breath (0 = a clean FM tone) */
 } patch_t;
 static const patch_t PATCH[] = {
@@ -76,6 +77,7 @@ static const patch_t PATCH[] = {
     {"VIOLINS", 16,  680, 500, 400,  60, 1800,  230, 350, 1, 0,    0, 2, 80},   /* a section, singing: the symphony's lead */
     {"CELLOS",  16,  700, 450, 300,  90, 2700,  220, 300, 1, 0,    0, 2, 70},   /* cellos and basses, bowed */
     {"SUPERSAW", 16,   0,   0, 100,   6, 3000,  235, 380, 0, 0,    0, 3},   /* seven saws, wide and bright */
+    {"ORCH HIT", 16, 1100, 260, 160,   1, 2300,    0, 220, 0, 0,  420, 4, 120},   /* one key, a whole orchestra: bright, a burst of noise, gone in half a second */
 };
 #define NPATCH (sizeof PATCH / sizeof PATCH[0])
 
@@ -291,6 +293,7 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
     v->breath = P->breath; v->s1 = 0;
     v->fx_porta = (int8_t)note_porta; v->fx_vib = (uint8_t)note_vib;
     if (P->chaos == 3u) for (i = 0; i < 6u; i++) { (void)noise(); v->ss[i] = noise_s; }   /* free-running: each note starts elsewhere */
+    if (P->chaos == 4u) { v->ss[0] = 0x20000000u; v->ss[1] = 0; }                      /* the hit's tenth; ss[1]: its noise burst's age */
     if (midi) mo_push(0x90u | v->midi_ch, midi, 100);
 }
 
@@ -621,7 +624,19 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                 v->s1 += ((noise() - v->s1) * 9000) >> 15;
                 s += (((v->s1 * v->breath) >> 8) * v->amp) >> 14;
             }
-            if (v->chaos == 2u) {                                       /* an ensemble: two more players, a little out */
+            if (v->chaos == 4u) {                                       /* ORCH HIT: the fifth, the octave and the tenth above, as brassy */
+                int32_t e;
+                uint32_t q;
+                v->pph1 += inc + (inc >> 1);                            /* 3:2 */
+                v->pph2 += inc << 1;                                    /* 2:1 */
+                v->ss[0] += (inc << 1) + (inc >> 1);                    /* 5:2, the major tenth */
+                q = (uint32_t)(v->idx > 0 ? v->idx : 0) << 6;
+                e = SIN[(v->pph1 + (uint32_t)(SIN[v->pph1 >> 22] * (int32_t)(q >> 6)) * 64u) >> 22]
+                  + SIN[(v->pph2 + (uint32_t)(SIN[v->pph2 >> 22] * (int32_t)(q >> 7)) * 64u) >> 22]
+                  + (SIN[(v->ss[0] + (uint32_t)(SIN[v->ss[0] >> 22] * (int32_t)(q >> 7)) * 64u) >> 22] >> 1);
+                s = ((s * 3) >> 3) + ((((e * 3) >> 3) * v->amp) >> 15);
+                if (v->ss[1] < 4410u) { v->ss[1]++; s += (((noise() * (int32_t)(4410u - v->ss[1])) >> 12) * v->amp) >> 16; }   /* the attack's burst, 0.1 s */
+            } else if (v->chaos == 2u) {                                /* an ensemble: two more players, a little out */
                 int32_t e;
                 v->pph1 += inc + (inc >> 8);
                 v->pph2 += inc - (inc >> 8) - (inc >> 10);

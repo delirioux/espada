@@ -114,10 +114,11 @@ lane faded out, a save waiting, the keys' octave off 0.
 - **Blend** moves lanes to the queued style from the bottom up: drums, then bass, pad, lead (the word under it
   says how far).
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.
-- **Sound** (PLAY): AUTO follows the style; or one of eighteen patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
-  STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS, VIOLINS, CELLOS, SUPERSAW), or one of four drum
+- **Sound** (PLAY): AUTO follows the style; or one of nineteen patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
+  STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS, VIOLINS, CELLOS, SUPERSAW, ORCH HIT), or one of four drum
   kits (STANDARD, TRACKER, ELECTRO, DEEP). SUPERSAW is not FM: seven saws detuned around the note, wide and bright,
-  for big chords and leads. DEEP has a kick that drops to about 33 Hz and rings long, with a dry kit around it; the
+  for big chords and leads. ORCH HIT is the orchestra hit: one key plays the note with its fifth, octave and tenth
+  above, brassy, with a burst of noise on the attack, gone in half a second; for stabs on the lead or the pad. DEEP has a kick that drops to about 33 Hz and rings long, with a dry kit around it; the
   styles never pick these two, you do. (A small speaker hardly plays DEEP's kick: use headphones or the output.) A kit has nine hits: kick, snare, hat, kettle drum, crash, clap (three quick bursts and a
   tail), open hat (the closed hat cuts it off), tom (toms in a row step down, as in a fill) and rim shot. RAZOR is a cutting, saw-like lead; PULSE a hollow one; PIANO and E.PIANO ring out. CHAOS is
   three sounds in one: a light saw lead, a heavy pad under it (two detuned oscillators, one an octave down, fading

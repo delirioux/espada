@@ -6,7 +6,7 @@ Espada 0.1: the first version of a generative groovebox for the M-VAVE FM-1 in t
 - Played as in a tracker: lead notes glide in, long chords swell and fade, an echo channel on the lead; strings with bow noise, darker and longer snares and cymbals.
 - One screen as a mixing desk: a group button (PLAY, SOUND, TRACKER, SONG), PRESETS through its settings, KNOB 1-4 the setting for four lanes side by side; ALGORITHM slides that window over all six lanes.
 - MELODY, RHYTHM, PITCH and CHANGE per lane. The lead plays 16-bar arcs of two 8-bar periods, closed on the root.
-- Instruments including piano, strings, violins, cellos, brass, a supersaw and a chaos instrument; stereo voices and a room (SPACE).
+- Instruments including piano, strings, violins, cellos, brass, a supersaw, an orchestra hit and a chaos instrument; stereo voices and a room (SPACE).
 - Density from sparse to busy, inside the chord and its scale; ENERGY for all lanes at once.
 - Per lane: filter with a tempo-synced wobble, FM brightness, drive, crush, level; slide, retrigger, echo, porta up and down, vibrato, tremolo, tremor, gate, swing and an equal-power pan; VARY changes the character per phrase.
 - ENV fades a lane out and in; LEVEL sets it.
