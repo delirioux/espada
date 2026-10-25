@@ -13,7 +13,8 @@ lane from the bottom up, or launch it at once with its own tempo. Shape each lan
 filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, porta, vibrato, tremolo, tremor, gate, swing,
 retrigger, a bit crusher, echo, and an equal-power pan per lane with an autopan that sends each note to the other side or sweeps the lane in time. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself. SETUP's free knobs
 show pictures: a scope, level meters, a goniometer, a spectrum landscape, and demo-style pictures (a turning crystal, a
-tunnel, dots, plasma, fire and more). SEL + HOME shows them full screen, cut on the beat.
+tunnel, dots, plasma, fire and more). SEL + HOME shows them full screen, cut on the beat;
+SETUP's BACK puts one behind the lanes.
 
 <p align="center"><img src="docs/screens/main.png" width="320" alt="Makohai's screen: the VOLUME setting, all six lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
 

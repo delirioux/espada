@@ -66,6 +66,7 @@ Hold **HOME** for SETUP; HOME (or any group button, or EDIT) leaves it. PRESETS 
 | LOOK | palette: MAKOHAI (its colours), AMBER, GREEN, CYAN, RED, MONO | screen: 100, 75, 50 or 25 % | lights: the keys' and buttons' glow on or off | SCOPE (a picture) |
 | MIDI | the lead's channel | the pad's | the bass's | the drums' (1..16 or OFF) |
 | MIDI 2 | the arp's channel | LANES (a picture) | STEREO (a picture) | SPECTRUM (a picture) |
+| BACK | a picture behind the lanes: OFF or one of the ten below | its brightness, 10..60 % (30) | PREVIEW: the picture itself | STEREO (a picture) |
 | RESET | defaults: five clicks to the right puts everything back as it comes (patterns cleared); SAVE keeps it | a picture (turn: the next) | a picture | a picture |
 | SYSTEM | stack: free, of 23 K (the least it has had free since power-on) | the interrupts' stack: the same, of 7 K | RAM free | the pool free (the big buffers) |
 | AUDIO | the audio interrupt's worst time, µs | its average over the last half second | the worst as a share of the 5805 µs it has | any knob here starts the worst again |
@@ -78,7 +79,8 @@ bass on the left, hats on the right, as a landscape rolling away. RESET's three 
 **CRYSTAL** (a see-through faceted body turning, swelling on the drums), **TUNNEL** (flying down a tunnel at the
 tempo), **DOTS** (a ball of dots that becomes a ring and back), **PLASMA**, **TWIRL** (a checker turning and
 zooming), **STARS**, **FIRE**, **LOGO** (the logo with raster bars behind it), **SCOPE** and **SPECTRUM**. Which pictures RESET
-shows is not saved.
+shows is not saved. **BACK** puts one of them behind the lanes on the main screen, dimmed so the notes stay clear;
+each lane's band then glows over it. SAVE keeps BACK with the look.
 
 SAVE keeps the setup with everything else. SYSTEM and AUDIO only show; they are how a firmware that runs short of
 memory or time is caught before it crackles or crashes. In the browser, SYSTEM shows N/A (there is no FM-1 memory

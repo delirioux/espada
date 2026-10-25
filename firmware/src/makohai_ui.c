@@ -615,6 +615,9 @@ static void vis_prep(void)
     static int16_t sl[256], sr[256];
     int32_t b[8], trig = 0, l, k, peak = 1, x, y;
     uint32_t w = scope_w, i;
+    static uint32_t prep_ms = 0xFFFFFFFFu;
+    if (prep_ms == fm1_ms) return;                                            /* once a frame, whoever asks */
+    prep_ms = fm1_ms;
     if (!vis_ready) vis_init();
     vis_t++;
     vis_hit = (int32_t)(fm1_ms - lane_hit_ms[L_DRUMS]) < 100 && seq_playing;
@@ -872,7 +875,9 @@ static uint16_t px_fire(int32_t u, int32_t v, int32_t W, int32_t H) { return fpa
 static void pic_fire(void) { render_px(px_fire); }
 static uint16_t px_logo(int32_t u, int32_t v, int32_t W, int32_t H)           /* the logo, raster bars where it is dark */
 {
-    int32_t lx = u * 240 / W, ly = v * 240 / H, b = LOGO_PX[(ly * 240 + lx) >> 1], i = lx & 1 ? b & 15 : b >> 4;
+    int32_t lx = u * 240 / W, ly = 120 + (v - H / 2) * 240 / W, b, i;                     /* square, the middle of it */
+    if (ly < 0 || ly > 239) return vpal[0];
+    b = LOGO_PX[(ly * 240 + lx) >> 1]; i = lx & 1 ? b & 15 : b >> 4;
     if (logo_dark >> i & 1) {
         int32_t ph = (ly * 2 + (int32_t)vis_t * 3) & 63, k = ph < 32 ? ph : 63 - ph;
         return wpal[k * 2 * (vis_hit ? 5 : 3) / 5];
@@ -901,6 +906,41 @@ static void t_pick1(int32_t d) { pick[1] = fmodp(pick[1] + (d > 0 ? 1 : -1), NPI
 static void t_pick2(int32_t d) { pick[2] = fmodp(pick[2] + (d > 0 ? 1 : -1), NPIC); }
 static const char *pic_label(const card_t *C) { return C->draw == vis_s0 ? PICN[pick[0]] : C->draw == vis_s1 ? PICN[pick[1]] : C->draw == vis_s2 ? PICN[pick[2]] : C->name; }
 static void v_vis(char *o) { o[0] = 0; }
+
+/* BACK (SETUP): a picture behind the lanes, dimmed so the notes stay clear; the lanes' bands glow over it */
+static int32_t back_pic, back_dim = 30;                                       /* 0 = none, else a picture + 1; how bright, % */
+static void t_back(int32_t d) { back_pic = fmodp(back_pic + (d > 0 ? 1 : -1), NPIC + 1); }
+static void v_back(char *o) { s_cat(o, back_pic ? PICN[back_pic - 1] : "OFF"); }
+static void t_bdim(int32_t d) { back_dim = clampi(back_dim + d, 10, 60); }
+static void v_bdim(char *o) { s_pct(o, back_dim); }
+static void vis_back(int32_t x) { tile(x); if (back_pic) PICF[back_pic - 1](); }
+static void draw_backdrop(void)
+{
+    int32_t keep = tr_on, y, ya = LANE_Y > cy0 ? LANE_Y : cy0, yb = LANE_Y + LANES_H < cy0 + chh ? LANE_Y + LANES_H : cy0 + chh, i;
+    tr_on = 0;
+    vx0 = 0; vy0 = LANE_Y; vw = 240; vh = LANES_H; vps = PIC_CHUNKY[back_pic - 1] ? 2 : 1;
+    PICF[back_pic - 1]();
+    tr_on = keep;
+    for (y = ya; y < yb; y++) {                                               /* dimmed */
+        uint16_t *p = cvp + (y - cy0) * 240;
+        for (i = 0; i < 240; i++) {
+            uint32_t c = SW(p[i]), r = (c >> 11) * (uint32_t)back_dim / 100u, g = (c >> 5 & 63u) * (uint32_t)back_dim / 100u, b = (c & 31u) * (uint32_t)back_dim / 100u;
+            p[i] = SW((uint16_t)(r << 11 | g << 5 | b));
+        }
+    }
+}
+static void glow_row(int32_t y, uint16_t c)                                   /* a lane's band added over the picture */
+{
+    uint32_t pc = paint(c), cr = pc >> 11, cg = pc >> 5 & 63u, cb = pc & 31u;
+    int32_t i;
+    uint16_t *p;
+    if (y < cy0 || y >= cy0 + chh) return;
+    p = cvp + (y - cy0) * 240;
+    for (i = 0; i < 240; i++) {
+        uint32_t d = SW(p[i]), r = (d >> 11) + cr, g = (d >> 5 & 63u) + cg, b = (d & 31u) + cb;
+        p[i] = SW((uint16_t)((r > 31u ? 31u : r) << 11 | (g > 63u ? 63u : g) << 5 | (b > 31u ? 31u : b)));
+    }
+}
 
 /* ---- DEMO (SEL + HOME): the pictures full screen while the music plays, cut on the bar every few bars and with a
  * flash on a drop. PRESETS: the next picture (or the one before), ALGORITHM: how often it cuts. HOME, FX, ARP, GLO
@@ -1047,6 +1087,7 @@ static const srow_t ROW_SETUP[] = {
     {"LOOK", -1, {{"PALETTE", t_pal, v_pal, 0}, {"SCREEN", t_scr, v_scr, 0}, {"LIGHTS", t_glow, v_glow, s_glow}, {"SCOPE", t_none, v_vis, 0, vis_scope}}},
     {"MIDI", -1, {{"LEAD", t_ch0, v_ch0, s_ch}, {"PAD", t_ch1, v_ch1, s_ch}, {"BASS", t_ch2, v_ch2, s_ch}, {"DRUMS", t_ch3, v_ch3, s_ch}}},
     {"MIDI 2", -1, {{"ARP", t_ch5, v_ch5, s_ch}, {"LANES", t_none, v_vis, 0, vis_lanes}, {"STEREO", t_none, v_vis, 0, vis_stereo}, {"SPECTRUM", t_none, v_vis, 0, vis_spectrum}}},
+    {"BACK", -1, {{"PICTURE", t_back, v_back, 0}, {"BRIGHT", t_bdim, v_bdim, 0}, {"PREVIEW", t_none, v_vis, 0, vis_back}, {"STEREO", t_none, v_vis, 0, vis_stereo}}},
     {"RESET", -1, {{"DEFAULTS", t_reset, v_reset, s_reset}, {"PICTURE", t_pick0, v_vis, 0, vis_s0}, {"PICTURE", t_pick1, v_vis, 0, vis_s1}, {"PICTURE", t_pick2, v_vis, 0, vis_s2}}},
     {"SYSTEM", -1, {{"STACK", t_none, v_stk, s_stk}, {"IRQ", t_none, v_irq, s_irq}, {"RAM", t_none, v_ram, s_free}, {"POOL", t_none, v_pool, s_free}}},
     {"AUDIO", -1, {{"WORST", t_isr, v_worst, s_msw}, {"AVERAGE", t_isr, v_avg, s_msw}, {"LOAD", t_isr, v_load, s_load}, {"RESET", t_isr, v_tr, s_tr}}},
@@ -1110,7 +1151,7 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
     if (y >= cy0 + chh || y + h + GAP <= cy0) return;
     for (r = 0; r < h; r++) {                                       /* the copper bar */
         int32_t a = (big ? 44 : l == sel ? 48 : 22) + flash * 56, tri = 256 - (r > h / 2 ? r - h / 2 : h / 2 - r) * 256 / (h / 2);
-        fill(0, y + r, 240, 1, cscale(col, a * tri >> 8));
+        if (back_pic) glow_row(y + r, cscale(col, (a * tri >> 8) * 2 / 3)); else fill(0, y + r, 240, 1, cscale(col, a * tri >> 8));
     }
     b0 = cur_step() / 16 - 1; if (b0 < 0) b0 = 0;                  /* the bars from the step count, which does not wrap */
     b1 = (cur_step() + (240 - NOWX) / PPS) / 16 + 1;
@@ -1434,7 +1475,7 @@ static void draw_frame(int force)
     if (demo_on) { draw_demo(); last_drawn_pos = 0xFFFFFFFFu; area_dirty = 0; return; }   /* DEMO: the whole screen */
     draw_knobs(force);
     if (!edit_on) draw_title(force);
-    if (!force && pos16 == last_drawn_pos && !area_dirty && !seq_playing) return;
+    if (!force && pos16 == last_drawn_pos && !area_dirty && !seq_playing && !(back_pic && view == 0)) return;   /* a picture behind: it moves */
     last_drawn_pos = pos16;
     draw_header();
     platform_poll();
@@ -1446,7 +1487,7 @@ static void draw_frame(int force)
         if (view == 1) draw_edit_area();
         else if (view == 2) draw_song_area();
         else if (view == 3) draw_arc_area();
-        else for (l = 0; l < (int32_t)NLANE; l++) draw_lane(LROW[l], LANE_Y + l * (LH + GAP), LH, 0);
+        else { if (back_pic) { vis_prep(); draw_backdrop(); } for (l = 0; l < (int32_t)NLANE; l++) draw_lane(LROW[l], LANE_Y + l * (LH + GAP), LH, 0); }
         cs_end();
         platform_poll();
     }
@@ -1459,22 +1500,25 @@ static void draw_frame(int force)
 typedef struct {
     uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy; uint8_t space;
     struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; int8_t porta, pan; uint8_t vibr, trem, gate, tremor, swing, aglide, uon, autopan, aprate; } l[NLANE];
-    uint8_t palette, screen, glow;
+    uint8_t palette, screen, glow, back, backdim;
 } save_t;
 typedef char save_fits[sizeof(save_t) <= 256u ? 1 : -1];          /* settings_save takes at most 256 bytes */
-#define SAVE_VER 13
-/* older records had shorter lanes, the new settings at a lane's end: version 11 (1.0) two bytes (no AUTOPAN, PAN
- * RATE), version 12 one (no PAN RATE); they are read and brought up to date */
-#define SAVE_OLD(v) (sizeof(save_t) - NLANE * (uint32_t)(SAVE_VER - (v)))
-typedef char save_bytes[sizeof(save_t) == 16u + NLANE * 35u ? 1 : -1];   /* bytes only, no padding: the copy below relies on it */
+#define SAVE_VER 14
+/* older records, read and brought up to date: a lane of 33 bytes (11, 1.0), 34 (12, no PAN RATE), 35 since; the look
+ * at the end 3 bytes before 14 (no BACK) */
+#define SAVE_HEAD 13u
+static uint32_t save_lane(uint32_t v) { return v <= 11u ? 33u : v == 12u ? 34u : 35u; }
+static uint32_t save_tail(uint32_t v) { return v <= 13u ? 3u : 5u; }
+static uint32_t save_size(uint32_t v) { return SAVE_HEAD + NLANE * save_lane(v) + save_tail(v); }
+typedef char save_bytes[sizeof(save_t) == SAVE_HEAD + NLANE * 35u + 5u ? 1 : -1];   /* bytes only, no padding: the copy below relies on it */
 static void save_up(const uint8_t *o, uint32_t v, save_t *S)
 {
     uint8_t *d = (uint8_t *)S;
-    uint32_t h = (uint32_t)((uint8_t *)S->l - d), L = sizeof S->l[0], k = (uint32_t)(SAVE_VER - (int32_t)v), l;
+    uint32_t L = sizeof S->l[0], lo = save_lane(v), l;
     memset(S, 0, sizeof *S);
-    memcpy(d, o, h);
-    for (l = 0; l < NLANE; l++) memcpy(d + h + l * L, o + h + l * (L - k), L - k);
-    memcpy(d + h + NLANE * L, o + h + NLANE * (L - k), sizeof *S - h - NLANE * L);
+    memcpy(d, o, SAVE_HEAD);
+    for (l = 0; l < NLANE; l++) memcpy(d + SAVE_HEAD + l * L, o + SAVE_HEAD + l * lo, lo);
+    memcpy(d + SAVE_HEAD + NLANE * L, o + SAVE_HEAD + NLANE * lo, save_tail(v));
     S->ver = SAVE_VER;
 }
 /* the own parts, in their store: [head 16 B][lanes 20 B][to 64][each lane's bars, 32 B each]; the CRC covers all
@@ -1539,7 +1583,7 @@ static void state_get(save_t *P)                                /* everything in
     save_t S;
     int32_t l;
     memset(&S, 0, sizeof S);
-    S.ver = SAVE_VER; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
+    S.ver = SAVE_VER; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.back = (uint8_t)back_pic; S.backdim = (uint8_t)back_dim; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
     for (l = 0; l < (int32_t)NLANE; l++) {
         S.l[l].prof = ln[l].prof; S.l[l].lock = ln[l].lock; S.l[l].dens = ln[l].dens; S.l[l].oct = ln[l].oct; S.l[l].filt = (int8_t)fxu[l].filt;
@@ -1567,7 +1611,7 @@ static void state_put(const save_t *P, int setup)
     const save_t S = *P;
     int32_t l;
     {
-        if (setup) { palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0; }
+        if (setup) { palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0; back_pic = S.back % (NPIC + 1); back_dim = S.backdim ? clampi(S.backdim, 10, 60) : 30; }
         energy = clampi(S.energy, -50, 50); space = clampi(S.space, 0, 100);
         set_key(S.key % 12u); scale_sel = S.scale < NSCALE ? S.scale : 0; prog_sel = S.prog <= NPROG ? S.prog : 0; bpc = clampi(S.bpc, 1, 4);
         { int32_t was = arc_on; arc_on = S.arc != 0; build_ph = clampi(S.build, 2, 16); if (arc_on && (setup || !was)) arc_restart(seq_playing ? cur_bar() + 1 : 0); } peak_ph = clampi(S.peak, 1, 8); auto_drop = S.autod != 0; target = S.target % NPROF; set_bpm(S.bpm);
@@ -1591,8 +1635,10 @@ static int do_load(void)                                        /* 1: a saved se
     static uint8_t old[sizeof(save_t)];
     int got = 0;
     if (settings_load(&S, sizeof S) == 0 && S.ver == SAVE_VER) got = 1;
-    else if (settings_load(old, SAVE_OLD(12)) == 0 && old[0] == 12) { save_up(old, 12, &S); got = 1; }
-    else if (settings_load(old, SAVE_OLD(11)) == 0 && old[0] == 11) { save_up(old, 11, &S); got = 1; }
+    else {
+        uint32_t v;
+        for (v = SAVE_VER - 1u; v >= 11u && !got; v--) if (settings_load(old, save_size(v)) == 0 && old[0] == v) { save_up(old, v, &S); got = 1; }
+    }
     if (got) state_put(&S, 1);
     parts_load();
     return got;
@@ -1616,8 +1662,8 @@ static void sets_load(void)
     if (h[1] == sizeof(save_t)) {
         if (slots_read(16, sets, sizeof sets)) return;
         for (i = 0; i < sizeof sets; i++) c = c * 31u + ((const uint8_t *)sets)[i];
-    } else if (h[1] == SAVE_OLD(11) || h[1] == SAVE_OLD(12)) {        /* older sets: each brought up to date */
-        uint32_t v = h[1] == SAVE_OLD(11) ? 11u : 12u;
+    } else if (h[1] == save_size(11) || h[1] == save_size(12) || h[1] == save_size(13)) {   /* older sets: each brought up to date */
+        uint32_t v = h[1] == save_size(11) ? 11u : h[1] == save_size(12) ? 12u : 13u;
         for (k = 0; k < NSETS; k++) {
             if (slots_read(16 + k * h[1], old, h[1])) return;
             for (i = 0; i < h[1]; i++) c = c * 31u + old[i];
@@ -1991,7 +2037,7 @@ static void defaults(void)
     fxu[L_LEAD].vary = 40;
     set_key(2); set_bpm(125); scale_sel = 0; prog_sel = 0; bpc = 1; energy = 0; space = 35;
     arc_on = 0; build_ph = 6; peak_ph = 4; auto_drop = 1; target = PROF_START; blend = 0;
-    palette = 0; screen_lvl = 100; glow_on = 1; fm1_glow_all();
+    palette = 0; screen_lvl = 100; glow_on = 1; back_pic = 0; back_dim = 30; fm1_glow_all();
     if (seq_playing) invalidate_from(cur_bar()); else form_arm();
     area_dirty = 1;
 }
