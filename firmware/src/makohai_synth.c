@@ -82,6 +82,9 @@ static const patch_t PATCH[] = {
     {"ORCH HIT", 16, 1100, 260, 160,   1, 2300,    0, 220, 0, 0,  420, 4, 120},   /* one key, a whole orchestra: bright, a burst of noise, gone in half a second */
 };
 #define NPATCH (sizeof PATCH / sizeof PATCH[0])
+/* what a voice of each patch costs the audio interrupt, in units (a plain FM voice is 2), measured: the voice budget */
+static const uint8_t PATCH_W[] = {2, 2, 2, 2, 5, 4, 2, 2, 3, 3, 3, 3, 2, 2, 5, 5, 5, 4, 3, 4};
+typedef char patch_w_all[sizeof PATCH_W == NPATCH ? 1 : -1];
 
 typedef struct { const char *name; uint16_t kh, kl, kd, sf, sd, hf, hd; uint8_t sharp; } kit_t;   /* Hz and ms; sharp: a click, a crack, open hats */
 static const kit_t KITS[] = {
@@ -115,6 +118,7 @@ typedef struct {
     uint32_t pph1, pph2;                        /* the pad's two oscillators */
     uint32_t ss[6];                             /* SUPERSAW: the six detuned saws' phases */
     int32_t pamp, brown;                        /* the pad's level (Q15, slow), the brown noise */
+    uint8_t wt;                                 /* what it costs (the voice budget) */
 } voice_t;
 #define NVOICE 33u
 static voice_t vc[NVOICE];
@@ -252,9 +256,17 @@ static int32_t tau_k(uint32_t ms)               /* per-tick factor (Q15) of a de
     return 32768 - (int32_t)((CTRL * 32768u) / smp_tau);
 }
 
-static voice_t *alloc_voice(uint32_t lane)
+/* the voice budget: all that sounds may cost at most voice_limit units (VOICES, SETUP); past it, the quietest voice
+ * that is fading out goes first (an echo's tail, mostly), else the oldest. So no style, echo or chord can make a block
+ * of sound late (a crack) */
+#ifndef VOICE_LIMIT0
+#define VOICE_LIMIT0 80                         /* the default: the styles alone reach about 78; with echo everywhere
+                                                * SYMPHONY reached 107 and 109 % of the time on an FM-1 */
+#endif
+static volatile int32_t voice_limit = VOICE_LIMIT0, voice_now, voice_peak;
+static voice_t *alloc_voice(uint32_t lane, uint32_t wt)
 {
-    uint32_t v, pick = VLO[lane], best = 0xFFFFFFFFu;
+    uint32_t v, pick = VLO[lane], best = 0xFFFFFFFFu, total = wt;
     for (v = VLO[lane]; v < VHI[lane]; v++) {
         /* a free voice, else the quietest one in its release, else the oldest */
         uint32_t score = vc[v].kind == V_OFF ? 0u
@@ -263,6 +275,21 @@ static voice_t *alloc_voice(uint32_t lane)
         if (score < best) { best = score; pick = v; }
     }
     if (vc[pick].kind != V_OFF && vc[pick].midi) mo_push(0x80u | vc[pick].midi_ch, vc[pick].midi, 0);
+    vc[pick].kind = V_OFF;
+    for (v = 0; v < NVOICE; v++) if (vc[v].kind != V_OFF) total += vc[v].wt;
+    while (total > (uint32_t)voice_limit) {                          /* over budget: one goes, anywhere */
+        uint32_t victim = NVOICE, vb = 0xFFFFFFFFu;
+        for (v = 0; v < NVOICE; v++) {
+            uint32_t score;
+            if (vc[v].kind == V_OFF) continue;
+            score = vc[v].stage == 2u || (vc[v].kind != V_FM && vc[v].kind < V_WASH) ? 1u + (uint32_t)vc[v].amp : 0x40000000u + (vc[v].age & 0x3FFFFFFFu);
+            if (score < vb) { vb = score; victim = v; }
+        }
+        if (victim == NVOICE) break;
+        if (vc[victim].midi) mo_push(0x80u | vc[victim].midi_ch, vc[victim].midi, 0);
+        total -= vc[victim].wt; vc[victim].kind = V_OFF;
+    }
+    vc[pick].wt = (uint8_t)wt;
     return &vc[pick];
 }
 
@@ -273,7 +300,7 @@ static voice_t *last_voice;                             /* the voice start_fm ju
 static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur, uint32_t lvl, uint32_t from_inc,
                      const uint32_t *arp, uint32_t arp_n, uint32_t midi)
 {
-    voice_t *v = alloc_voice(lane);
+    voice_t *v = alloc_voice(lane, PATCH_W[(uint32_t)(P - PATCH) < NPATCH ? (uint32_t)(P - PATCH) : 0u]);
     last_voice = v;
     int32_t bright = fx[lane].bright, mult = 64 + bright * 768 / 100;   /* Q8: 25 -> 1.0 */
     uint32_t a = (uint32_t)P->a_ms * 441u / 10u, i;
@@ -315,7 +342,7 @@ static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_ori
     voice_t *v;
     uint32_t gm = GM_DRUM[kind < NDK ? kind : 0];
     if (kind == DK_HAT) { uint32_t i; for (i = 0; i < NVOICE; i++) if (vc[i].kind == V_OHAT) vc[i].dec_k = tau_k(8); }   /* the closed hat chokes the open one */
-    v = alloc_voice(L_DRUMS);
+    v = alloc_voice(L_DRUMS, 2u);
     const kit_t *K = &KITS[kit < NKIT ? kit : 0];
     v->lane = L_DRUMS; v->stage = 1; v->ph = 0; v->ctr = 0; v->age = ++vage; v->s1 = v->s2 = v->s3 = 0;
     v->gate = 0xFFFFFFFFu; v->midi = 0; v->chaos = 0; v->breath = K->sharp; v->tone_amp = 0;   /* breath: the kit's sharpness, for drums */
@@ -370,7 +397,7 @@ static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_ori
 /* an sfx sound: kind SX_x, pitch a MIDI note (riser start, bits), dur in samples (wash, riser, crackle) */
 static void start_sfx(uint32_t kind, uint32_t pitch, uint32_t dur, uint32_t lvl)
 {
-    voice_t *v = alloc_voice(L_SFX);
+    voice_t *v = alloc_voice(L_SFX, kind == SX_GALE || kind == SX_WASH ? 3u : 2u);
     if (dur < CTRL * 4u) dur = CTRL * 4u;
     v->lane = L_SFX; v->kind = (uint8_t)(V_WASH + (kind < NSX ? kind : 0)); v->ph = 0; v->ctr = 0; v->age = ++vage;
     v->s1 = v->s2 = v->s3 = 0; v->tph = 0; v->tone_amp = 0; v->midi = 0; v->gate = 0xFFFFFFFFu; v->stage = 2; v->peak = 0; v->chaos = 0; v->breath = 0;
@@ -1017,6 +1044,11 @@ static void app_audio(int32_t *out, uint32_t n)
         if ((s < 0 ? -s : s) > out_pk[k & 1u]) out_pk[k & 1u] = s < 0 ? -s : s;
     }
     for (k = 0; k < n; k += 4u) { uint32_t j = scope_w & 255u; scope_l[j] = (int16_t)(out[2u * k] >> 1); scope_r[j] = (int16_t)(out[2u * k + 1u] >> 1); scope_w++; }
+    {                                                                       /* the budget in use (VOICES) */
+        uint32_t v; int32_t t = 0;
+        for (v = 0; v < NVOICE; v++) if (vc[v].kind != V_OFF) t += vc[v].wt;
+        voice_now = t; if (t > voice_peak) voice_peak = t;
+    }
     vis_step = seq_step;
     vis_frac = seq_step_len_q8 ? (seq_acc_q8 >> 8) * 65536u / (seq_step_len_q8 >> 8 ? seq_step_len_q8 >> 8 : 1u) : 0u;
     isr_us_last = (fm1_ticks() - t0) / FM1_TICKS_PER_US;

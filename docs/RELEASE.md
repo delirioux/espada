@@ -6,6 +6,8 @@ Since 1.0:
 - CRACKLE and BITS (sfx) at a tenth of their old level: far in the background.
 - Pictures on SETUP's free knobs: SCOPE, LANES, STEREO (a goniometer), SPECTRUM (a landscape), and RESET's three
   knobs each picking one of CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, FIRE, LOGO, SCOPE, SPECTRUM.
+- A voice budget (SETUP, VOICES: now, peak, LIMIT): all that sounds may cost at most LIMIT units, so echo on every
+  lane can no longer make the sound late (a crack); past it the quietest fading voice stops first.
 - BACK (SETUP): a picture behind the lanes, dimmed (10..60 %), saved with the look.
 - DEMO (SEL + HOME): the pictures full screen while the music plays, cut on the bar every 4, 8 or 16 bars with
   flashes, blinds, wipes, dissolves, an iris, dips and pushes; a drop cuts with a flash.

@@ -96,6 +96,6 @@ static volatile int32_t key_off;    /* the key: semitones from D, -6..5 (the ket
 #ifdef DINGHY_HOST
 static void makohai_host_stats(void)            /* host mode: the audio interrupt's worst time and the frames drawn */
 {
-    printf("audio interrupt: worst %u us, average %u us of 5805 (on this computer)\n", isr_us_max, isr_n ? isr_us_sum / isr_n : 0);
+    printf("audio interrupt: worst %u us, average %u us of 5805 (on this computer); voices at most %d of %d units\n", isr_us_max, isr_n ? isr_us_sum / isr_n : 0, (int)voice_peak, (int)voice_limit);
 }
 #endif

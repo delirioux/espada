@@ -70,6 +70,7 @@ Hold **HOME** for SETUP; HOME (or any group button, or EDIT) leaves it. PRESETS 
 | RESET | defaults: five clicks to the right puts everything back as it comes (patterns cleared); SAVE keeps it | a picture (turn: the next) | a picture | a picture |
 | SYSTEM | stack: free, of 23 K (the least it has had free since power-on) | the interrupts' stack: the same, of 7 K | RAM free | the pool free (the big buffers) |
 | AUDIO | the audio interrupt's worst time, µs | its average over the last half second | the worst as a share of the 5805 µs it has | any knob here starts the worst again |
+| VOICES | what sounds now, in units of the voice budget | the most so far (any knob but LIMIT starts it again) | LIMIT: the budget, 20..100 (80) | LOAD, as on AUDIO |
 
 The pictures fill the knobs SETUP has no use for. **SCOPE** draws the output's wave, held still on a rising zero,
 with the waves before it going back into the screen. **LANES** is a level per lane, as lit blocks. **STEREO** is a
@@ -81,6 +82,13 @@ tempo), **DOTS** (a ball of dots that becomes a ring and back), **PLASMA**, **TW
 zooming), **STARS**, **FIRE**, **LOGO** (the logo with raster bars behind it), **SCOPE** and **SPECTRUM**. Which pictures RESET
 shows is not saved. **BACK** puts one of them behind the lanes on the main screen, dimmed so the notes stay clear;
 each lane's band then glows over it. SAVE keeps BACK with the look.
+
+**The voice budget.** Every voice costs the audio its time: a plain FM voice 2 units, flute and chip 3, strings,
+supersaw and the orchestra hit 4, brass, violins, cellos and CHAOS 5, a drum or a noise 2 or 3. All that sounds may
+cost at most LIMIT; a new note past it stops the quietest voice that is fading out (an echo's tail, mostly), else
+the oldest. The styles alone stay under 80; ECHO on many lanes would go past it, and past what the FM-1 can do in
+time (a crack across the whole sound). If LOAD ever goes near 100 %, lower LIMIT; if notes seem to vanish and LOAD
+stays well under, raise it. LIMIT is not saved.
 
 SAVE keeps the setup with everything else. SYSTEM and AUDIO only show; they are how a firmware that runs short of
 memory or time is caught before it crackles or crashes. In the browser, SYSTEM shows N/A (there is no FM-1 memory

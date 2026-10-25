@@ -1075,7 +1075,13 @@ static void s_irq(char *o) { if (sysm.known) { o = s_cat(o, "OF "); s_kib(o, sys
 static void v_ram(char *o) { sys_poll(); v_free(o, sysm.ram_free); }
 static void v_pool(char *o) { sys_poll(); v_free(o, sysm.pool_free); }
 static void s_free(char *o) { if (sysm.known) s_cat(o, "FREE"); }
-static void t_isr(int32_t d) { (void)d; isr_us_max = 0; }
+static void t_isr(int32_t d) { (void)d; isr_us_max = 0; voice_peak = 0; }
+static void v_vnow(char *o) { s_int(o, voice_now); }
+static void v_vpeak(char *o) { s_int(o, voice_peak); }
+static void s_vof(char *o) { o = s_cat(o, "OF "); s_int(o, voice_limit); }
+static void t_vlim(int32_t d) { voice_limit = clampi(voice_limit + d, 20, 100); }
+static void v_vlim(char *o) { s_int(o, voice_limit); }
+static void s_vlim(char *o) { s_cat(o, "2 = 1 VOICE"); }
 static void v_worst(char *o) { s_int(o, (int32_t)isr_us_max); }
 static void v_avg(char *o) { sys_poll(); s_int(o, (int32_t)isr_avg_us); }
 static void v_load(char *o) { s_pct(o, (int32_t)(isr_us_max * 100u / 5805u)); }
@@ -1091,6 +1097,7 @@ static const srow_t ROW_SETUP[] = {
     {"RESET", -1, {{"DEFAULTS", t_reset, v_reset, s_reset}, {"PICTURE", t_pick0, v_vis, 0, vis_s0}, {"PICTURE", t_pick1, v_vis, 0, vis_s1}, {"PICTURE", t_pick2, v_vis, 0, vis_s2}}},
     {"SYSTEM", -1, {{"STACK", t_none, v_stk, s_stk}, {"IRQ", t_none, v_irq, s_irq}, {"RAM", t_none, v_ram, s_free}, {"POOL", t_none, v_pool, s_free}}},
     {"AUDIO", -1, {{"WORST", t_isr, v_worst, s_msw}, {"AVERAGE", t_isr, v_avg, s_msw}, {"LOAD", t_isr, v_load, s_load}, {"RESET", t_isr, v_tr, s_tr}}},
+    {"VOICES", -1, {{"NOW", t_isr, v_vnow, s_vof}, {"PEAK", t_isr, v_vpeak, s_vof}, {"LIMIT", t_vlim, v_vlim, s_vlim}, {"LOAD", t_isr, v_load, s_load}}},
 };
 #define NROWS_OF(a) ((int32_t)(sizeof(a) / sizeof(a[0])))
 static int32_t nrows(int32_t g) { return g == G_PLAY ? NROWS_OF(ROW_PLAY) : g == G_SOUND ? NROWS_OF(ROW_SOUND) : g == G_TRK ? NROWS_OF(ROW_TRK) : NROWS_OF(ROW_SONG); }
