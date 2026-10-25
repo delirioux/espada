@@ -9,7 +9,8 @@ Since 1.0:
 - The keys light up the notes the marked lane plays (drums and sfx: their keys as they hit).
 - A voice budget (SETUP, VOICES: now, peak, LIMIT): all that sounds may cost at most LIMIT units, so echo on every
   lane can no longer make the sound late (a crack); past it the quietest fading voice stops first.
-- BACK (SETUP): a picture behind the lanes, dimmed (10..60 %), saved with the look.
+- BACK (SETUP): a picture behind the whole screen on every page, dimmed (10..60 %), CYCLE to the next one every
+  4, 8 or 16 bars with a cut; saved with the look.
 - DEMO (SEL + HOME): the pictures full screen while the music plays, cut on the bar every 4, 8 or 16 bars with
   flashes, blinds, wipes, dissolves, an iris, dips and pushes; a drop cuts with a flash.
 - A new identity, FM-1_47625642 (1.0 reported FM-1_960, as another firmware does), the same for every version: the FM-1 Firmware Hub tells Makohai apart by it.

@@ -66,7 +66,7 @@ Hold **HOME** for SETUP; HOME (or any group button, or EDIT) leaves it. PRESETS 
 | LOOK | palette: MAKOHAI (its colours), AMBER, GREEN, CYAN, RED, MONO | screen: 100, 75, 50 or 25 % | lights: the keys' and buttons' glow on or off | SCOPE (a picture) |
 | MIDI | the lead's channel | the pad's | the bass's | the drums' (1..16 or OFF) |
 | MIDI 2 | the arp's channel | LANES (a picture) | STEREO (a picture) | SPECTRUM (a picture) |
-| BACK | a picture behind the lanes: OFF or one of the ten below | its brightness, 10..60 % (30) | PREVIEW: the picture itself | STEREO (a picture) |
+| BACK | a picture behind the whole screen: OFF or one of the ten below | its brightness, 10..60 % (30) | CYCLE: the next picture every 4, 8 or 16 bars, or OFF | PREVIEW: the picture itself |
 | RESET | defaults: five clicks to the right puts everything back as it comes (patterns cleared); SAVE keeps it | a picture (turn: the next) | a picture | a picture |
 | SYSTEM | stack: free, of 23 K (the least it has had free since power-on) | the interrupts' stack: the same, of 7 K | RAM free | the pool free (the big buffers) |
 | AUDIO | the audio interrupt's worst time, µs | its average over the last half second | the worst as a share of the 5805 µs it has | any knob here starts the worst again |
@@ -80,8 +80,10 @@ bass on the left, hats on the right, as a landscape rolling away. RESET's three 
 **CRYSTAL** (a see-through faceted body turning, swelling on the drums), **TUNNEL** (flying down a tunnel at the
 tempo), **DOTS** (a ball of dots that becomes a ring and back), **PLASMA**, **TWIRL** (a checker turning and
 zooming), **STARS**, **FIRE**, **LOGO** (the logo with raster bars behind it), **SCOPE** and **SPECTRUM**. Which pictures RESET
-shows is not saved. **BACK** puts one of them behind the lanes on the main screen, dimmed so the notes stay clear;
-each lane's band then glows over it. SAVE keeps BACK with the look.
+shows is not saved. **BACK** puts one of them behind the whole screen, on every page (PLAY, SOUND, TRACKER, SONG, EDIT, SETUP), dimmed
+so everything stays clear; the lanes' bands glow over it. With CYCLE it moves on to the next picture every 4, 8 or 16
+bars, on the bar line, with a cut (blinds, a raster wipe, a dissolve, an iris or a push). SAVE keeps BACK and CYCLE
+with the look.
 
 **The voice budget.** Every voice costs the audio its time: a plain FM voice 2 units, flute and chip 3, strings,
 supersaw and the orchestra hit 4, brass, violins, cellos and CHAOS 5, a drum or a noise 2 or 3. All that sounds may

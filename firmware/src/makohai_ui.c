@@ -66,12 +66,15 @@ static uint16_t cvb[2][240u * STRIP_H] __attribute__((section(".pool")));
 static uint16_t *cvp;
 static int32_t cy0, chh;
 static uint32_t cvn;
+static int32_t back_now;                                    /* BACK shows behind this frame (it fills each strip first) */
+static void back_strip(void);
 static void cs_begin(int32_t y0, int32_t h, uint16_t bg)
 {
     uint32_t i, n = 240u * (uint32_t)h;
     uint16_t s = SW(paint(bg));
     cvp = cvb[cvn++ & 1u]; cy0 = y0; chh = h;
     for (i = 0; i < n; i++) cvp[i] = s;
+    if (back_now) back_strip();
 }
 static void cs_end(void) { lcd_blit(0, (uint32_t)cy0, 240, (uint32_t)chh, cvp); }
 static void fill(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
@@ -907,26 +910,48 @@ static void t_pick2(int32_t d) { pick[2] = fmodp(pick[2] + (d > 0 ? 1 : -1), NPI
 static const char *pic_label(const card_t *C) { return C->draw == vis_s0 ? PICN[pick[0]] : C->draw == vis_s1 ? PICN[pick[1]] : C->draw == vis_s2 ? PICN[pick[2]] : C->name; }
 static void v_vis(char *o) { o[0] = 0; }
 
-/* BACK (SETUP): a picture behind the lanes, dimmed so the notes stay clear; the lanes' bands glow over it */
-static int32_t back_pic, back_dim = 30;                                       /* 0 = none, else a picture + 1; how bright, % */
-static void t_back(int32_t d) { back_pic = fmodp(back_pic + (d > 0 ? 1 : -1), NPIC + 1); }
+/* BACK (SETUP): a picture behind the whole screen, on every page, dimmed so all stays clear; the lanes' bands glow over
+ * it. CYCLE moves on to the next picture every 4, 8 or 16 bars, with a cut */
+static int32_t back_pic, back_dim = 30, back_cyc;                             /* 0 = none, else a picture + 1; how bright, %; CYCLE */
+static int32_t back_next, back_last = -1;
+static uint32_t back_t0, back_len, back_ms0;
+static int32_t back_tr, back_type;
+static const char *const CYCN[4] = {"OFF", "4 BARS", "8 BARS", "16 BARS"};
+static void t_back(int32_t d) { back_pic = fmodp(back_pic + (d > 0 ? 1 : -1), NPIC + 1); back_tr = 0; }
 static void v_back(char *o) { s_cat(o, back_pic ? PICN[back_pic - 1] : "OFF"); }
 static void t_bdim(int32_t d) { back_dim = clampi(back_dim + d, 10, 60); }
 static void v_bdim(char *o) { s_pct(o, back_dim); }
+static void t_bcyc(int32_t d) { back_cyc = clampi(back_cyc + (d > 0 ? 1 : -1), 0, 3); }
+static void v_bcyc(char *o) { s_cat(o, CYCN[back_cyc]); }
 static void vis_back(int32_t x) { tile(x); if (back_pic) PICF[back_pic - 1](); }
-static void draw_backdrop(void)
+static void back_tick(void)                                                   /* the cuts, on the bar */
 {
-    int32_t keep = tr_on, y, ya = LANE_Y > cy0 ? LANE_Y : cy0, yb = LANE_Y + LANES_H < cy0 + chh ? LANE_Y + LANES_H : cy0 + chh, i;
-    tr_on = 0;
-    vx0 = 0; vy0 = LANE_Y; vw = 240; vh = LANES_H; vps = PIC_CHUNKY[back_pic - 1] ? 2 : 1;
-    PICF[back_pic - 1]();
-    tr_on = keep;
-    for (y = ya; y < yb; y++) {                                               /* dimmed */
-        uint16_t *p = cvp + (y - cy0) * 240;
-        for (i = 0; i < 240; i++) {
-            uint32_t c = SW(p[i]), r = (c >> 11) * (uint32_t)back_dim / 100u, g = (c >> 5 & 63u) * (uint32_t)back_dim / 100u, b = (c & 31u) * (uint32_t)back_dim / 100u;
-            p[i] = SW((uint16_t)(r << 11 | g << 5 | b));
-        }
+    static const uint8_t KINDS[5] = {TR_BLINDS, TR_WIPE, TR_DISSOLVE, TR_IRIS, TR_PUSH};
+    int32_t ev = back_cyc ? 2 << back_cyc : 0, go = 0;                        /* 4, 8, 16 bars */
+    uint32_t bar_ms = 240000u / (uint32_t)(seq_bpm > 0 ? seq_bpm : 120);
+    if (back_tr && fm1_ms - back_t0 >= back_len) { back_tr = 0; back_pic = back_next; }
+    if (!ev || back_tr) return;
+    if (seq_playing) { int32_t b = cur_bar(); if (b != back_last && b % ev == 0 && (cur_step() & 15) < 2) { back_last = b; go = 1; } }
+    else if (fm1_ms - back_ms0 >= (uint32_t)ev * bar_ms) { back_ms0 = fm1_ms; go = 1; }
+    if (!go) return;
+    back_next = back_pic % NPIC + 1;
+    back_type = KINDS[vis_rand() % 5u];
+    back_len = bar_ms / 2u < 400u ? 400u : bar_ms / 2u > 1100u ? 1100u : bar_ms / 2u;
+    back_t0 = fm1_ms; back_tr = 1;
+}
+static void demo_draw_pic(int32_t p, int32_t ox);
+static void back_strip(void)                                                  /* the picture in this strip, dimmed */
+{
+    int32_t n = 240 * chh, i;
+    if (back_tr) {
+        tr_on = 1; tr_type = back_type; tr_p = (int32_t)((fm1_ms - back_t0) * 256u / (back_len ? back_len : 1u)); if (tr_p > 255) tr_p = 255;
+        if (tr_type == TR_PUSH) { int32_t sft = 240 * tr_p * (512 - tr_p) / 65536; demo_draw_pic(back_pic - 1, -sft); demo_draw_pic(back_next - 1, 240 - sft); }
+        else { tr_side = 0; demo_draw_pic(back_pic - 1, 0); tr_side = 1; demo_draw_pic(back_next - 1, 0); }
+        tr_on = 0;
+    } else { tr_on = 0; demo_draw_pic(back_pic - 1, 0); }
+    for (i = 0; i < n; i++) {
+        uint32_t c = SW(cvp[i]), rr = (c >> 11) * (uint32_t)back_dim / 100u, g = (c >> 5 & 63u) * (uint32_t)back_dim / 100u, b = (c & 31u) * (uint32_t)back_dim / 100u;
+        cvp[i] = SW((uint16_t)(rr << 11 | g << 5 | b));
     }
 }
 static void glow_row(int32_t y, uint16_t c)                                   /* a lane's band added over the picture */
@@ -1093,7 +1118,7 @@ static const srow_t ROW_SETUP[] = {
     {"LOOK", -1, {{"PALETTE", t_pal, v_pal, 0}, {"SCREEN", t_scr, v_scr, 0}, {"LIGHTS", t_glow, v_glow, s_glow}, {"SCOPE", t_none, v_vis, 0, vis_scope}}},
     {"MIDI", -1, {{"LEAD", t_ch0, v_ch0, s_ch}, {"PAD", t_ch1, v_ch1, s_ch}, {"BASS", t_ch2, v_ch2, s_ch}, {"DRUMS", t_ch3, v_ch3, s_ch}}},
     {"MIDI 2", -1, {{"ARP", t_ch5, v_ch5, s_ch}, {"LANES", t_none, v_vis, 0, vis_lanes}, {"STEREO", t_none, v_vis, 0, vis_stereo}, {"SPECTRUM", t_none, v_vis, 0, vis_spectrum}}},
-    {"BACK", -1, {{"PICTURE", t_back, v_back, 0}, {"BRIGHT", t_bdim, v_bdim, 0}, {"PREVIEW", t_none, v_vis, 0, vis_back}, {"STEREO", t_none, v_vis, 0, vis_stereo}}},
+    {"BACK", -1, {{"PICTURE", t_back, v_back, 0}, {"BRIGHT", t_bdim, v_bdim, 0}, {"CYCLE", t_bcyc, v_bcyc, 0}, {"PREVIEW", t_none, v_vis, 0, vis_back}}},
     {"RESET", -1, {{"DEFAULTS", t_reset, v_reset, s_reset}, {"PICTURE", t_pick0, v_vis, 0, vis_s0}, {"PICTURE", t_pick1, v_vis, 0, vis_s1}, {"PICTURE", t_pick2, v_vis, 0, vis_s2}}},
     {"SYSTEM", -1, {{"STACK", t_none, v_stk, s_stk}, {"IRQ", t_none, v_irq, s_irq}, {"RAM", t_none, v_ram, s_free}, {"POOL", t_none, v_pool, s_free}}},
     {"AUDIO", -1, {{"WORST", t_isr, v_worst, s_msw}, {"AVERAGE", t_isr, v_avg, s_msw}, {"LOAD", t_isr, v_load, s_load}, {"RESET", t_isr, v_tr, s_tr}}},
@@ -1158,7 +1183,7 @@ static void draw_lane(int32_t l, int32_t y, int32_t h, int big)
     if (y >= cy0 + chh || y + h + GAP <= cy0) return;
     for (r = 0; r < h; r++) {                                       /* the copper bar */
         int32_t a = (big ? 44 : l == sel ? 48 : 22) + flash * 56, tri = 256 - (r > h / 2 ? r - h / 2 : h / 2 - r) * 256 / (h / 2);
-        if (back_pic) glow_row(y + r, cscale(col, (a * tri >> 8) * 2 / 3)); else fill(0, y + r, 240, 1, cscale(col, a * tri >> 8));
+        if (back_now) glow_row(y + r, cscale(col, (a * tri >> 8) * 2 / 3)); else fill(0, y + r, 240, 1, cscale(col, a * tri >> 8));
     }
     b0 = cur_step() / 16 - 1; if (b0 < 0) b0 = 0;                  /* the bars from the step count, which does not wrap */
     b1 = (cur_step() + (240 - NOWX) / PPS) / 16 + 1;
@@ -1479,10 +1504,12 @@ static void draw_frame(int force)
 {
     int32_t l, k, ns, y0, h0, view = edit_on ? 1 : setup_on ? 0 : grp == G_SONG && rowi[G_SONG] == SR_KEY ? 2 : grp == G_SONG && rowi[G_SONG] == SR_ARC ? 3 : 0;
     pos16 = (uint32_t)cur_step() * 65536u + (seq_playing ? (uint32_t)vis_frac : 0u);
-    if (demo_on) { draw_demo(); last_drawn_pos = 0xFFFFFFFFu; area_dirty = 0; return; }   /* DEMO: the whole screen */
+    if (demo_on) { back_now = 0; draw_demo(); last_drawn_pos = 0xFFFFFFFFu; area_dirty = 0; return; }   /* DEMO: the whole screen */
+    back_now = back_pic != 0;
+    if (back_now) { vis_prep(); back_tick(); force = 1; }                    /* a picture behind it all: every frame, all of it */
     draw_knobs(force);
     if (!edit_on) draw_title(force);
-    if (!force && pos16 == last_drawn_pos && !area_dirty && !seq_playing && !(back_pic && view == 0)) return;   /* a picture behind: it moves */
+    if (!force && pos16 == last_drawn_pos && !area_dirty && !seq_playing) return;
     last_drawn_pos = pos16;
     draw_header();
     platform_poll();
@@ -1494,7 +1521,7 @@ static void draw_frame(int force)
         if (view == 1) draw_edit_area();
         else if (view == 2) draw_song_area();
         else if (view == 3) draw_arc_area();
-        else { if (back_pic) { vis_prep(); draw_backdrop(); } for (l = 0; l < (int32_t)NLANE; l++) draw_lane(LROW[l], LANE_Y + l * (LH + GAP), LH, 0); }
+        else for (l = 0; l < (int32_t)NLANE; l++) draw_lane(LROW[l], LANE_Y + l * (LH + GAP), LH, 0);
         cs_end();
         platform_poll();
     }
@@ -1590,7 +1617,7 @@ static void state_get(save_t *P)                                /* everything in
     save_t S;
     int32_t l;
     memset(&S, 0, sizeof S);
-    S.ver = SAVE_VER; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.back = (uint8_t)back_pic; S.backdim = (uint8_t)back_dim; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
+    S.ver = SAVE_VER; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.back = (uint8_t)back_pic; S.backdim = (uint8_t)(back_dim | back_cyc << 6);   /* CYCLE in the top two bits */ S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
     for (l = 0; l < (int32_t)NLANE; l++) {
         S.l[l].prof = ln[l].prof; S.l[l].lock = ln[l].lock; S.l[l].dens = ln[l].dens; S.l[l].oct = ln[l].oct; S.l[l].filt = (int8_t)fxu[l].filt;
@@ -1618,7 +1645,7 @@ static void state_put(const save_t *P, int setup)
     const save_t S = *P;
     int32_t l;
     {
-        if (setup) { palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0; back_pic = S.back % (NPIC + 1); back_dim = S.backdim ? clampi(S.backdim, 10, 60) : 30; }
+        if (setup) { palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0; back_pic = S.back % (NPIC + 1); back_dim = S.backdim & 63 ? clampi(S.backdim & 63, 10, 60) : 30; back_cyc = S.backdim >> 6; }
         energy = clampi(S.energy, -50, 50); space = clampi(S.space, 0, 100);
         set_key(S.key % 12u); scale_sel = S.scale < NSCALE ? S.scale : 0; prog_sel = S.prog <= NPROG ? S.prog : 0; bpc = clampi(S.bpc, 1, 4);
         { int32_t was = arc_on; arc_on = S.arc != 0; build_ph = clampi(S.build, 2, 16); if (arc_on && (setup || !was)) arc_restart(seq_playing ? cur_bar() + 1 : 0); } peak_ph = clampi(S.peak, 1, 8); auto_drop = S.autod != 0; target = S.target % NPROF; set_bpm(S.bpm);
@@ -1759,7 +1786,7 @@ static void play_button(int held)
 /* a group button: the group; pressed again, its next setting. From EDIT: back to the group. */
 static void group_btn(int32_t g)
 {
-    if (demo_on) { demo_on = 0; area_dirty = 1; return; }               /* out of DEMO, back where you were */
+    if (demo_on) { demo_on = 0; tr_on = 0; area_dirty = 1; return; }               /* out of DEMO, back where you were */
     if (setup_on) setup_on = 0;
     else if (edit_on) edit_on = 0;
     else if (grp == g) rowi[g] = fmodp(rowi[g] + 1, nrows(g));
@@ -1908,13 +1935,13 @@ static void input(void)
         static int home_held, home_used;
         if (b & (1u << BTN_HOME) && held) { demo_toggle(); home_held = 0; }     /* SEL + HOME: DEMO on or off */
         else if (b & (1u << BTN_HOME)) { home_ms = fm1_ms; home_held = 1; home_used = 0; }
-        if (home_held && !home_used && fm1_ms - home_ms >= 600u) { home_used = 1; demo_on = 0; setup_on = 1; edit_on = 0; reset_turns = 0; area_dirty = 1; }
+        if (home_held && !home_used && fm1_ms - home_ms >= 600u) { home_used = 1; demo_on = 0; tr_on = 0; setup_on = 1; edit_on = 0; reset_turns = 0; area_dirty = 1; }
         if (rel & (1u << BTN_HOME)) { if (home_held && !home_used) group_btn(G_PLAY); home_held = 0; }
     }
     if (b & (1u << BTN_FX)) group_btn(G_SOUND);
     if (b & (1u << BTN_ARP)) group_btn(G_TRK);
     if (b & (1u << BTN_GLO)) group_btn(G_SONG);
-    if (b & (1u << BTN_EDIT) && demo_on) { demo_on = 0; area_dirty = 1; }
+    if (b & (1u << BTN_EDIT) && demo_on) { demo_on = 0; tr_on = 0; area_dirty = 1; }
     else if (b & (1u << BTN_EDIT) && setup_on) { setup_on = 0; area_dirty = 1; }
     else if (b & (1u << BTN_EDIT)) {
         if (held && edit_on) clear_bar_ui();
@@ -2064,7 +2091,7 @@ static void defaults(void)
     fxu[L_LEAD].vary = 40;
     set_key(2); set_bpm(125); scale_sel = 0; prog_sel = 0; bpc = 1; energy = 0; space = 35;
     arc_on = 0; build_ph = 6; peak_ph = 4; auto_drop = 1; target = PROF_START; blend = 0;
-    palette = 0; screen_lvl = 100; glow_on = 1; back_pic = 0; back_dim = 30; fm1_glow_all();
+    palette = 0; screen_lvl = 100; glow_on = 1; back_pic = 0; back_dim = 30; back_cyc = 0; fm1_glow_all();
     if (seq_playing) invalidate_from(cur_bar()); else form_arm();
     area_dirty = 1;
 }
