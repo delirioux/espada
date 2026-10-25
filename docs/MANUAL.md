@@ -38,7 +38,7 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 
 | Group | Button | Settings (KNOB 1..4 = the four lanes in the window) |
 | --- | --- | --- |
-| PLAY | HOME | melody, rhythm, pitch, change, density, octave, style, sound, volume |
+| PLAY | HOME | volume, style, sound, melody, rhythm, pitch, density, octave, change |
 | SOUND | FX | filter, resonance, wobble, drive, brightness, crush, vary, reverb |
 | TRACKER | ARP | slide, retrigger, rate, echo, porta, vibrato, tremolo, tremor, gate, swing, pan |
 
@@ -94,7 +94,7 @@ lane faded out, a save waiting, the keys' octave off 0.
 
 ## What the knobs do
 
-- **The musical settings** (PLAY, the first four): **MELODY** picks the idea: every position is its own melody, riff,
+- **The musical settings** (PLAY: MELODY, RHYTHM, PITCH, and CHANGE at the end): **MELODY** picks the idea: every position is its own melody, riff,
   voicing or drum pattern, and turning back brings one back. Every power-on sets each lane's MELODY at random, so
   Espada starts with a new song each time (a saved set keeps everything else). **RHYTHM** goes from slow long notes to busy 16ths (on
   the other lanes: sparser or busier). **PITCH** goes from small steps to wide leaps and a higher register (the bass
@@ -108,8 +108,8 @@ lane faded out, a save waiting, the keys' octave off 0.
 
 - **Energy** (SONG, LIVE) adds to or takes from every lane's density at once: one knob for a build or a breakdown.
 - **Space** (SONG, LIVE) is the room, a stereo reverb, and how loud it is. **Reverb** (SOUND) is how much of each lane goes into it. It starts with the sfx all the way in (100), the pad much (60),
-  the lead some (35), the drums a little (18) and the bass hardly (3). VOLUME starts at 80, the lead and the arp at
-  60, the sfx at 30.
+  the lead some (35), the drums a little (18) and the bass hardly (3). VOLUME starts at 80, the arp at 60, the lead at
+  50, the sfx at 30.
 - **The arc** is off until you turn it on (SONG, ARC, knob 1). On: it starts with a few drum hits and builds bass,
   pad and lead in as the energy rises, breaks, drops and builds again; the ARC row draws it. DROP works without it.
 - **Blend** moves lanes to the queued style from the bottom up: drums, then bass, pad, lead (the word under it

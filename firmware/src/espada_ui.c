@@ -412,10 +412,10 @@ static void s_rep(char *o) { int32_t b = cursor >> 4; if (b < 1) s_cat(o, "FROM 
 /* ---- the settings. A lane group's setting is one row of the desk: KNOB 1..4 set it for LEAD, PAD, BASS, DRUMS.
  * SONG's rows are four settings each, of the song or of the sfx lane. The functions act on `sel`: drawing sets it
  * for the column and puts it back, turning a lane's knob leaves it there (the lane you touch is the lane). */
-static const card_t ROW_PLAY[] = {
-    {"MELODY", t_mel, v_mel, s_mel}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"PITCH", t_pit, v_pit, s_pit}, {"CHANGE", t_chg, v_chg, s_chg},
-    {"DENSITY", t_dens, v_dens, 0}, {"OCTAVE", t_oct, v_oct, 0}, {"STYLE", t_lprof, v_lprof, 0}, {"SOUND", t_inst, v_inst, s_inst},
-    {"VOLUME", t_level, v_level, 0}};
+static const card_t ROW_PLAY[] = {                              /* the mix, the lane's character, the music, how soon it changes */
+    {"VOLUME", t_level, v_level, 0}, {"STYLE", t_lprof, v_lprof, 0}, {"SOUND", t_inst, v_inst, s_inst},
+    {"MELODY", t_mel, v_mel, s_mel}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"PITCH", t_pit, v_pit, s_pit},
+    {"DENSITY", t_dens, v_dens, 0}, {"OCTAVE", t_oct, v_oct, 0}, {"CHANGE", t_chg, v_chg, s_chg}};
 static const card_t ROW_SOUND[] = {
     {"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0},
     {"BRIGHT", t_bright, v_bright, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary}, {"REVERB", t_send, v_send, 0}};

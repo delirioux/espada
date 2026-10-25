@@ -11,7 +11,7 @@ lane from the bottom up, or launch it at once with its own tempo. Shape each lan
 filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, porta, vibrato, tremolo, tremor, gate, swing,
 retrigger, a bit crusher, echo, and an equal-power pan per lane. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
 
-<p align="center"><img src="docs/screens/main.png" width="320" alt="Espada's screen: the MELODY setting, all six lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
+<p align="center"><img src="docs/screens/main.png" width="320" alt="Espada's screen: the VOLUME setting, all six lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
 
 > **Status: 0.1, in development.** It boots and runs on the FM-1; playing on the hardware is still being tested.
 > Install it over the official firmware and keep the USB rescue in mind (below).
@@ -25,7 +25,7 @@ the kind of setting, PRESETS steps through them.
 
 <table>
 <tr>
-<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="PLAY, MELODY"><br><b>PLAY</b> (HOME): melody, rhythm, pitch, change, density, octave, style, sound, volume.</td>
+<td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="PLAY, VOLUME"><br><b>PLAY</b> (HOME): volume, style, sound, melody, rhythm, pitch, density, octave, change.</td>
 <td align="center" width="33%"><img src="docs/screens/sound.png" width="240" alt="SOUND, FILTER"><br><b>SOUND</b> (FX): filter, resonance, wobble, drive, brightness, crush, vary, reverb. The lanes darken what the filter cuts.</td>
 <td align="center" width="33%"><img src="docs/screens/tracker.png" width="240" alt="TRACKER, RATE"><br><b>TRACKER</b> (ARP): slide, retrigger, rate, echo, porta, vibrato, tremolo, tremor, gate, swing, pan.</td>
 </tr>
