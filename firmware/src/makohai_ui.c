@@ -2026,7 +2026,8 @@ static uint32_t lane_keys(int32_t l)
         const voice_t *v = &vc[i];
         if (v->kind == V_OFF || v->lane != (uint8_t)l) continue;
         if (l == L_SFX) { int32_t w = (int32_t)v->kind - V_WASH; for (k = 0; k < 27; k++) if (white_index(k) == w) m |= 1u << k; continue; }
-        if (!v->key || v->stage == 2u) continue;                    /* sounding, not fading out */
+        if (!v->key || v->stage == 2u || v->gate < 1764u) continue;   /* sounding, not fading out; dark its last 40 ms, so a fast
+                                                                     * run of notes (the arp) blinks note by note */
         k = (int32_t)v->key - 53 - 12 * kb_oct;
         while (k < 0) k += 12;
         while (k > 26) k -= 12;

@@ -288,7 +288,9 @@ switch WASH, RISER, IMPACT, ZAP, CRACKLE, BITS, SURF and GALE at the cursor.
 - The keys play the marked lane, live, from F3 to G5 shifted by OCT- / OCT+: a note
   sounds as long as you hold it, with the lane's sound. On DRUMS the first nine white keys (F3 .. G4) play kick,
   snare, hat, kettle drum, crash, clap, open hat, tom and rim shot; on SFX the first eight its sounds. While it plays, the keys light up the notes the marked lane plays, as they sound (a note above or below the keys'
-  range lights in the octave that is there; OCT- / OCT+ count); on DRUMS and SFX the white key of each hit. Stopped,
+  range lights in the octave that is there, so the arp, which plays above the keys, shows an octave or two down;
+  OCT- / OCT+ count; each note goes dark just before its end, so a fast run blinks note by note); on DRUMS and SFX
+  the white key of each hit. Stopped,
   the keys of the tonic are lit. The keys you hold are always lit.
 - On PAD a key is a chord in key: the triad on that note in the song's scale (in C major: C, Dm, Em, F, G, Am, ...);
   SEL + a key the sus4. Your pad parts and recordings play the same chords.
