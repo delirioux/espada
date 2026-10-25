@@ -310,7 +310,7 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
 }
 
 static uint32_t tom_at, tom_n;                  /* toms in a row step down: the last one's time, how many */
-static void start_drum(uint32_t kind, uint32_t pitch, uint32_t lvl, uint32_t kit, int32_t is_orig)   /* pitch: the timpani's note (0: the key's) */
+static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_orig)
 {
     voice_t *v;
     uint32_t gm = GM_DRUM[kind < NDK ? kind : 0];
@@ -321,7 +321,7 @@ static void start_drum(uint32_t kind, uint32_t pitch, uint32_t lvl, uint32_t kit
     v->gate = 0xFFFFFFFFu; v->midi = 0; v->chaos = 0; v->breath = K->sharp; v->tone_amp = 0;   /* breath: the kit's sharpness, for drums */
     switch (kind) {
     case DK_KICK: case DK_KETTLE: {
-        uint32_t lo = kind == DK_KETTLE ? note_inc(pitch ? (int32_t)pitch : 50 + key_off) : HZ_INC(K->kl);   /* timpani: tuned, in the octave a small speaker plays */
+        uint32_t lo = kind == DK_KETTLE ? note_inc(38 + key_off) : HZ_INC(K->kl);
         v->kind = kind == DK_KETTLE ? V_KETTLE : V_KICK;
         v->inc_lo = lo; v->inc = kind == DK_KETTLE ? lo + (lo * 3u >> 2) : HZ_INC(K->kh);
         v->inc_k = (uint32_t)tau_k(kind == DK_KETTLE ? 20u : 30u);
@@ -446,7 +446,7 @@ static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags,
     uint32_t i;
     lane_hit_ms[lane] = fm1_ms;
     if (fx[lane].autopan > 0 && !fx[lane].aprate && smp - ap_last[lane] > 441u) { ap_side[lane] ^= 1u; ap_last[lane] = smp; }
-    if (lane == L_DRUMS) { start_drum(note[0], note[1], lvl, kind_or_inst, original); return; }
+    if (lane == L_DRUMS) { start_drum(note[0], lvl, kind_or_inst, original); return; }
     if (lane == L_SFX) { start_sfx(note[0], note[1], dur, lvl); return; }
     {
         const patch_t *P = &PATCH[flags & EV_ORCH ? NPATCH - 1u : kind_or_inst < NPATCH ? kind_or_inst : 0];   /* ORCH HIT is the last patch */
@@ -891,7 +891,7 @@ static void live_run(void)
         const live_t *e = (const live_t *)&live_q[live_r % 16u];
         uint32_t k = e->key < 27u ? e->key : 0u;
         if (e->on) {
-            if (e->lane == L_DRUMS) start_drum(e->note, 0, 230, e->inst, 0);
+            if (e->lane == L_DRUMS) start_drum(e->note, 230, e->inst, 0);
             else if (e->lane == L_SFX) start_sfx(e->note, (uint32_t)(62 + key_off), 44100, 230);
             else {
                 const uint8_t nn[3] = {e->note, e->n2, e->n3};
