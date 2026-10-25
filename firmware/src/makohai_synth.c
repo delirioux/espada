@@ -119,6 +119,7 @@ typedef struct {
     uint32_t ss[6];                             /* SUPERSAW: the six detuned saws' phases */
     int32_t pamp, brown;                        /* the pad's level (Q15, slow), the brown noise */
     uint8_t wt;                                 /* what it costs (the voice budget) */
+    uint8_t key;                                /* the note it plays (0: an echo copy, a drum, a noise): the keys light it */
 } voice_t;
 #define NVOICE 33u
 static voice_t vc[NVOICE];
@@ -207,7 +208,7 @@ static volatile uint32_t scope_w;
 static const uint8_t AP_STEPS[8] = {0, 128, 64, 32, 16, 8, 4, 2};   /* PAN RATE: a sweep's cycle in 16ths */
 static uint32_t wob_ph[NLANE];
 static uint32_t lane_last_inc[NLANE][3];
-static volatile uint32_t lane_hit_ms[NLANE];
+static volatile uint32_t lane_hit_ms[NLANE], hit_ms[NDK > NSX ? NDK : NSX];   /* the last hit of each drum (or sfx) kind: the keys light it */
 
 /* ---- the clock */
 static volatile int32_t seq_playing, seq_start_req, seq_stop_req, seq_start_step;
@@ -289,7 +290,7 @@ static voice_t *alloc_voice(uint32_t lane, uint32_t wt)
         if (vc[victim].midi) mo_push(0x80u | vc[victim].midi_ch, vc[victim].midi, 0);
         total -= vc[victim].wt; vc[victim].kind = V_OFF;
     }
-    vc[pick].wt = (uint8_t)wt;
+    vc[pick].wt = (uint8_t)wt; vc[pick].key = 0;
     return &vc[pick];
 }
 
@@ -325,6 +326,7 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
     v->vib = P->vib; v->vph = 0;
     v->arp_n = (uint8_t)arp_n; v->arp_i = 0; v->arp_t = 0;
     for (i = 0; i < arp_n && i < 3u; i++) v->arp[i] = arp[i];
+    v->key = (uint8_t)midi;
     if (midi_chan[lane] > 15u) midi = 0;                            /* this lane sends no MIDI */
     v->midi = (uint8_t)midi; v->midi_ch = midi_chan[lane];
     v->chaos = P->chaos; v->pph1 = 0x40000000u; v->pph2 = 0; v->pamp = 0; v->brown = 0;
@@ -473,7 +475,7 @@ static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags,
     uint32_t i;
     lane_hit_ms[lane] = fm1_ms;
     if (fx[lane].autopan > 0 && !fx[lane].aprate && smp - ap_last[lane] > 441u) { ap_side[lane] ^= 1u; ap_last[lane] = smp; }
-    if (lane == L_DRUMS) { start_drum(note[0], lvl, kind_or_inst, original); return; }
+    if (lane == L_DRUMS) { if (note[0] < NDK) hit_ms[note[0]] = fm1_ms; start_drum(note[0], lvl, kind_or_inst, original); return; }
     if (lane == L_SFX) { start_sfx(note[0], note[1], dur, lvl); return; }
     {
         const patch_t *P = &PATCH[flags & EV_ORCH ? NPATCH - 1u : kind_or_inst < NPATCH ? kind_or_inst : 0];   /* ORCH HIT is the last patch */

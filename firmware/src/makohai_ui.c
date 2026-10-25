@@ -1988,6 +1988,25 @@ static void input(void)
 }
 
 /* ---- the lights: every button and key glows; lit: where you are and what is on */
+/* the keys that show what a lane plays: its notes as they sound (an octave folded in when out of the keys' range, the
+ * keys' octave counted), the drums' and sfx's white keys as they hit */
+static uint32_t lane_keys(int32_t l)
+{
+    uint32_t m = 0, i;
+    int32_t k;
+    if (l == L_DRUMS) { for (k = 0; k < 27; k++) { int32_t w = white_index(k); if (w >= 0 && w < NDK && fm1_ms - hit_ms[w] < 120u) m |= 1u << k; } return m; }
+    for (i = 0; i < NVOICE; i++) {
+        const voice_t *v = &vc[i];
+        if (v->kind == V_OFF || v->lane != (uint8_t)l) continue;
+        if (l == L_SFX) { int32_t w = (int32_t)v->kind - V_WASH; for (k = 0; k < 27; k++) if (white_index(k) == w) m |= 1u << k; continue; }
+        if (!v->key || v->stage == 2u) continue;                    /* sounding, not fading out */
+        k = (int32_t)v->key - 53 - 12 * kb_oct;
+        while (k < 0) k += 12;
+        while (k > 26) k -= 12;
+        m |= 1u << k;
+    }
+    return m;
+}
 static void leds(void)
 {
     static uint32_t last = 0xFFFFFFFFu, lastk = 0xFFFFFFFFu;
@@ -2007,7 +2026,8 @@ static void leds(void)
             else if (wi >= 0 && UK(sel, cursor) != EMPTY && wi - 4 + 7 * entry_oct == UK(sel, cursor)) km |= 1u << k;
         }
     } else {
-        for (k = 0; k < 27u; k++) if (!HITS(sel) && (53u + k + 120u + 12u * (uint32_t)(kb_oct + 2)) % 12u == (uint32_t)key) km |= 1u << k;   /* the tonic */
+        if (seq_playing) km = lane_keys(sel);                       /* playing: what the marked lane plays */
+        else for (k = 0; k < 27u; k++) if (!HITS(sel) && (53u + k + 120u + 12u * (uint32_t)(kb_oct + 2)) % 12u == (uint32_t)key) km |= 1u << k;   /* stopped: the tonic */
         km |= keys_down;                                            /* and what you hold */
     }
     if (m != last) { for (k = 0; k < 14u; k++) fm1_led_key(k, m >> k & 1u); last = m; }
