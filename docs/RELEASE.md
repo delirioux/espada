@@ -1,21 +1,31 @@
-Since 1.0:
+Makohai 1.1: stereo that moves, pictures in demo style, keys that show what plays, and no more cracks.
 
-- AUTOPAN and PAN RATE (TRACKER, after PAN): each new note on the other side of the lane's pan, or a slow sweep
-  from side to side in time (8 bars to an 8th a cycle), as far as you set it.
-- Settings and sets saved by 1.0 are read and kept.
+Sound
+- A voice budget (SETUP, VOICES: now, peak, LIMIT). Every voice costs the audio its time; all that sounds may cost at
+  most LIMIT, and past it the quietest voice that is fading out stops first. ECHO on every lane in SYMPHONY took the
+  FM-1 to 109 % of its time (a crack across the whole sound); now it stays under.
+- AUTOPAN and PAN RATE (TRACKER, after PAN): each new note on the other side of the lane's pan, or a slow sweep from
+  side to side in time (8 bars to an 8th a cycle). Every lane now starts at PAN 0; the lead and the arp at AUTOPAN 20.
 - CRACKLE and BITS (sfx) at a tenth of their old level: far in the background.
-- Pictures on SETUP's free knobs: SCOPE, LANES, STEREO (a goniometer), SPECTRUM (a landscape), and RESET's three
-  knobs each picking one of CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, FIRE, LOGO, SCOPE, SPECTRUM.
-- Every lane starts at PAN 0; the lead and the arp at AUTOPAN 20.
-- The keys light up the notes the marked lane plays (drums and sfx: their keys as they hit), and their octave follows
-  the marked lane to where it plays.
-- A voice budget (SETUP, VOICES: now, peak, LIMIT): all that sounds may cost at most LIMIT units, so echo on every
-  lane can no longer make the sound late (a crack); past it the quietest fading voice stops first.
-- BACK (SETUP): a picture behind the whole screen on every page, dimmed (10..60 %), CYCLE to the next one every
-  4, 8 or 16 bars with a cut; saved with the look.
+
+Pictures
+- SETUP's free knobs show pictures: SCOPE, LANES, STEREO (a goniometer), SPECTRUM (a landscape), and RESET's three
+  knobs each pick one of CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, FIRE, LOGO, SCOPE, SPECTRUM.
+- BACK (SETUP): a picture behind the whole screen on every page, dimmed (10..60 %), CYCLE to the next one every 4, 8
+  or 16 bars with a cut; saved with the look.
 - DEMO (SEL + HOME): the pictures full screen while the music plays, cut on the bar every 4, 8 or 16 bars with
-  flashes, blinds, wipes, dissolves, an iris, dips and pushes; a drop cuts with a flash.
-- A new identity, FM-1_47625642 (1.0 reported FM-1_960, as another firmware does), the same for every version: the FM-1 Firmware Hub tells Makohai apart by it.
+  flashes, blinds, wipes, dissolves, an iris, dips and pushes; a drop cuts with a flash. PRESETS steps, ALGORITHM
+  sets how often.
+
+Keys
+- The keys light up the notes the marked lane plays, note by note (drums and sfx: their keys as they hit).
+- The keys' octave follows the marked lane to where it plays, so the lights show the real notes and what you play
+  sits in the lane's register.
+
+Install
+- A new identity, FM-1_47625642, the same for every version from now on (1.0 reported FM-1_960, as another firmware
+  does): the FM-1 Firmware Hub tells Makohai apart by it.
+- Settings and sets saved by 1.0 are read and kept.
 
 Makohai 1.0 (formerly Espada): the first release of a generative groovebox for the M-VAVE FM-1 in the style of early-90s PC tracker music.
 

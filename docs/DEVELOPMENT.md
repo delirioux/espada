@@ -4,8 +4,8 @@ How Makohai is made and where it is going: the agreements, how changes reach Git
 and why, how to build and test it, the open risks and what comes next. What Makohai is and how to play it is in
 the [README](../README.md) and the [manual](MANUAL.md); the chip's rules are in [RULES.md](RULES.md).
 
-Status: 25 October 2026. Version 1.0 runs on the FM-1; hours-long runs were tested on a computer, not yet on the
-hardware. Six lanes,
+Status: 25 October 2026. Version 1.1 runs on the FM-1. Its first overload (SYMPHONY with echo everywhere, 109 % of
+the audio time) is closed by the voice budget; hours-long runs on the hardware are still to come. Six lanes,
 ten styles played as in a tracker, long lead arcs, the one-screen interface, the browser version and the web
 installer are in.
 
