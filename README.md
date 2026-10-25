@@ -12,8 +12,8 @@ glides, swells and an echo channel. You do not program steps; you mix styles. Qu
 lane from the bottom up, or launch it at once with its own tempo. Shape each lane with a
 filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, porta, vibrato, tremolo, tremor, gate, swing,
 retrigger, a bit crusher, echo, and an equal-power pan per lane with an autopan that sends each note to the other side or sweeps the lane in time. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself. SETUP's free knobs
-show pictures: a scope, level meters, a goniometer, a spectrum landscape, and eight demo-style pictures (a turning
-crystal, a tunnel, dots, plasma and more).
+show pictures: a scope, level meters, a goniometer, a spectrum landscape, and demo-style pictures (a turning crystal, a
+tunnel, dots, plasma, fire and more). SEL + HOME shows them full screen, cut on the beat.
 
 <p align="center"><img src="docs/screens/main.png" width="320" alt="Makohai's screen: the VOLUME setting, all six lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
 
@@ -32,7 +32,7 @@ the kind of setting, PRESETS steps through them.
 <tr>
 <td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="PLAY, VOLUME"><br><b>PLAY</b> (HOME): volume, style, sound, melody, rhythm, pitch, density, octave, change.</td>
 <td align="center" width="33%"><img src="docs/screens/sound.png" width="240" alt="SOUND, FILTER"><br><b>SOUND</b> (FX): reverb, filter, resonance, wobble, brightness, drive, crush, vary. The lanes darken what the filter cuts.</td>
-<td align="center" width="33%"><img src="docs/screens/tracker.png" width="240" alt="TRACKER, RATE"><br><b>TRACKER</b> (ARP): slide, retrigger, rate, echo, porta, vibrato, tremolo, tremor, gate, swing, pan.</td>
+<td align="center" width="33%"><img src="docs/screens/tracker.png" width="240" alt="TRACKER, AUTOPAN"><br><b>TRACKER</b> (ARP): pan, autopan, pan rate, swing, echo, slide, glides, porta, vibrato, tremolo, tremor, gate, retrigger, rate.</td>
 </tr>
 <tr>
 <td align="center"><img src="docs/screens/song.png" width="240" alt="SONG, KEY"><br><b>SONG</b> (GLO): the knobs are four settings of their own. KEY: key, scale, chords, bars per chord, the chord playing lit.</td>

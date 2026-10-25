@@ -4,7 +4,9 @@ Since 1.0:
   from side to side in time (8 bars to an 8th a cycle), as far as you set it.
 - Settings and sets saved by 1.0 are read and kept.
 - Pictures on SETUP's free knobs: SCOPE, LANES, STEREO (a goniometer), SPECTRUM (a landscape), and RESET's three
-  knobs each picking one of CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, COPPER, MAKO.
+  knobs each picking one of CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, COPPER, MAKO, FIRE, LOGO, SCOPE, SPECTRUM.
+- DEMO (SEL + HOME): the pictures full screen while the music plays, cut on the bar every 4, 8 or 16 bars with
+  flashes, blinds, wipes, dissolves, an iris, dips and pushes; a drop cuts with a flash.
 - A new identity, FM-1_47625642 (1.0 reported FM-1_960, as another firmware does), the same for every version: the FM-1 Firmware Hub tells Makohai apart by it.
 
 Makohai 1.0 (formerly Espada): the first release of a generative groovebox for the M-VAVE FM-1 in the style of early-90s PC tracker music.

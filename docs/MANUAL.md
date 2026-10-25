@@ -77,8 +77,9 @@ goniometer: left against right, turned so that one sound in the middle stands up
 bass on the left, hats on the right, as a landscape rolling away. RESET's three knobs each pick a picture:
 **CRYSTAL** (a see-through faceted body turning, swelling on the drums), **TUNNEL** (flying down a tunnel at the
 tempo), **DOTS** (a ball of dots that becomes a ring and back), **PLASMA**, **TWIRL** (a checker turning and
-zooming), **STARS**, **COPPER** (raster bars flashing on the drums) and **MAKO** (a fin crossing the sea, bobbing on
-the bass). Which pictures RESET shows is not saved.
+zooming), **STARS**, **COPPER** (raster bars flashing on the drums), **MAKO** (a fin crossing the sea, bobbing on
+the bass), **FIRE**, **LOGO** (the logo with raster bars behind it), **SCOPE** and **SPECTRUM**. Which pictures RESET
+shows is not saved.
 
 SAVE keeps the setup with everything else. SYSTEM and AUDIO only show; they are how a firmware that runs short of
 memory or time is caught before it crackles or crashes. In the browser, SYSTEM shows N/A (there is no FM-1 memory
@@ -90,7 +91,7 @@ Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on
 
 | Button | Does |
 | --- | --- |
-| HOME, FX, ARP, GLO | the groups PLAY, SOUND, TRACKER, SONG; pressed again: the next setting. From EDIT: back. Hold HOME: SETUP |
+| HOME, FX, ARP, GLO | the groups PLAY, SOUND, TRACKER, SONG; pressed again: the next setting. From EDIT: back. Hold HOME: SETUP. SEL + HOME: DEMO |
 | EDIT | the lane's own part, step by step, bar by bar (again: back); PRESETS through its five pages. SEL + EDIT: clear this bar (the last bar goes) |
 | PLAY | stopped: start from the top with an INTRO (SEL + PLAY: everything at once). Playing: the END (SEL + PLAY, or PLAY again during the END: stop now) |
 | SEQ | LAUNCH: every unlocked lane moves to the queued style at once, at the style's tempo. SEL + SEQ: launch and keep your tempo. On EDIT: COPY the whole part of the lane set on EDIT 2 into this one |
@@ -99,6 +100,20 @@ Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on
 | LFO | a new idea for the lane, at once (MELODY moves on). On EDIT: GENERATE this bar: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
 | OCT- / OCT+ | the keys' octave; both together: back to 0. On EDIT: the octave you enter in |
 | SAVE | keep everything (settings and your parts); while playing it waits until you stop. SEL + SAVE: the audio interrupt's time in the header (also SETUP, AUDIO) |
+
+## Demo
+
+**SEL + HOME** fills the screen with the pictures while the music plays on. Every 8 bars it cuts to another one on
+the bar line, with a cut of its own each time: a flash, blinds, a raster wipe, a dissolve, an iris, a dip to black, or
+the new picture pushing the old one out. A drop (yours with REC, or the arc's) cuts at once with a white flash.
+**PRESETS** cuts to the next picture (or the one before), **ALGORITHM** sets how often it cuts: every 4, 8 or 16
+bars, or not at all. A word in the corner says what came. HOME, FX, ARP, GLO and EDIT leave DEMO and take you back
+where you were; PLAY, SEQ, REC, ENV, LFO, SAVE, SELECT (the tempo), the four knobs and the keys go on working as
+always, unseen. The pictures that colour every pixel (TUNNEL, PLASMA, TWIRL, FIRE, LOGO) draw in blocks of 2 x 2,
+as on the old 320 x 200 screens; the rest draw in single pixels. The sound always comes first: drawing never takes
+time from it, at most the pictures move a little slower.
+
+<p align="center"><img src="screens/demo.png" width="320" alt="DEMO: the logo full screen, raster bars behind it"></p>
 
 Every button and key glows faintly; lit means: the group you are in, EDIT, playing, a break, a launch waiting, the
 lane faded out, a save waiting, the keys' octave off 0.

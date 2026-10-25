@@ -537,33 +537,34 @@ static const card_t ROW_EDIT[5][4] = {
     {{"FROM", t_from, v_from, s_range}, {"TO", t_to, v_to, s_range}, {"PASTE", t_paste, v_paste, s_paste}, {"CLEAR", t_clear, v_clear, s_clear}}};
 static const char *const EDIT_PAGE[5] = {"NOTES", "FX", "PART", "BAR", "RANGE"};
 static int32_t edit_row, rec_on;                               /* the EDIT page; RECORD (REC on EDIT) */
-/* ---- the pictures on SETUP's free knobs. Four show the sound: SCOPE (the output's wave and the ones before it,
- * going back into the screen), LANES (a level per lane, as blocks), STEREO (left against right, a goniometer with a
- * trail), SPECTRUM (what sounds by pitch, as a landscape rolling away). RESET's three show a picture each, picked
- * with their knob: CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, COPPER, MAKO. All in integers; the sound is read
- * once a frame (vis_prep), then each strip of the knob row draws its part */
+/* ---- the pictures: on SETUP's free knobs, and full screen in DEMO (SEL + HOME). Each draws into the current view
+ * (where on the screen, how large, and its pixel size: 2 makes the per-pixel ones chunky and four times cheaper);
+ * the sound is read once a frame (vis_prep), then each strip of the screen draws its part. During a cut the outgoing
+ * picture draws where the cut's mask says "not yet", the incoming one where it says "now". All in integers */
 #define VIS_Y (KNOB_Y + 20)
 #define VIS_H (KNOB_H - 24)
 #define VIS_W (COL_W - 6)
-#define VIS_X0(x) ((x) + 3)
 #define SC_N 28                                     /* SCOPE: points a trace, traces kept */
 #define SC_K 10
 #define LS_N 16                                     /* SPECTRUM: rows of the landscape */
 #define GO_N 96                                     /* STEREO: points a frame */
+#define FIRE_W 60
+#define FIRE_H 62
+#define TQ 64                                       /* TUNNEL: a quarter's table, TQ x TQ */
 static int8_t sc_hist[SC_K][SC_N];
-static int16_t vis_sc[56];
 static int32_t vis_lane[NLANE], vis_out[2], vis_band[8], sc_head, ls_head;
 static uint8_t ls_hist[LS_N][8];
 static int8_t go_pt[3][GO_N][2];                    /* the last three frames of left/right points */
 static uint32_t vis_t, vis_rng = 0x9E3779B9u, go_head;
-static int32_t star_x[24], star_y[24], star_z[24], vis_hit;
-static uint16_t vpal[64], wpal[64];                 /* two ramps, already painted (the palette, the screen level) */
-static uint8_t tun_ang[VIS_H][VIS_W] __attribute__((section(".pool"))), tun_dep[VIS_H][VIS_W] __attribute__((section(".pool")));
+static int32_t star_x[48], star_y[48], star_z[48], vis_hit;
+static uint16_t vpal[64], wpal[64], fpal[64];       /* three ramps, already painted (the palette, the screen level) */
+static uint8_t tq_ang[TQ][TQ] __attribute__((section(".pool"))), tq_dep[TQ][TQ] __attribute__((section(".pool")));
+static uint8_t flame[FIRE_H][FIRE_W] __attribute__((section(".pool")));
 static int8_t dot_sph[96][3], dot_tor[96][3];
-static int32_t vis_ready;
-#define NPIC 8
-static const char *const PICN[NPIC] = {"CRYSTAL", "TUNNEL", "DOTS", "PLASMA", "TWIRL", "STARS", "COPPER", "MAKO"};
-static int32_t pick[3] = {0, 1, 2};
+static int32_t vis_ready, logo_dark;
+static int32_t vx0, vy0, vw, vh, vps = 1;           /* the view */
+enum { TR_FLASH, TR_BLINDS, TR_WIPE, TR_DISSOLVE, TR_IRIS, TR_DIP, TR_PUSH, NTR };
+static int32_t tr_on, tr_type, tr_p, tr_side;       /* a cut: its kind, how far (0..256), which side draws now */
 
 static uint32_t vis_rand(void) { vis_rng ^= vis_rng << 13; vis_rng ^= vis_rng >> 17; vis_rng ^= vis_rng << 5; return vis_rng; }
 static int32_t vis_fall(int32_t now, int32_t was) { return now > was ? now : was * 13 / 16; }   /* up at once, down slowly */
@@ -577,16 +578,7 @@ static int32_t isqrt(int32_t v)
     while (b) { if (v >= r + b) { v -= r + b; r = (r >> 1) + b; } else r >>= 1; b >>= 2; }
     return r;
 }
-static int32_t iatan2(int32_t y, int32_t x)                                  /* 0..255 a turn, near enough to draw with */
-{
-    int32_t ax = x < 0 ? -x : x, ay = y < 0 ? -y : y, a;
-    if (!ax && !ay) return 0;
-    a = ax >= ay ? 32 * ay / ax : 64 - 32 * ax / ay;                          /* 0..64 in the first quarter */
-    if (x < 0) a = 128 - a;
-    if (y < 0) a = 256 - a;
-    return a & 255;
-}
-static uint16_t vramp(int32_t i, uint32_t c0, uint32_t c1, uint32_t c2)       /* 0..63 through three colours */
+static uint16_t vramp(int32_t i, uint32_t c0, uint32_t c1, uint32_t c2)      /* 0..63 through three colours */
 {
     uint32_t a = i < 32 ? c0 : c1, b = i < 32 ? c1 : c2;
     int32_t f = (i & 31) * 8, r = (int32_t)(a >> 16) + (((int32_t)(b >> 16) - (int32_t)(a >> 16)) * f >> 8);
@@ -596,12 +588,12 @@ static uint16_t vramp(int32_t i, uint32_t c0, uint32_t c1, uint32_t c2)       /*
 }
 static void vis_init(void)                                                    /* the tables, once */
 {
-    int32_t x, y, i, j;
-    for (y = 0; y < VIS_H; y++)
-        for (x = 0; x < VIS_W; x++) {
-            int32_t dx = x - VIS_W / 2, dy = y - VIS_H / 2, d = isqrt(dx * dx + dy * dy);
-            tun_ang[y][x] = (uint8_t)iatan2(dy, dx);
-            tun_dep[y][x] = (uint8_t)(d < 2 ? 255 : 1024 / d > 255 ? 255 : 1024 / d);
+    int32_t x, y, i, j, best = 1 << 30;
+    for (y = 0; y < TQ; y++)                                                  /* a quarter of the tunnel: the rest mirrors it */
+        for (x = 0; x < TQ; x++) {
+            int32_t d = isqrt(x * x + y * y);
+            tq_ang[y][x] = (uint8_t)(x == 0 && y == 0 ? 0 : x >= y ? 32 * y / x : 64 - 32 * x / y);
+            tq_dep[y][x] = (uint8_t)(d < 3 ? 255 : 1024 / d > 255 ? 255 : 1024 / d);
         }
     for (i = 0; i < 8; i++)                                                   /* a ball of 8 rings of 12, a ring of 12 tubes */
         for (j = 0; j < 12; j++) {
@@ -611,38 +603,44 @@ static void vis_init(void)                                                    /*
             r = 17 + (vcos(tu) * 7 >> 15);
             dot_tor[i * 12 + j][0] = (int8_t)(r * vcos(lo) >> 15); dot_tor[i * 12 + j][1] = (int8_t)(vsin(tu) * 7 >> 15); dot_tor[i * 12 + j][2] = (int8_t)(r * vsin(lo) >> 15);
         }
+    for (i = 0; i < 16; i++) {                                                /* the logo's darkest colour (it may be there more than once): */
+        int32_t c = LOGO_PAL[i], l = ((c >> 11) * 2 + ((c >> 5) & 63) + (c & 31) * 2);   /* where the bars show through */
+        if (l < best) { best = l; logo_dark = 1 << i; } else if (l == best) logo_dark |= 1 << i;
+    }
     vis_ready = 1;
 }
 static void vis_prep(void)
 {
     static const uint8_t KBAND[] = {0, 0, 0, 4, 7, 6, 1, 5, 7, 2, 5, 5, 4, 1, 3, 6, 6, 3, 5};   /* a drum's or a noise's band, by kind */
     static int16_t sl[256], sr[256];
-    int32_t b[8], trig = 0, l, k, peak = 1;
+    int32_t b[8], trig = 0, l, k, peak = 1, x, y;
     uint32_t w = scope_w, i;
     if (!vis_ready) vis_init();
     vis_t++;
     vis_hit = (int32_t)(fm1_ms - lane_hit_ms[L_DRUMS]) < 100 && seq_playing;
-    for (k = 0; k < 64; k++) { vpal[k] = vramp(k, 0x020818u, 0x1aa0c8u, 0xf0fbffu); wpal[k] = vramp(k, 0x14062au, 0xc03a8cu, 0xffd27au); }
+    for (k = 0; k < 64; k++) {
+        vpal[k] = vramp(k, 0x020818u, 0x1aa0c8u, 0xf0fbffu); wpal[k] = vramp(k, 0x14062au, 0xc03a8cu, 0xffd27au);
+        fpal[k] = k < 32 ? vramp(k, 0x000000u, 0x200000u, 0xd02800u) : vramp(k, 0x000000u, 0xd02800u, 0xfff0a0u);
+    }
     for (i = 0; i < 256u; i++) { sl[i] = scope_l[(w + i) & 255u]; sr[i] = scope_r[(w + i) & 255u]; }   /* oldest first */
     for (i = 1; i < 144u; i++) if (sl[i - 1] + sr[i - 1] < 0 && sl[i] + sr[i] >= 0) { trig = (int32_t)i; break; }   /* a rising zero: it stands still */
-    for (k = 0; k < 56; k++) vis_sc[k] = (int16_t)((sl[trig + k * 2] + sr[trig + k * 2]) >> 1);
-    sc_head = (sc_head + 1) % SC_K;                                           /* this frame's trace, the oldest goes */
-    for (k = 0; k < SC_N; k++) { int32_t v = vis_sc[k * 2] / 700; sc_hist[sc_head][k] = (int8_t)(v > 40 ? 40 : v < -40 ? -40 : v); }
+    sc_head = (sc_head + 1) % SC_K;                                           /* this frame's trace; the oldest goes */
+    for (k = 0; k < SC_N; k++) { int32_t v = (sl[trig + k * 4] + sr[trig + k * 4]) / 1400; sc_hist[sc_head][k] = (int8_t)(v > 40 ? 40 : v < -40 ? -40 : v); }
     for (i = 128u; i < 256u; i++) { int32_t a = sl[i] < 0 ? -sl[i] : sl[i], c = sr[i] < 0 ? -sr[i] : sr[i]; if (a > peak) peak = a; if (c > peak) peak = c; }
     go_head = (go_head + 1u) % 3u;
     for (k = 0; k < GO_N; k++) {                                              /* side to side across, middle up: 45 degrees turned */
-        int32_t L = sl[160 + k], R = sr[160 + k], gx = (R - L) * 26 / (peak * 2), gy = (L + R) * 30 / (peak * 2);
-        go_pt[go_head][k][0] = (int8_t)gx; go_pt[go_head][k][1] = (int8_t)gy;
+        int32_t L = sl[160 + k], R = sr[160 + k];
+        go_pt[go_head][k][0] = (int8_t)((R - L) * 26 / (peak * 2)); go_pt[go_head][k][1] = (int8_t)((L + R) * 30 / (peak * 2));
     }
     for (l = 0; l < (int32_t)NLANE; l++) { int32_t p = lane_pk[l]; lane_pk[l] = 0; vis_lane[l] = vis_fall(p, vis_lane[l]); }
     for (k = 0; k < 2; k++) { int32_t p = out_pk[k]; out_pk[k] = 0; vis_out[k] = vis_fall(p, vis_out[k]); }
     for (k = 0; k < 8; k++) b[k] = 0;
     for (i = 0; i < NVOICE; i++) {                                            /* every voice that sounds, by its pitch */
-        const voice_t *x = &vc[i];
-        int32_t a = x->amp < 0 ? -x->amp : x->amp, band;
-        if (x->kind == V_OFF || x->kind >= sizeof KBAND) continue;
-        if (x->kind == V_FM) { uint32_t hz = x->inc / 97392u; band = hz < 80u ? 0 : hz < 160u ? 1 : hz < 320u ? 2 : hz < 640u ? 3 : hz < 1280u ? 4 : hz < 2560u ? 5 : hz < 5120u ? 6 : 7; }
-        else band = KBAND[x->kind];
+        const voice_t *v = &vc[i];
+        int32_t a = v->amp < 0 ? -v->amp : v->amp, band;
+        if (v->kind == V_OFF || v->kind >= sizeof KBAND) continue;
+        if (v->kind == V_FM) { uint32_t hz = v->inc / 97392u; band = hz < 80u ? 0 : hz < 160u ? 1 : hz < 320u ? 2 : hz < 640u ? 3 : hz < 1280u ? 4 : hz < 2560u ? 5 : hz < 5120u ? 6 : 7; }
+        else band = KBAND[v->kind];
         b[band] += a;
         if (band > 0) b[band - 1] += a / 3;
         if (band < 7) b[band + 1] += a / 3;
@@ -652,36 +650,67 @@ static void vis_prep(void)
         ls_head = (ls_head + 1) % LS_N;
         for (k = 0; k < 8; k++) { int32_t h = vis_band[k] * 30 / 30000; ls_hist[ls_head][k] = (uint8_t)(h > 30 ? 30 : h); }
     }
-    for (k = 0; k < 24; k++) {                                                /* the stars fly out, faster with the tempo */
+    for (k = 0; k < 48; k++) {                                                /* the stars fly out, faster with the tempo */
         int32_t px, py;
         star_z[k] -= 1 + (int32_t)seq_bpm / 50;
         px = star_z[k] > 0 ? star_x[k] * 24 / star_z[k] : 999; py = star_z[k] > 0 ? star_y[k] * 24 / star_z[k] : 999;
-        if (star_z[k] <= 2 || px > VIS_W / 2 || px < -VIS_W / 2 || py > VIS_H / 2 || py < -VIS_H / 2 || star_z[k] > 64) {
+        if (star_z[k] <= 2 || px > 27 || px < -27 || py > 34 || py < -34 || star_z[k] > 64) {
             star_x[k] = (int32_t)(vis_rand() % 61u) - 30; star_y[k] = (int32_t)(vis_rand() % 61u) - 30; star_z[k] = 40 + (int32_t)(vis_rand() % 24u);
         }
     }
+    for (x = 0; x < FIRE_W; x++)                                              /* the fire: a hot floor, hotter on the drums */
+        flame[FIRE_H - 1][x] = (uint8_t)(vis_rand() % 100u < (vis_hit ? 85u : 55u) ? 255 : 40);
+    for (y = 0; y < FIRE_H - 1; y++)
+        for (x = 0; x < FIRE_W; x++) {
+            int32_t s = flame[y + 1][x > 0 ? x - 1 : x] + flame[y + 1][x] + flame[y + 1][x < FIRE_W - 1 ? x + 1 : x] + flame[y + 2 < FIRE_H ? y + 2 : y + 1][x];
+            s = (s >> 2) - 2;
+            flame[y][x] = (uint8_t)(s < 0 ? 0 : s);
+        }
 }
 
-/* drawing into the strip: a pixel, and the rows of the picture this strip holds */
-static void vpix(int32_t x, int32_t y, uint16_t sw)                           /* sw: painted and swapped */
+/* where a picture may draw: its view, the screen, the strip, and the cut's side */
+static int32_t in_b(int32_t x, int32_t y)                                     /* is (x, y) the incoming picture's already */
 {
-    if (y < cy0 || y >= cy0 + chh || y < VIS_Y || y >= VIS_Y + VIS_H || x < 0 || x >= 240) return;
-    cvp[(y - cy0) * 240 + x] = sw;
+    switch (tr_type) {
+    case TR_BLINDS: return (y % 20) < tr_p * 20 / 256;
+    case TR_WIPE: return x + y / 2 + (int32_t)((uint32_t)(y >> 1) * 2654435761u >> 29) < tr_p * 368 / 256;
+    case TR_DISSOLVE: return (int32_t)(((uint32_t)(x >> 1) * 73856093u ^ (uint32_t)(y >> 1) * 19349663u) >> 9 & 255u) < tr_p;
+    case TR_IRIS: { int32_t dx = x - 120, dy = y - 120, r = tr_p * 172 / 256; return dx * dx + dy * dy < r * r; }
+    case TR_DIP: return tr_p >= 128;
+    default: return 1;
+    }
 }
+static int32_t vok(int32_t x, int32_t y)
+{
+    if (x < vx0 || x >= vx0 + vw || y < vy0 || y >= vy0 + vh || x < 0 || x >= 240 || y < cy0 || y >= cy0 + chh) return 0;
+    return !tr_on || tr_type == TR_PUSH || in_b(x, y) == tr_side;
+}
+static void vpix(int32_t x, int32_t y, uint16_t sw) { if (vok(x, y)) cvp[(y - cy0) * 240 + x] = sw; }   /* sw: painted and swapped */
+static void vline(int32_t x, int32_t ya, int32_t yb, uint16_t c) { int32_t y; if (ya > yb) { y = ya; ya = yb; yb = y; } for (y = ya; y <= yb; y++) vpix(x, y, c); }
+static void vfill(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c) { int32_t i, j; for (j = y; j < y + h; j++) for (i = x; i < x + w; i++) vpix(i, j, c); }
 static uint16_t mix50(uint16_t a_sw, uint16_t b_sw)                           /* half and half, both swapped */
 {
     uint16_t a = SW(a_sw), b = SW(b_sw);
     return SW((uint16_t)(((a & 0xF7DEu) >> 1) + ((b & 0xF7DEu) >> 1)));
 }
-static int32_t vrows(int32_t *y0, int32_t *y1)                                  /* the picture's rows in this strip */
+/* a per-pixel picture: fn gives the colour of (u, v) of W x H; a row is worked out once for vps rows of the screen */
+typedef uint16_t (*px_fn)(int32_t u, int32_t v, int32_t W, int32_t H);
+static void render_px(px_fn fn)
 {
-    *y0 = VIS_Y > cy0 ? VIS_Y : cy0; *y1 = VIS_Y + VIS_H < cy0 + chh ? VIS_Y + VIS_H : cy0 + chh;
-    return *y1 > *y0;
+    static uint16_t line[240];
+    int32_t W = vw / vps, H = vh / vps, y, ya = vy0 > cy0 ? vy0 : cy0, yb = vy0 + vh < cy0 + chh ? vy0 + vh : cy0 + chh, last = -1;
+    int32_t xa = vx0 > 0 ? vx0 : 0, xb = vx0 + vw < 240 ? vx0 + vw : 240, mask = tr_on && tr_type != TR_PUSH;
+    for (y = ya; y < yb; y++) {
+        int32_t v = (y - vy0) / vps, x, u;
+        uint16_t *d = cvp + (y - cy0) * 240;
+        if (v != last) { for (u = 0; u < W && u < 240; u++) line[u] = fn(u, v, W, H); last = v; }
+        for (x = xa; x < xb; x++) {
+            if (mask && in_b(x, y) != tr_side) continue;
+            d[x] = line[(x - vx0) / vps];
+        }
+    }
 }
-static void vline(int32_t x, int32_t ya, int32_t yb, uint16_t c) { int32_t y; if (ya > yb) { y = ya; ya = yb; yb = y; } for (y = ya; y <= yb; y++) vpix(x, y, c); }
-static void vfill(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c) { int32_t i, j; for (j = y; j < y + h; j++) for (i = x; i < x + w; i++) vpix(i, j, c); }
-
-/* a turn about y then x, and the view: Q8 screen offsets from the picture's middle */
+/* a turn about y then x */
 static void rot3(int32_t *p, uint32_t ay, uint32_t ax)
 {
     int32_t x = p[0], y = p[1], z = p[2], t;
@@ -689,76 +718,81 @@ static void rot3(int32_t *p, uint32_t ay, uint32_t ax)
     t = (y * vcos(ax) - z * vsin(ax)) >> 15; z = (y * vsin(ax) + z * vcos(ax)) >> 15; y = t;
     p[0] = x; p[1] = y; p[2] = z;
 }
+static int32_t vsize(void) { return vw < vh ? vw : vh; }                      /* the view's short side */
 
-static void vis_scope(int32_t x)                                               /* this trace in front, the last ones behind */
+/* the sound */
+static void pic_scope(void)                                                   /* this trace in front, the last ones behind */
 {
-    int32_t r, k, mid = VIS_Y + VIS_H / 2 + 10;
+    int32_t r, k, mid = vy0 + vh * 64 / 100, amp = vh * 30 / 68;
     for (r = SC_K - 1; r >= 0; r--) {
         const int8_t *t = sc_hist[(sc_head - r + SC_K) % SC_K];
-        int32_t inset = r * 2, lift = r * 3, w = VIS_W - 2 * inset, prev = 0;
+        int32_t inset = r * vw / 27, lift = r * vh / 22, w = vw - 2 * inset, prev = 0;
         uint16_t c = vpal[63 - r * 5];
         for (k = 0; k < w; k++) {
-            int32_t i = k * (SC_N - 1) / (w > 1 ? w - 1 : 1), y = mid - lift - t[i] * (10 - r / 2) / 20;
-            if (k) vline(VIS_X0(x) + inset + k, prev, y, c); else vpix(VIS_X0(x) + inset, y, c);
+            int32_t i = k * (SC_N - 1) / (w > 1 ? w - 1 : 1), y = mid - lift - t[i] * amp * (20 - r) / 1000;
+            if (k) vline(vx0 + inset + k, prev, y, c); else vpix(vx0 + inset, y, c);
             prev = y;
         }
     }
 }
-static void vis_lanes(int32_t x)                                               /* blocks with a lit top and a dark side */
+static void pic_lanes(void)                                                   /* blocks with a lit top and a dark side */
 {
-    int32_t r, bw = VIS_W / (int32_t)NLANE;
+    int32_t r, bw = vw / (int32_t)NLANE, dp = bw / 5 + 1;
     for (r = (int32_t)NLANE - 1; r >= 0; r--) {
-        int32_t l = LROW[r], h = vis_lane[l] * (VIS_H - 6) / 16000, bx = VIS_X0(x) + r * bw, base = VIS_Y + VIS_H - 1, j;
+        int32_t l = LROW[r], h = vis_lane[l] * (vh - 2 * dp) / 16000, bx = vx0 + r * bw, base = vy0 + vh - 1, j;
         uint16_t front = SW(paint(LCOL[l])), top = SW(paint(cscale(LCOL[l], 330))), side = SW(paint(cscale(LCOL[l], 110)));
-        if (h > VIS_H - 6) h = VIS_H - 6;
-        vfill(bx, base - h, bw - 3, h + 1, front);
-        for (j = 0; j < 3; j++) { vfill(bx + j + 1, base - h - j - 1, bw - 3, 1, top); vline(bx + bw - 3 + j, base - j, base - h - j, side); }
+        if (h > vh - 2 * dp) h = vh - 2 * dp;
+        vfill(bx, base - h, bw - dp, h + 1, front);
+        for (j = 0; j < dp; j++) { vfill(bx + j + 1, base - h - j - 1, bw - dp, 1, top); vline(bx + bw - dp + j, base - j, base - h - j, side); }
     }
 }
-static void vis_stereo(int32_t x)                                              /* a goniometer: one sound in the middle stands up */
+static void pic_stereo(void)                                                  /* a goniometer: one sound in the middle stands up */
 {
-    int32_t f, k, cx = VIS_X0(x) + VIS_W / 2, cy = VIS_Y + VIS_H / 2;
-    uint16_t axis = SW(paint(C_GRID));
-    vline(cx, VIS_Y + 2, VIS_Y + VIS_H - 3, axis);
-    for (k = -20; k <= 20; k++) vpix(cx + k, cy, axis);
+    int32_t f, k, cx = vx0 + vw / 2, cy = vy0 + vh / 2, s = vsize() * 256 / 60, q = s > 300 ? 2 : 1;
+    uint16_t axis = SW(paint(C_GRID)), red = SW(paint(RGBC(0xff7a5a)));
+    vline(cx, vy0 + 2, vy0 + vh - 3, axis);
+    vfill(cx - vw * 4 / 10, cy, vw * 8 / 10, 1, axis);
     for (f = 2; f >= 0; f--) {
         uint16_t c = vpal[63 - f * 18];
         const int8_t (*p)[2] = go_pt[(go_head + 3u - (uint32_t)f) % 3u];
-        for (k = 0; k < GO_N; k++) vpix(cx + p[k][0], cy - p[k][1], c);
+        for (k = 0; k < GO_N; k++) vfill(cx + (p[k][0] * s >> 8), cy - (p[k][1] * s >> 8), q, q, c);
     }
-    vfill(VIS_X0(x), VIS_Y, 3, 3, vis_out[0] > 28000 ? SW(paint(RGBC(0xff7a5a))) : axis);
-    vfill(VIS_X0(x) + VIS_W - 3, VIS_Y, 3, 3, vis_out[1] > 28000 ? SW(paint(RGBC(0xff7a5a))) : axis);
+    vfill(vx0, vy0, 3 * q, 3 * q, vis_out[0] > 28000 ? red : axis);
+    vfill(vx0 + vw - 3 * q, vy0, 3 * q, 3 * q, vis_out[1] > 28000 ? red : axis);
 }
-static void vis_spectrum(int32_t x)                                            /* rows rolling away, the newest in front */
+static void pic_spectrum(void)                                                /* rows rolling away, the newest in front */
 {
-    int32_t r, k;
+    int32_t r, k, hs = vh * 256 / 68;
     uint16_t bg = SW(paint(C_BG));
     for (r = LS_N - 1; r >= 0; r--) {
         const uint8_t *row = ls_hist[(ls_head - r + LS_N) % LS_N];
-        int32_t s = 256 * 10 / (10 + r), w = VIS_W * s >> 8, x0 = VIS_X0(x) + (VIS_W - w) / 2, base = VIS_Y + VIS_H - 2 - r * 22 / LS_N;
+        int32_t s = 256 * 10 / (10 + r), w = vw * s >> 8, x0 = vx0 + (vw - w) / 2, base = vy0 + vh - 2 - r * vh * 22 / (68 * LS_N);
         uint16_t c = wpal[63 - r * 3];
         for (k = 0; k < w; k++) {
             int32_t p = k * 7 * 256 / (w > 1 ? w - 1 : 1), i = p >> 8, f = p & 255;
-            int32_t h = (row[i] * (256 - f) + row[i < 7 ? i + 1 : 7] * f) >> 8, top = base - (h * s >> 8) - 1;
+            int32_t h = (row[i] * (256 - f) + row[i < 7 ? i + 1 : 7] * f) >> 8, top = base - ((h * s >> 8) * hs >> 8) - 1;
             vline(x0 + k, top + 1, base, bg);                                 /* what is behind is hidden */
             vpix(x0 + k, top, c);
+            if (vps == 1 && hs > 400) vpix(x0 + k, top - 1, c);
         }
     }
 }
 
-/* RESET's pictures */
-static void pic_crystal(int32_t x)                                             /* a see-through faceted body, turning */
+/* the eye candy */
+static void pic_crystal(void)                                                 /* a see-through faceted body, turning */
 {
     static const int8_t V[14][3] = {{-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1}, {-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1},
                                     {0, 0, -2}, {0, 0, 2}, {-2, 0, 0}, {2, 0, 0}, {0, -2, 0}, {0, 2, 0}};
     static const uint8_t F[6][5] = {{8, 0, 1, 2, 3}, {9, 5, 4, 7, 6}, {10, 4, 0, 3, 7}, {11, 1, 5, 6, 2}, {12, 4, 5, 1, 0}, {13, 3, 2, 6, 7}};
-    int32_t P[14][3], i, f, e, pass, sz = 11 + (vis_hit ? 2 : 0), cx = VIS_X0(x) + VIS_W / 2, cy = VIS_Y + VIS_H / 2, y0, y1;
-    if (!vrows(&y0, &y1)) return;
+    int32_t P[14][3], i, f, e, pass, sz = vsize() * (vis_hit ? 13 : 11) / 54, cx = vx0 + vw / 2, cy = vy0 + vh / 2, y0, y1, xa, xb;
+    y0 = vy0 > cy0 ? vy0 : cy0; y1 = vy0 + vh < cy0 + chh ? vy0 + vh : cy0 + chh;
+    xa = vx0 > 0 ? vx0 : 0; xb = vx0 + vw < 240 ? vx0 + vw - 1 : 239;
+    if (y1 <= y0) return;
     for (i = 0; i < 14; i++) {
         int32_t p[3] = {V[i][0] * sz * 256, V[i][1] * sz * 256, V[i][2] * sz * 256}, d;
         if (i >= 8) { p[0] = p[0] * 7 / 10; p[1] = p[1] * 7 / 10; p[2] = p[2] * 7 / 10; }   /* the face's point, out a little */
         rot3(p, vis_t * 7u, vis_t * 5u);
-        d = 256 * 64 / (64 + (p[2] >> 8));
+        d = 256 * (sz * 6) / (sz * 6 + (p[2] >> 8));
         P[i][0] = cx + ((p[0] >> 8) * d >> 8); P[i][1] = cy + ((p[1] >> 8) * d >> 8); P[i][2] = p[2];
     }
     for (pass = 0; pass < 2; pass++)                                          /* the far side first, darker; then the near */
@@ -777,110 +811,204 @@ static void pic_crystal(int32_t x)                                             /
                     }
                     if (n < 2) continue;
                     lo = xs[0] < xs[1] ? xs[0] : xs[1]; hi = xs[0] < xs[1] ? xs[1] : xs[0];
-                    if (lo < VIS_X0(x)) lo = VIS_X0(x);
-                    if (hi > VIS_X0(x) + VIS_W - 1) hi = VIS_X0(x) + VIS_W - 1;
-                    for (xx = lo; xx <= hi; xx++) { uint16_t *d = &cvp[(y - cy0) * 240 + xx]; *d = mix50(*d, col); }
+                    if (lo < xa) lo = xa;
+                    if (hi > xb) hi = xb;
+                    for (xx = lo; xx <= hi; xx++) if (vok(xx, y)) { uint16_t *d = &cvp[(y - cy0) * 240 + xx]; *d = mix50(*d, col); }
                 }
             }
 }
-static void pic_tunnel(int32_t x)
+static uint16_t px_tunnel(int32_t u, int32_t v, int32_t W, int32_t H)
 {
-    int32_t y0, y1, y, i;
-    uint32_t tu = vis_t * (uint32_t)(2 + seq_bpm / 40), ta = vis_t;
-    if (!vrows(&y0, &y1)) return;
-    for (y = y0; y < y1; y++) {
-        uint16_t *d = &cvp[(y - cy0) * 240 + VIS_X0(x)];
-        for (i = 0; i < VIS_W; i++) {
-            int32_t a = tun_ang[y - VIS_Y][i], z = tun_dep[y - VIS_Y][i], tex = ((a + (int32_t)ta) ^ (z + (int32_t)tu)) & 32, lit = z > 200 ? 0 : 63 - z / 4;
-            d[i] = vpal[tex ? lit : lit / 3];
-        }
-    }
+    int32_t dx = (u - W / 2) * 54 / (W > 54 ? W : 54) * (W > 54 ? 2 : 1), dy = (v - H / 2) * 54 / (W > 54 ? W : 54) * (W > 54 ? 2 : 1);
+    int32_t ax = dx < 0 ? -dx : dx, ay = dy < 0 ? -dy : dy, a, z, tex, lit;
+    if (ax >= TQ) ax = TQ - 1;
+    if (ay >= TQ) ay = TQ - 1;
+    a = tq_ang[ay][ax]; z = tq_dep[ay][ax];
+    if (dx < 0) a = 128 - a;
+    if (dy < 0) a = 256 - a;
+    tex = ((a + (int32_t)vis_t) ^ (z + (int32_t)(vis_t * (uint32_t)(2 + seq_bpm / 40)))) & 32;
+    lit = z > 200 ? 0 : 63 - z / 4;
+    return vpal[tex ? lit : lit / 3];
 }
-static void pic_dots(int32_t x)                                                /* a ball of dots that becomes a ring and back */
+static void pic_tunnel(void) { render_px(px_tunnel); }
+static void pic_dots(void)                                                    /* a ball of dots that becomes a ring and back */
 {
-    int32_t i, m = (vsin(vis_t * 4u) + 32768) >> 8, cx = VIS_X0(x) + VIS_W / 2, cy = VIS_Y + VIS_H / 2;
+    int32_t i, m = (vsin(vis_t * 4u) + 32768) >> 8, cx = vx0 + vw / 2, cy = vy0 + vh / 2, s = vsize() * 256 / 54, q = s > 300 ? 2 : 1;
     if (m > 256) m = 256;
     for (i = 0; i < 96; i++) {
-        int32_t p[3], d, sx2, sy2, k;
+        int32_t p[3], d, k;
         for (k = 0; k < 3; k++) p[k] = (dot_sph[i][k] * (256 - m) + dot_tor[i][k] * m) * (vis_hit ? 5 : 4) / 4;
         rot3(p, vis_t * 6u, vis_t * 3u + 128u);
         d = 256 * 80 / (80 + (p[2] >> 8));
-        sx2 = cx + ((p[0] >> 8) * d >> 8); sy2 = cy + ((p[1] >> 8) * d >> 8);
-        if (p[2] < 0) vfill(sx2, sy2, 2, 2, vpal[63]);
-        else vpix(sx2, sy2, vpal[30]);
+        if (p[2] < 0) vfill(cx + ((p[0] >> 8) * d >> 8) * s / 256, cy + ((p[1] >> 8) * d >> 8) * s / 256, 2 * q, 2 * q, vpal[63]);
+        else vfill(cx + ((p[0] >> 8) * d >> 8) * s / 256, cy + ((p[1] >> 8) * d >> 8) * s / 256, q, q, vpal[30]);
     }
 }
-static void pic_plasma(int32_t x)
+static uint16_t px_plasma(int32_t u, int32_t v, int32_t W, int32_t H)
 {
-    int32_t y0, y1, y, i;
     uint32_t t = vis_t;
-    if (!vrows(&y0, &y1)) return;
-    for (y = y0; y < y1; y++) {
-        uint16_t *d = &cvp[(y - cy0) * 240 + VIS_X0(x)];
-        int32_t yy = y - VIS_Y, rowv = vsin((uint32_t)yy * 19u + t * 6u) + vsin((uint32_t)yy * 7u - t * 4u);
-        for (i = 0; i < VIS_W; i++) {
-            int32_t v = rowv + vsin((uint32_t)i * 23u + t * 5u) + vsin((uint32_t)(i + yy) * 13u + t * 9u);
-            d[i] = wpal[(((v + 131072) >> 11) + (int32_t)t) & 63];   /* the colours cycle through it */
-        }
+    int32_t uu = u * 54 / W, vv = v * 68 / H;
+    int32_t s = vsin((uint32_t)vv * 19u + t * 6u) + vsin((uint32_t)vv * 7u - t * 4u) + vsin((uint32_t)uu * 23u + t * 5u) + vsin((uint32_t)(uu + vv) * 13u + t * 9u);
+    return wpal[(((s + 131072) >> 11) + (int32_t)t) & 63];
+}
+static void pic_plasma(void) { render_px(px_plasma); }
+static uint16_t px_twirl(int32_t u, int32_t v, int32_t W, int32_t H)          /* a checker turned and zoomed */
+{
+    int32_t zm = 200 + (vsin(vis_t * 5u) >> 8) + (vis_hit ? 60 : 0), cs = vcos(vis_t * 4u) * zm >> 15, sn = vsin(vis_t * 4u) * zm >> 15;
+    int32_t x = (u - W / 2) * 54 / W, y = (v - H / 2) * 54 / W;
+    int32_t tu = (x * cs - y * sn + (int32_t)vis_t * 300) >> 8, tv = (x * sn + y * cs) >> 8, c = ((tu ^ tv) & 8) ? 16 + ((tu + tv) & 15) * 3 : 4;
+    return vpal[c > 63 ? 63 : c];
+}
+static void pic_twirl(void) { render_px(px_twirl); }
+static void pic_stars(void)
+{
+    int32_t k, cx = vx0 + vw / 2, cy = vy0 + vh / 2, s = vsize() * 256 / 54, q = s > 300 ? 2 : 1;
+    for (k = 0; k < (vw > 100 ? 48 : 24); k++) {               /* full screen: twice as many */
+        int32_t sx2 = cx + (star_x[k] * 24 / star_z[k]) * s / 256, sy2 = cy + (star_y[k] * 24 / star_z[k]) * s / 256, sz = star_z[k] < 16 ? 2 * q : q;
+        vfill(sx2, sy2, sz, sz, SW(paint(star_z[k] < 24 ? C_CREAM : star_z[k] < 44 ? C_LIGHT : C_DIMG)));
     }
 }
-static void pic_roto(int32_t x)                                                /* a checker turned and zoomed */
+static void pic_copper(void)
 {
-    int32_t y0, y1, y, i, zm = 200 + (vsin(vis_t * 5u) >> 8) + (vis_hit ? 60 : 0), cs = vcos(vis_t * 4u) * zm >> 15, sn = vsin(vis_t * 4u) * zm >> 15;
-    if (!vrows(&y0, &y1)) return;
-    for (y = y0; y < y1; y++) {
-        uint16_t *d = &cvp[(y - cy0) * 240 + VIS_X0(x)];
-        int32_t yy = y - VIS_Y - VIS_H / 2, u = -VIS_W / 2 * cs - yy * sn + (int32_t)vis_t * 300, v = -VIS_W / 2 * sn + yy * cs;
-        for (i = 0; i < VIS_W; i++) {
-            int32_t tu = u >> 8, tv = v >> 8, c = ((tu ^ tv) & 8) ? 16 + ((tu + tv) & 15) * 3 : 4;
-            d[i] = vpal[c > 63 ? 63 : c];
-            u += cs; v += sn;
-        }
-    }
-}
-static void pic_stars(int32_t x)
-{
-    int32_t k, cx = x + COL_W / 2, cy = VIS_Y + VIS_H / 2;
-    for (k = 0; k < 24; k++) {
-        int32_t sx2 = cx + star_x[k] * 24 / star_z[k], sy2 = cy + star_y[k] * 24 / star_z[k], s = star_z[k] < 16 ? 2 : 1;
-        if (sx2 < x + 2 || sx2 > x + COL_W - 3) continue;
-        vfill(sx2, sy2, s, s, SW(paint(star_z[k] < 24 ? C_CREAM : star_z[k] < 44 ? C_LIGHT : C_DIMG)));
-    }
-}
-static void pic_copper(int32_t x)
-{
-    static const uint16_t SHADE[9] = {50, 90, 140, 200, 256, 200, 140, 90, 50};
-    int32_t k, j;
+    int32_t k, j, bh = vh / 8 + 1;
     for (k = 0; k < 3; k++) {
-        int32_t c = VIS_Y + VIS_H / 2 - 4 + vsin(vis_t * 9u + (uint32_t)k * 340u) * (VIS_H / 2 - 5) / 32768;
-        for (j = 0; j < 9; j++) vfill(x + 1, c + j, COL_W - 2, 1, SW(paint(cscale(LCOL[LROW[k * 2]], SHADE[j] * (vis_hit ? 5 : 4) / 4))));
+        int32_t c = vy0 + vh / 2 - bh / 2 + vsin(vis_t * 9u + (uint32_t)k * 340u) * (vh / 2 - bh / 2 - 1) / 32768;
+        for (j = 0; j < bh; j++) {
+            int32_t sh = 256 - (j * 2 - bh) * (j * 2 - bh) * 200 / (bh * bh);
+            vfill(vx0, c + j, vw, 1, SW(paint(cscale(LCOL[LROW[k * 2]], sh * (vis_hit ? 5 : 4) / 4))));
+        }
     }
 }
-static void pic_mako(int32_t x)
+static void pic_mako(void)
 {
-    int32_t k, sea = VIS_Y + VIS_H * 2 / 3, span = VIS_W + 24, fx = VIS_X0(x) + (int32_t)(vis_t % (uint32_t)span) - 12;
-    int32_t bob = (int32_t)(fm1_ms - lane_hit_ms[L_BASS]) < 120 && seq_playing ? 2 : 0;
-    for (k = 0; k < 18; k++) {                                                /* the fin, swimming right: a straight back, a curved front */
-        int32_t y = sea - 18 + k - bob, x0 = fx, x1 = fx + 1 + k * 14 / 18 + (k * k) / 40;
-        if (x0 < x + 2) x0 = x + 2;
-        if (x1 > x + COL_W - 3) x1 = x + COL_W - 3;
-        if (x1 > x0) vfill(x0, y, x1 - x0, 1, SW(paint(RGBC(0x6f8fa8))));
+    int32_t k, sz = vsize() * 256 / 54, sea = vy0 + vh * 2 / 3, span = vw + 24 * sz / 256, fx = vx0 + (int32_t)(vis_t * (uint32_t)(sz / 256 + 1) % (uint32_t)span) - 12 * sz / 256;
+    int32_t bob = (int32_t)(fm1_ms - lane_hit_ms[L_BASS]) < 120 && seq_playing ? 2 * sz / 256 : 0, fh = 18 * sz / 256;
+    for (k = 0; k < fh; k++) {                                                /* the fin, swimming right: a straight back, a curved front */
+        int32_t kk = k * 18 / fh, x1 = fx + (1 + kk * 14 / 18 + (kk * kk) / 40) * sz / 256;
+        vfill(fx, sea - fh + k - bob, x1 - fx, 1, SW(paint(RGBC(0x6f8fa8))));
     }
-    for (k = 0; k < VIS_W; k++) {                                             /* the sea, rolling */
-        int32_t y = sea + vsin((uint32_t)k * 40u + vis_t * 24u) * 2 / 32768;
-        vline(VIS_X0(x) + k, y, VIS_Y + VIS_H - 1, SW(paint(cscale(C_CYAN, 70))));
-        vpix(VIS_X0(x) + k, y, SW(paint(C_CYAN)));
+    for (k = 0; k < vw; k++) {                                                /* the sea, rolling */
+        int32_t y = sea + vsin((uint32_t)(k * 54 / vw) * 40u + vis_t * 24u) * 2 * sz / 256 / 32768;
+        vline(vx0 + k, y, vy0 + vh - 1, SW(paint(cscale(C_CYAN, 70))));
+        vpix(vx0 + k, y, SW(paint(C_CYAN)));
     }
 }
-static void (*const PICF[NPIC])(int32_t x) = {pic_crystal, pic_tunnel, pic_dots, pic_plasma, pic_roto, pic_stars, pic_copper, pic_mako};
-static void vis_s0(int32_t x) { PICF[pick[0]](x); }
-static void vis_s1(int32_t x) { PICF[pick[1]](x); }
-static void vis_s2(int32_t x) { PICF[pick[2]](x); }
+static uint16_t px_fire(int32_t u, int32_t v, int32_t W, int32_t H) { return fpal[flame[v * (FIRE_H - 2) / H][u * FIRE_W / W] >> 2]; }
+static void pic_fire(void) { render_px(px_fire); }
+static uint16_t px_logo(int32_t u, int32_t v, int32_t W, int32_t H)           /* the logo, raster bars where it is dark */
+{
+    int32_t lx = u * 240 / W, ly = v * 240 / H, b = LOGO_PX[(ly * 240 + lx) >> 1], i = lx & 1 ? b & 15 : b >> 4;
+    if (logo_dark >> i & 1) {
+        int32_t ph = (ly * 2 + (int32_t)vis_t * 3) & 63, k = ph < 32 ? ph : 63 - ph;
+        return wpal[k * 2 * (vis_hit ? 5 : 3) / 5];
+    }
+    return SW(paint(LOGO_PAL[i]));
+}
+static void pic_logo(void) { render_px(px_logo); }
+
+#define NPIC 12
+static const char *const PICN[NPIC] = {"CRYSTAL", "TUNNEL", "DOTS", "PLASMA", "TWIRL", "STARS", "COPPER", "MAKO", "FIRE", "LOGO", "SCOPE", "SPECTRUM"};
+static void (*const PICF[NPIC])(void) = {pic_crystal, pic_tunnel, pic_dots, pic_plasma, pic_twirl, pic_stars, pic_copper, pic_mako, pic_fire, pic_logo, pic_scope, pic_spectrum};
+static const uint8_t PIC_CHUNKY[NPIC] = {0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0};   /* per pixel: drawn in 2 x 2 full screen */
+static int32_t pick[3] = {0, 1, 2};
+
+/* on SETUP's knobs: the view is the knob's tile */
+static void tile(int32_t x) { vx0 = x + 3; vy0 = VIS_Y; vw = VIS_W; vh = VIS_H; vps = 1; }
+static void vis_scope(int32_t x) { tile(x); pic_scope(); }
+static void vis_lanes(int32_t x) { tile(x); pic_lanes(); }
+static void vis_stereo(int32_t x) { tile(x); pic_stereo(); }
+static void vis_spectrum(int32_t x) { tile(x); pic_spectrum(); }
+static void vis_s0(int32_t x) { tile(x); PICF[pick[0]](); }
+static void vis_s1(int32_t x) { tile(x); PICF[pick[1]](); }
+static void vis_s2(int32_t x) { tile(x); PICF[pick[2]](); }
 static void t_pick0(int32_t d) { pick[0] = fmodp(pick[0] + (d > 0 ? 1 : -1), NPIC); }
 static void t_pick1(int32_t d) { pick[1] = fmodp(pick[1] + (d > 0 ? 1 : -1), NPIC); }
 static void t_pick2(int32_t d) { pick[2] = fmodp(pick[2] + (d > 0 ? 1 : -1), NPIC); }
 static const char *pic_label(const card_t *C) { return C->draw == vis_s0 ? PICN[pick[0]] : C->draw == vis_s1 ? PICN[pick[1]] : C->draw == vis_s2 ? PICN[pick[2]] : C->name; }
 static void v_vis(char *o) { o[0] = 0; }
+
+/* ---- DEMO (SEL + HOME): the pictures full screen while the music plays, cut on the bar every few bars and with a
+ * flash on a drop. PRESETS: the next picture (or the one before), ALGORITHM: how often it cuts. HOME, FX, ARP, GLO
+ * and EDIT leave it; PLAY, SEQ, REC, ENV, LFO, SAVE, the knobs and the keys go on working */
+static const uint8_t DEMO_EVERY[4] = {4, 8, 16, 0};
+static const char *const DEMO_EVN[4] = {"CUTS EVERY 4 BARS", "CUTS EVERY 8 BARS", "CUTS EVERY 16 BARS", "NO CUTS: PRESETS"};
+static int32_t demo_on, demo_pic = 1, demo_next, demo_ev = 1, demo_last = -1, demo_drop_bar = -1;
+static uint32_t tr_t0, tr_len, demo_ms0, demo_msg_until;
+static const char *demo_msg;
+static void demo_say(const char *s) { demo_msg = s; demo_msg_until = fm1_ms + 1500u; }
+static void demo_cut(int32_t to, int32_t kind)
+{
+    uint32_t bar_ms = 240000u / (uint32_t)(seq_bpm > 0 ? seq_bpm : 120);
+    if (tr_on) demo_pic = demo_next;                                          /* a cut during a cut: the last one is done */
+    demo_next = to < 0 ? fmodp(demo_pic + 1 + (int32_t)(vis_rand() % (NPIC - 1)), NPIC) : to;
+    tr_type = kind < 0 ? 1 + (int32_t)(vis_rand() % (NTR - 1)) : kind;
+    tr_len = tr_type == TR_FLASH ? bar_ms / 2 : bar_ms / 2 < 400u ? 400u : bar_ms / 2 > 1100u ? 1100u : bar_ms / 2;
+    tr_t0 = fm1_ms; tr_on = 1; tr_p = 0;
+    demo_say(PICN[demo_next]);
+}
+static void demo_toggle(void)
+{
+    demo_on = !demo_on; tr_on = 0;
+    demo_last = seq_playing ? cur_bar() : -1; demo_ms0 = fm1_ms;
+    if (demo_on) demo_say("DEMO: PRESETS, ALGORITHM; HOME LEAVES");
+    area_dirty = 1;
+}
+static void demo_turn(int32_t e, int32_t d)                                   /* PRESETS and ALGORITHM in DEMO */
+{
+    if (e == ENC_PRESETS) demo_cut(fmodp((tr_on ? demo_next : demo_pic) + (d > 0 ? 1 : -1), NPIC), -1);
+    else { demo_ev = fmodp(demo_ev + (d > 0 ? 1 : -1), 4); demo_say(DEMO_EVN[demo_ev]); }
+}
+static void demo_tick(void)                                                   /* the cuts, in time */
+{
+    int32_t ev = DEMO_EVERY[demo_ev];
+    if (tr_on) { tr_p = (int32_t)((fm1_ms - tr_t0) * 256u / (tr_len ? tr_len : 1u)); if (tr_p >= 256) { tr_on = 0; demo_pic = demo_next; } }
+    if (seq_playing) {
+        int32_t b = cur_bar();
+        arc_t A = arc_at(b);
+        if (A.drop && b != demo_drop_bar && (cur_step() & 15) < 2) { demo_drop_bar = b; demo_cut(-1, TR_FLASH); demo_last = b; }
+        else if (ev && !tr_on && b != demo_last && b % ev == 0 && (cur_step() & 15) < 2) { demo_last = b; demo_cut(-1, -1); }
+    } else if (ev && !tr_on && fm1_ms - demo_ms0 >= (uint32_t)ev * 240000u / (uint32_t)(seq_bpm > 0 ? seq_bpm : 120)) {
+        demo_ms0 = fm1_ms; demo_cut(-1, -1);
+    }
+}
+static void demo_draw_pic(int32_t p, int32_t ox)
+{
+    vx0 = ox; vy0 = 0; vw = 240; vh = 240; vps = PIC_CHUNKY[p] ? 2 : 1;
+    PICF[p]();
+}
+static void draw_demo(void)
+{
+    int32_t y, k;
+    vis_prep();
+    demo_tick();
+    for (y = 0; y < 240; y += (int32_t)STRIP_H) {
+        int32_t h = 240 - y < (int32_t)STRIP_H ? 240 - y : (int32_t)STRIP_H;
+        cs_begin(y, h, C_BG);
+        if (!tr_on) { tr_side = 0; demo_draw_pic(demo_pic, 0); }
+        else if (tr_type == TR_PUSH) {                                        /* the new one pushes the old one out to the left */
+            int32_t s = 240 * tr_p * (512 - tr_p) / 65536;                   /* eased: fast, then slow */
+            demo_draw_pic(demo_pic, -s); demo_draw_pic(demo_next, 240 - s);
+        } else { tr_side = 0; demo_draw_pic(demo_pic, 0); tr_side = 1; demo_draw_pic(demo_next, 0); }
+        if (tr_on && (tr_type == TR_FLASH || tr_type == TR_DIP)) {            /* white that fades, or down to black and up */
+            int32_t a = tr_type == TR_FLASH ? 256 - tr_p : tr_p < 128 ? tr_p * 2 : (256 - tr_p) * 2, n = 240 * h, i;
+            for (i = 0; i < n; i++) {
+                uint32_t c = SW(cvp[i]), r = c >> 11, g = c >> 5 & 63u, b = c & 31u;
+                if (tr_type == TR_FLASH) { r += (31u - r) * (uint32_t)a >> 8; g += (63u - g) * (uint32_t)a >> 8; b += (31u - b) * (uint32_t)a >> 8; }
+                else { r = r * (uint32_t)(256 - a) >> 8; g = g * (uint32_t)(256 - a) >> 8; b = b * (uint32_t)(256 - a) >> 8; }
+                cvp[i] = SW((uint16_t)(r << 11 | g << 5 | b));
+            }
+        }
+        if (y == 0 && ((demo_msg && fm1_ms < demo_msg_until) || fm1_ms < toast_until)) {   /* a word on what changed, top left */
+            const char *m = fm1_ms < toast_until ? toast_s : demo_msg;
+            k = tw7(m);
+            fill(0, 0, k + 6, 13, C_BG);
+            text7(3, 3, m, C_CREAM);
+        }
+        cs_end();
+        platform_poll();
+    }
+    tr_on = tr_on && tr_p < 256;
+}
 /* SETUP (hold HOME): the look, the MIDI channels, the defaults */
 static int32_t setup_on, setup_row, reset_turns;
 static void defaults(void);
@@ -1328,6 +1456,7 @@ static void draw_frame(int force)
 {
     int32_t l, k, ns, y0, h0, view = edit_on ? 1 : setup_on ? 0 : grp == G_SONG && rowi[G_SONG] == SR_KEY ? 2 : grp == G_SONG && rowi[G_SONG] == SR_ARC ? 3 : 0;
     pos16 = (uint32_t)cur_step() * 65536u + (seq_playing ? (uint32_t)vis_frac : 0u);
+    if (demo_on) { draw_demo(); last_drawn_pos = 0xFFFFFFFFu; area_dirty = 0; return; }   /* DEMO: the whole screen */
     draw_knobs(force);
     if (!edit_on) draw_title(force);
     if (!force && pos16 == last_drawn_pos && !area_dirty && !seq_playing) return;
@@ -1602,6 +1731,7 @@ static void play_button(int held)
 /* a group button: the group; pressed again, its next setting. From EDIT: back to the group. */
 static void group_btn(int32_t g)
 {
+    if (demo_on) { demo_on = 0; area_dirty = 1; return; }               /* out of DEMO, back where you were */
     if (setup_on) setup_on = 0;
     else if (edit_on) edit_on = 0;
     else if (grp == g) rowi[g] = fmodp(rowi[g] + 1, nrows(g));
@@ -1726,6 +1856,7 @@ static void input(void)
         if (!d) continue;
         if (held) d *= 10;
         if (e == ENC_SELECT) { set_bpm(seq_bpm + d); area_dirty = 1; continue; }              /* SELECT: tempo */
+        if (demo_on && (e == ENC_PRESETS || e == ENC_ALGORITHM)) { demo_turn(e, d); continue; }   /* DEMO: the picture, the cuts */
         if (e == ENC_ALGORITHM) { int32_t r = 0; while (LROW[r] != sel) r++; set_sel(LROW[fmodp(r + (d > 0 ? 1 : -1), NLANE)]); continue; }   /* the lane, in screen order */
         if (e == ENC_PRESETS) {                                         /* the setting in the group */
             if (setup_on) { setup_row = fmodp(setup_row + (d > 0 ? 1 : -1), NROWS_OF(ROW_SETUP)); reset_turns = 0; }
@@ -1747,14 +1878,16 @@ static void input(void)
     {                                                               /* HOME: tap = the PLAY group; hold = SETUP */
         static uint32_t home_ms;
         static int home_held, home_used;
-        if (b & (1u << BTN_HOME)) { home_ms = fm1_ms; home_held = 1; home_used = 0; }
-        if (home_held && !home_used && fm1_ms - home_ms >= 600u) { home_used = 1; setup_on = 1; edit_on = 0; reset_turns = 0; area_dirty = 1; }
+        if (b & (1u << BTN_HOME) && held) { demo_toggle(); home_held = 0; }     /* SEL + HOME: DEMO on or off */
+        else if (b & (1u << BTN_HOME)) { home_ms = fm1_ms; home_held = 1; home_used = 0; }
+        if (home_held && !home_used && fm1_ms - home_ms >= 600u) { home_used = 1; demo_on = 0; setup_on = 1; edit_on = 0; reset_turns = 0; area_dirty = 1; }
         if (rel & (1u << BTN_HOME)) { if (home_held && !home_used) group_btn(G_PLAY); home_held = 0; }
     }
     if (b & (1u << BTN_FX)) group_btn(G_SOUND);
     if (b & (1u << BTN_ARP)) group_btn(G_TRK);
     if (b & (1u << BTN_GLO)) group_btn(G_SONG);
-    if (b & (1u << BTN_EDIT) && setup_on) { setup_on = 0; area_dirty = 1; }
+    if (b & (1u << BTN_EDIT) && demo_on) { demo_on = 0; area_dirty = 1; }
+    else if (b & (1u << BTN_EDIT) && setup_on) { setup_on = 0; area_dirty = 1; }
     else if (b & (1u << BTN_EDIT)) {
         if (held && edit_on) clear_bar_ui();
         else { edit_on = !edit_on; cursor = clampi(cursor, 0, nav_steps(sel) - 1); area_dirty = 1; }
@@ -1779,7 +1912,7 @@ static void input(void)
             else { rec_on = !rec_on; if (rec_on) undo_save(sel, -1); toast(rec_on ? (seq_playing ? "RECORDING" : "RECORDING: PRESS PLAY") : "RECORDED"); area_dirty = 1; }
         }
         else if (!seq_playing) toast("DROP: PRESS PLAY FIRST");
-        else { drop_press(sel); { char t[40], *o = s_cat(t, LNAME[sel]); s_cat(o, " ALONE"); toast(t); } }
+        else { drop_press(sel); if (demo_on) demo_cut(-1, TR_FLASH); { char t[40], *o = s_cat(t, LNAME[sel]); s_cat(o, " ALONE"); toast(t); } }
     }
     if (rel & (1u << BTN_REC) && drop_seg >= 0) { drop_release(); toast(drop_tapped ? "INTER" : "DROP"); }
     if (b & (1u << BTN_ENV)) {
