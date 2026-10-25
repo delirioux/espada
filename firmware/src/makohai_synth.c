@@ -397,7 +397,7 @@ static void start_sfx(uint32_t kind, uint32_t pitch, uint32_t dur, uint32_t lvl)
         v->inc = note_inc((int32_t)pitch + 24); v->inc_lo = HZ_INC(60); v->inc_k = (uint32_t)tau_k(35);
         break;
     case V_CRACKLE:
-        v->peak = (int32_t)((14400u * lvl) >> 8); v->amp = 0; v->stage = 0;   /* 10 % under the rest: it tires the ear */
+        v->peak = (int32_t)((1600u * lvl) >> 8); v->amp = 0; v->stage = 0;    /* a tenth of the others' level: it tires the ear */
         v->att = v->peak * (int32_t)CTRL / 900; if (v->att < 1) v->att = 1;
         v->gate = dur; v->rel_k = tau_k(150);
         break;
@@ -414,7 +414,7 @@ static void start_sfx(uint32_t kind, uint32_t pitch, uint32_t dur, uint32_t lvl)
         v->gate = dur; v->rel_k = tau_k(900);
         break;
     default:                                        /* V_BITS */
-        v->amp = (int32_t)((6300u * lvl) >> 8); v->dec_k = tau_k(160);   /* 10 % under the rest, as CRACKLE */
+        v->amp = (int32_t)((700u * lvl) >> 8); v->dec_k = tau_k(160);    /* a tenth, as CRACKLE */
         v->inc = note_inc((int32_t)pitch + 12); v->s1 = 0x7FFF;
         break;
     }

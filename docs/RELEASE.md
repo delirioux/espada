@@ -4,7 +4,7 @@ Since 1.0:
   from side to side in time (8 bars to an 8th a cycle), as far as you set it.
 - Settings and sets saved by 1.0 are read and kept.
 - The timpani are tuned: SYMPHONY's play the chord's root and fifth, an octave higher than before, so a small speaker plays them too.
-- CRACKLE and BITS (sfx) 10 % quieter.
+- CRACKLE and BITS (sfx) at a tenth of their old level: far in the background.
 - Pictures on SETUP's free knobs: SCOPE, LANES, STEREO (a goniometer), SPECTRUM (a landscape), and RESET's three
   knobs each picking one of CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, COPPER, MAKO, FIRE, LOGO, SCOPE, SPECTRUM.
 - DEMO (SEL + HOME): the pictures full screen while the music plays, cut on the bar every 4, 8 or 16 bars with

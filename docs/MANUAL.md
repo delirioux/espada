@@ -258,8 +258,8 @@ patch.
 
 The SFX lane plays noise, no notes. Its sounds: **WASH** (filtered white noise with a slow sweep), **RISER**
 (noise opening up under a tone that climbs four octaves), **IMPACT** (a falling sub and a noise burst), **ZAP** (a
-laser: a sine falling fast), **CRACKLE** (vinyl clicks and hiss), **BITS** (1-bit periodic noise, the metallic
-8-bit kind, on the chord's root), **SURF** (dark brown noise in waves, brighter on each crest) and **GALE** (white
+laser: a sine falling fast), **CRACKLE** (vinyl clicks and hiss, far in the background), **BITS** (1-bit periodic
+noise, the metallic 8-bit kind, on the chord's root, as quiet), **SURF** (dark brown noise in waves, brighter on each crest) and **GALE** (white
 noise through a narrow band that wanders, a wind in gusts).
 
 On **AUTO** (the default) it follows the arc: a gale fills the bar before each drop, the impact lands on it, and in
