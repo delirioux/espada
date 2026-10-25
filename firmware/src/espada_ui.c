@@ -199,10 +199,17 @@ static int32_t clampi(int32_t v, int32_t a, int32_t b) { return v < a ? a : v > 
 /* EDIT reaches your part's bars and the one right after it (writing there makes the part a bar longer), up to MAXB */
 static int32_t nav_bars(int32_t l) { return ln[l].up.bars < MAXB ? ln[l].up.bars + 1 : MAXB; }
 static int32_t nav_steps(int32_t l) { return nav_bars(l) * 16; }
+/* the knobs show four lanes side by side, in the screen's order; the window follows the marked lane */
+static int32_t win;                                             /* the screen row of KNOB 1's lane: 0..NLANE-4 */
+static int32_t lane_row(int32_t l) { int32_t r = 0; while (r < (int32_t)NLANE - 1 && LROW[r] != l) r++; return r; }
 static void set_sel(int32_t l)
 {
+    int32_t r;
     if (l == sel) return;
     sel = fmodp(l, NLANE);
+    r = lane_row(sel);
+    if (r < win) win = r;
+    if (r > win + 3) win = r - 3;
     cursor = clampi(cursor, 0, nav_steps(sel) - 1);
     area_dirty = 1;
 }
@@ -334,15 +341,35 @@ static void v_space(char *o) { s_pct(o, space); }
 static void s_blend(char *o) { static const char *const W[5] = {"", "DRUMS", "+BASS", "+PAD", "ALL"}; s_cat(o, W[blend]); }
 /* the four musical knobs of a channel (as Tuna's): MELODY which idea, RHYTHM sparse..busy, PITCH narrow..wide and
  * high, CHANGE how soon it brings new material; at once, from the next step */
+/* the arp lane's settings, as heard: the pattern MELODY gives, the step RHYTHM gives, the octaves PITCH gives */
+static void s_apat(char *o)
+{
+    static const char *const N[NAP] = {"UP", "DOWN", "UP-DOWN", "ALBERTI", "BROKEN", "RANDOM"};
+    s_cat(o, N[(PROF[ln[L_ARP].prof].arp[0] + ln[L_ARP].mel) % NAP]);
+}
+static void s_astep(char *o)
+{
+    int32_t st = PROF[ln[L_ARP].prof].arp[1];
+    if (ln[L_ARP].rhy >= 75 && st > 1) st /= 2; else if (ln[L_ARP].rhy < 25 && st < 4) st *= 2;
+    s_cat(o, st == 1 ? "16THS" : st == 2 ? "8THS" : "QUARTERS");
+}
+static void s_aoct(char *o)
+{
+    int32_t oc = PROF[ln[L_ARP].prof].arp[2] + (ln[L_ARP].pit >= 75) - (ln[L_ARP].pit < 25);
+    oc = oc < 1 ? 1 : oc > 3 ? 3 : oc;
+    o = s_int(o, oc); s_cat(o, oc == 1 ? " OCTAVE" : " OCTAVES");
+}
 static void t_mel(int32_t d) { ln[sel].mel = (uint8_t)fmodp(ln[sel].mel + d, 100); invalidate(); }
 static void v_mel(char *o) { s_int(o, ln[sel].mel); }
+static void s_mel(char *o) { if (sel == L_ARP) s_apat(o); }       /* the arp: the pattern it gives */
 static void t_rhy(int32_t d) { ln[sel].rhy = (uint8_t)clampi(ln[sel].rhy + d, 0, 100); invalidate(); }
 static void v_rhy(char *o) { s_pct(o, ln[sel].rhy); }
-static void s_rhy(char *o) { s_cat(o, ln[sel].rhy < 34 ? "SLOW" : ln[sel].rhy < 67 ? "MIDDLE" : "BUSY"); }
+static void s_rhy(char *o) { if (sel == L_ARP) { s_astep(o); return; } s_cat(o, ln[sel].rhy < 34 ? "SLOW" : ln[sel].rhy < 67 ? "MIDDLE" : "BUSY"); }
 static void t_pit(int32_t d) { ln[sel].pit = (uint8_t)clampi(ln[sel].pit + d, 0, 100); invalidate(); }
 static void v_pit(char *o) { s_pct(o, ln[sel].pit); }
 static void s_pit(char *o)
 {
+    if (sel == L_ARP) { s_aoct(o); return; }
     if (HITS(sel)) { s_cat(o, ln[sel].pit > 60 ? "TIMPANI" : ""); return; }       /* the drums: timpani on the off-beats */
     s_cat(o, ln[sel].pit < 34 ? "STEPS" : ln[sel].pit < 67 ? "LEAPS" : ln[sel].pit > 80 ? "HIGH" : "WIDE");
 }
@@ -380,7 +407,7 @@ static void s_rep(char *o) { int32_t b = cursor >> 4; if (b < 1) s_cat(o, "FROM 
  * SONG's rows are four settings each, of the song or of the sfx lane. The functions act on `sel`: drawing sets it
  * for the column and puts it back, turning a lane's knob leaves it there (the lane you touch is the lane). */
 static const card_t ROW_PLAY[] = {
-    {"MELODY", t_mel, v_mel, 0}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"PITCH", t_pit, v_pit, s_pit}, {"CHANGE", t_chg, v_chg, s_chg},
+    {"MELODY", t_mel, v_mel, s_mel}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"PITCH", t_pit, v_pit, s_pit}, {"CHANGE", t_chg, v_chg, s_chg},
     {"DENSITY", t_dens, v_dens, 0}, {"OCTAVE", t_oct, v_oct, 0}, {"STYLE", t_lprof, v_lprof, 0}, {"SOUND", t_inst, v_inst, s_inst},
     {"LEVEL", t_level, v_level, 0}};
 static const card_t ROW_SOUND[] = {
@@ -391,39 +418,11 @@ static const card_t ROW_TRK[] = {
     {"PORTA", t_porta, v_porta, s_porta}, {"VIBRATO", t_vibr, v_vibr, 0}, {"TREMOLO", t_trem, v_trem, s_trem}, {"TREMOR", t_tremor, v_tremor, 0},
     {"GATE", t_gate, v_gate, s_gate}, {"SWING", t_swing, v_swing, 0}, {"PAN", t_pan, v_pan, s_pan}};
 typedef struct { const char *name; int8_t lane; card_t c[4]; } srow_t;     /* lane: -1 the song, else that lane's */
-/* the arp lane's settings, as heard: the pattern MELODY gives, the step RHYTHM gives, the octaves PITCH gives */
-static void s_apat(char *o)
-{
-    static const char *const N[NAP] = {"UP", "DOWN", "UP-DOWN", "ALBERTI", "BROKEN", "RANDOM"};
-    s_cat(o, N[(PROF[ln[L_ARP].prof].arp[0] + ln[L_ARP].mel) % NAP]);
-}
-static void s_astep(char *o)
-{
-    int32_t st = PROF[ln[L_ARP].prof].arp[1];
-    if (ln[L_ARP].rhy >= 75 && st > 1) st /= 2; else if (ln[L_ARP].rhy < 25 && st < 4) st *= 2;
-    s_cat(o, st == 1 ? "16THS" : st == 2 ? "8THS" : "QUARTERS");
-}
-static void s_aoct(char *o)
-{
-    int32_t oc = PROF[ln[L_ARP].prof].arp[2] + (ln[L_ARP].pit >= 75) - (ln[L_ARP].pit < 25);
-    oc = oc < 1 ? 1 : oc > 3 ? 3 : oc;
-    o = s_int(o, oc); s_cat(o, oc == 1 ? " OCTAVE" : " OCTAVES");
-}
-enum { SR_LIVE, SR_KEY, SR_ARC, SR_SFX };
+enum { SR_LIVE, SR_KEY, SR_ARC };
 static const srow_t ROW_SONG[] = {
     {"LIVE", -1, {{"STYLE", t_prof, v_prof, 0}, {"BLEND", t_blend, v_blend, s_blend}, {"ENERGY", t_energy, v_energy, 0}, {"SPACE", t_space, v_space, 0}}},
     {"KEY", -1, {{"KEY", t_key, v_key, 0}, {"SCALE", t_scale, v_scale, 0}, {"CHORDS", t_prog, v_prog, 0}, {"BARS/CH", t_bpc, v_bpc, 0}}},
     {"ARC", -1, {{"ARC", t_arc, v_arc, 0}, {"BUILD", t_build, v_build, s_phr}, {"PEAK", t_peak, v_peak, s_phr}, {"AUTODROP", t_auto, v_auto, 0}}},
-    {"SFX", L_SFX, {{"SOUND", t_inst, v_inst, 0}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"CHANGE", t_chg, v_chg, s_chg}, {"LEVEL", t_level, v_level, 0}}},
-    {"SFX PART", L_SFX, {{"STYLE", t_lprof, v_lprof, 0}, {"DENSITY", t_dens, v_dens, 0}, {"MELODY", t_mel, v_mel, 0}, {"VARY", t_vary, v_vary, s_vary}}},
-    {"SFX FX", L_SFX, {{"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0}}},
-    {"SFX FX 2", L_SFX, {{"CRUSH", t_crush, v_crush, 0}, {"ECHO", t_echo, v_echo, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}}},
-    {"SFX ROOM", L_SFX, {{"REVERB", t_send, v_send, 0}, {"PAN", t_pan, v_pan, s_pan}, {"TREMOLO", t_trem, v_trem, s_trem}, {"TREMOR", t_tremor, v_tremor, 0}}},
-    {"ARP", L_ARP, {{"SOUND", t_inst, v_inst, s_inst}, {"MELODY", t_mel, v_mel, s_apat}, {"RHYTHM", t_rhy, v_rhy, s_astep}, {"LEVEL", t_level, v_level, 0}}},
-    {"ARP PART", L_ARP, {{"STYLE", t_lprof, v_lprof, 0}, {"PITCH", t_pit, v_pit, s_aoct}, {"DENSITY", t_dens, v_dens, 0}, {"CHANGE", t_chg, v_chg, s_chg}}},
-    {"ARP FX", L_ARP, {{"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0}}},
-    {"ARP FX 2", L_ARP, {{"ECHO", t_echo, v_echo, 0}, {"SLIDE", t_slide, v_slide, 0}, {"CRUSH", t_crush, v_crush, 0}, {"REVERB", t_send, v_send, 0}}},
-    {"ARP MIX", L_ARP, {{"PAN", t_pan, v_pan, s_pan}, {"GATE", t_gate, v_gate, s_gate}, {"SWING", t_swing, v_swing, 0}, {"TREMOR", t_tremor, v_tremor, 0}}},
 };
 static const card_t ROW_EDIT[2][4] = {
     {{"STEP", t_step, v_step, s_step}, {"LENGTH", t_len, v_len, 0}, {"BAR", t_bar, v_bar, s_bar}, {"PATTERN", t_use, v_use, 0}},
@@ -511,7 +510,7 @@ static const card_t *knob_card(int32_t c, int32_t *lane)
     if (setup_on) { *lane = -1; return &ROW_SETUP[setup_row].c[c]; }
     if (edit_on) { *lane = sel; return &ROW_EDIT[edit_row][c]; }
     if (grp == G_SONG) { *lane = ROW_SONG[r].lane; return &ROW_SONG[r].c[c]; }
-    *lane = c;
+    *lane = LROW[win + c];
     return grp == G_PLAY ? &ROW_PLAY[r] : grp == G_SOUND ? &ROW_SOUND[r] : &ROW_TRK[r];
 }
 static void card_text(const card_t *C, int32_t lane, char *v, char *sb)
@@ -524,7 +523,7 @@ static void card_text(const card_t *C, int32_t lane, char *v, char *sb)
     if (C->sub) C->sub(sb);
     sel = keep;
 }
-static uint16_t knob_col(int32_t c, int32_t lane) { return setup_on ? C_LIGHT : edit_on ? LCOL[sel] : grp == G_SONG ? (lane >= 0 ? LCOL[lane] : GCOL[G_SONG]) : LCOL[c]; }
+static uint16_t knob_col(int32_t c, int32_t lane) { return setup_on ? C_LIGHT : edit_on ? LCOL[sel] : grp == G_SONG ? (lane >= 0 ? LCOL[lane] : GCOL[G_SONG]) : LCOL[lane]; }
 static uint16_t head_col(void) { return setup_on ? C_LIGHT : edit_on ? LCOL[sel] : GCOL[grp]; }
 
 /* ---- drawing: the lanes */
@@ -803,7 +802,7 @@ static void draw_knobs(int force)
         for (i = 0; sb[c][i]; i++) h = (h ^ (uint8_t)sb[c][i]) * 16777619u;
         h = (h ^ (uint32_t)(uintptr_t)C ^ (uint32_t)(lane >= 0 ? ln[lane].mute : 0) << 3) * 16777619u;
     }
-    h ^= (uint32_t)(last_enc * 131 + (fm1_ms - last_enc_ms < 1500u) + sel * 7919 + grp * 31 + edit_on * 101 + setup_on * 3001 + setup_row * 17);
+    h ^= (uint32_t)(last_enc * 131 + (fm1_ms - last_enc_ms < 1500u) + sel * 7919 + win * 104729 + grp * 31 + edit_on * 101 + setup_on * 3001 + setup_row * 17);
     if (!force && h == knobs_hash) return;
     knobs_hash = h;
     for (k = 0; k < 2; k++) {
@@ -818,9 +817,9 @@ static void draw_knobs(int force)
             if (c) fill(x, KNOB_Y + 1, 1, KNOB_H - 1, C_GRID);
             if (!C->name) continue;
             off = !edit_on && lane >= 0 && ln[lane].mute;
-            if (grp != G_SONG && !edit_on && !setup_on ? c == sel : hot) fill(x + 1, KNOB_Y + 1, COL_W - 1, KNOB_H - 1, cscale(col, 40));
+            if (grp != G_SONG && !edit_on && !setup_on ? lane == sel : hot) fill(x + 1, KNOB_Y + 1, COL_W - 1, KNOB_H - 1, cscale(col, 40));
             fill(x + 4, KNOB_Y + 1, COL_W - 7, 2, hot ? C_WHITE : cscale(col, off ? 70 : 150));
-            label = grp != G_SONG && !edit_on && !setup_on ? LNAME[c] : C->name;
+            label = grp != G_SONG && !edit_on && !setup_on ? LNAME[lane] : C->name;
             if (tw(label, 1) <= COL_W - 2) textc(cx, KNOB_Y + 8, label, off ? cscale(col, 100) : col, 1);
             else text7(cx - tw7(label) / 2, KNOB_Y + 8, label, col);
             for (n = 0; val[n]; n++) ;

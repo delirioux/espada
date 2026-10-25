@@ -19,7 +19,8 @@ retrigger, a bit crusher, echo, and an equal-power pan per lane. An arc builds t
 ## The screens
 
 One screen, laid out as a mixing desk: the setting in large letters on top, all six lanes in the middle, and at the
-bottom the four knobs in a row: LEAD, PAD, BASS and DRUMS, each with its value for that setting. A group button picks
+bottom the four knobs in a row, four lanes side by side, each with its value for that setting; ALGORITHM slides the
+window over the six lanes. A group button picks
 the kind of setting, PRESETS steps through them.
 
 <table>
@@ -31,7 +32,7 @@ the kind of setting, PRESETS steps through them.
 <tr>
 <td align="center"><img src="docs/screens/song.png" width="240" alt="SONG, KEY"><br><b>SONG</b> (GLO): the knobs are four settings of their own. KEY: key, scale, chords, bars per chord, the chord playing lit.</td>
 <td align="center"><img src="docs/screens/arc.png" width="240" alt="SONG, ARC"><br><b>ARC</b> (off until you turn it on): the energy over the coming bars, build, break, peak and down.</td>
-<td align="center"><img src="docs/screens/live.png" width="240" alt="SONG, LIVE"><br><b>LIVE</b>: the next of ten styles, blend, energy and space; SEQ launches it at once, with its tempo. (SONG's last rows: the sfx lane.)</td>
+<td align="center"><img src="docs/screens/live.png" width="240" alt="SONG, LIVE"><br><b>LIVE</b>: the next of ten styles, blend, energy and space; SEQ launches it at once, with its tempo.</td>
 </tr>
 <tr>
 <td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT, the drums"><br><b>EDIT</b>: the lane's own part, bar by bar, up to 512 bars, in scale steps from the chord root; the drums' nine hits by row. FILL a bar from any style, REPEAT the bar before, COPY another lane's part; after your last bar: LOOP, PROFILE or MY STYLE (new bars in your manner).</td>
@@ -45,7 +46,7 @@ the kind of setting, PRESETS steps through them.
 | --- | --- |
 | HOME / FX / ARP / GLO | the groups PLAY, SOUND, TRACKER, SONG; again: the next setting. Hold HOME: SETUP (colours, screen, lights, MIDI channels, defaults) |
 | PRESETS | the setting in the group |
-| KNOB 1-4 | that setting for LEAD, PAD, BASS, DRUMS (SONG: the four shown) |
+| KNOB 1-4 | that setting for the four lanes in the window, LEAD ARP PAD BASS to PAD BASS DRUMS SFX (SONG: the four shown) |
 | ALGORITHM | the lane the buttons and keys act on (turning its knob picks it too) |
 | SELECT | tempo |
 | PLAY / SEQ / REC | INTRO and END, launch the next style (EDIT: copy a lane), INTER (tap) or DROP (hold) |
@@ -64,7 +65,7 @@ the kind of setting, PRESETS steps through them.
   always on screen; the white mark is the lane the buttons and keys act on. Every setting is on a knob, the keys
   only play.
 - **ARP.** Arpeggios through the chord that plays, in each style its own (up, down, up-down, Alberti, broken, random;
-  16ths to quarters, 1 to 3 octaves); SONG's ARP rows set it.
+  16ths to quarters, 1 to 3 octaves), set on the knobs as every lane.
 - **SFX.** The sixth lane: a gale of noise into every drop, the impact on it, washes, surf, laser zaps, crackle and
   8-bit noise, following the arc and the style.
 - **Ten styles**, to change the mood in one move: EPIC (orchestral minor), HYPERSPACE (techno minor with power

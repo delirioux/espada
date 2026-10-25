@@ -14,9 +14,11 @@ One screen, always the same: a mixing desk.
   now; outlined blocks show what the queued style will play. A faded-out lane is dark, a locked lane's name
   inverted. The white bar left of a name marks the lane the buttons and keys act on. (SONG's KEY row shows the chords
   here instead, its ARC row the arc, EDIT the step grid.)
-- The **knobs**: KNOB 1 to 4, in the order they sit on the panel. In PLAY, SOUND and TRACKER they are the four lanes,
-  LEAD, PAD, BASS and DRUMS, each with its value for the setting in the title: you see all four side by side and set
-  them as on a mixer. In SONG they are four settings of their own. A bar shows a share, a word under it what the
+- The **knobs**: KNOB 1 to 4, in the order they sit on the panel. In PLAY, SOUND and TRACKER they are four lanes side
+  by side, each with its value for the setting in the title, as on a mixer: a window over the six lanes, in the
+  screen's order. ALGORITHM moves the marked lane and the window follows it: LEAD ARP PAD BASS, then ARP PAD BASS
+  DRUMS, then PAD BASS DRUMS SFX. The name over each knob says which lane it is. In SONG they are four settings of
+  their own. A bar shows a share, a word under it what the
   value means. "-" means the setting does nothing on that lane.
 
 ## Knobs
@@ -26,7 +28,7 @@ One screen, always the same: a mixing desk.
 | SELECT | the tempo, everywhere |
 | PRESETS | the setting: steps through the group's settings |
 | ALGORITHM | the lane the buttons and keys act on (LEAD, ARP, PAD, BASS, DRUMS, SFX, in the screen's order) |
-| KNOB 1 .. 4 | the setting for LEAD, PAD, BASS, DRUMS (SONG: the four settings shown) |
+| KNOB 1 .. 4 | the setting for the four lanes in the window, as their names show (SONG: the four settings shown) |
 
 Turning a lane's knob also makes it the lane the buttons act on. Hold **SEL** to turn in steps of 10.
 
@@ -34,7 +36,7 @@ Turning a lane's knob also makes it the lane the buttons act on. Hold **SEL** to
 
 A group is a button; pressed again, it steps to its next setting, as PRESETS does.
 
-| Group | Button | Settings (KNOB 1..4 = LEAD, PAD, BASS, DRUMS) |
+| Group | Button | Settings (KNOB 1..4 = the four lanes in the window) |
 | --- | --- | --- |
 | PLAY | HOME | melody, rhythm, pitch, change, density, octave, style, sound, level |
 | SOUND | FX | filter, resonance, wobble, drive, brightness, crush, vary, reverb |
@@ -45,16 +47,6 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | LIVE | style (the next one) | blend | energy | space (the room) |
 | KEY | key | scale | chords | bars per chord |
 | ARC | arc on / off | build | peak | auto drop |
-| SFX | sound | rhythm | change | level |
-| SFX PART | style | density | melody | vary |
-| SFX FX | filter | resonance | wobble | drive |
-| SFX FX 2 | crush | echo | retrigger | rate |
-| SFX ROOM | reverb | pan | tremolo | tremor |
-| ARP | sound | melody: the pattern | rhythm: 16ths, 8ths or quarters | level |
-| ARP PART | style | pitch: 1 to 3 octaves | density | change |
-| ARP FX | filter | resonance | wobble | drive |
-| ARP FX 2 | echo | slide | crush | reverb |
-| ARP MIX | pan | gate | swing | tremor |
 
 | EDIT | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
@@ -112,8 +104,7 @@ lane faded out, a save waiting, the keys' octave off 0.
   B section (its pairs swapped), so 8 chords make a 16-chord form.
 
 - **Energy** (SONG, LIVE) adds to or takes from every lane's density at once: one knob for a build or a breakdown.
-- **Space** (SONG, LIVE) is the room, a stereo reverb, and how loud it is. **Reverb** (SOUND, and SFX ROOM for the
-  sfx lane) is how much of each lane goes into it. It starts with the sfx all the way in (100), the pad much (60),
+- **Space** (SONG, LIVE) is the room, a stereo reverb, and how loud it is. **Reverb** (SOUND) is how much of each lane goes into it. It starts with the sfx all the way in (100), the pad much (60),
   the lead some (35), the drums a little (18) and the bass hardly (3). The sfx lane starts at level 30.
 - **The arc** is off until you turn it on (SONG, ARC, knob 1). On: it starts with a few drum hits and builds bass,
   pad and lead in as the energy rises, breaks, drops and builds again; the ARC row draws it. DROP works without it.
@@ -205,7 +196,7 @@ going up, FUSION bells in broken thirds, OLDSKOOL the chip arpeggio, SYMPHONY a 
 an Alberti figure on electric piano, STEEL a saw running down, DRIFT slow bells, FUNK a random electric piano, RAVE
 a supersaw going up.
 
-Its settings are SONG's ARP rows. **MELODY** steps to the next pattern: UP, DOWN, UP-DOWN, ALBERTI (low, high, middle,
+Its settings are on the knobs as every lane's (ALGORITHM to ARP, and the window shows it). **MELODY** steps to the next pattern: UP, DOWN, UP-DOWN, ALBERTI (low, high, middle,
 high), BROKEN (in thirds) and RANDOM. **RHYTHM** makes it faster or slower (16ths, 8ths, quarters), **PITCH** wider or
 narrower (1 to 3 octaves), **DENSITY** leaves out off-beat notes or throws in octave jumps, **CHANGE** moves to a new
 pattern every 16 bars. The pattern runs on across bar lines, so a chord change lands in the middle of a run, as an
@@ -226,8 +217,8 @@ gale for EPIC, a cymbal swell and a far wind for SYMPHONY, zaps, gusts and bits 
 OLDSKOOL, crackle for FUNK, impacts and a storm for STEEL, zaps and a gust into every phrase for RAVE, more as the
 energy and the density rise. With the arc off: a gale every 8th bar, an impact after it. The RISER is never chosen
 on AUTO; turn it on yourself.
-Turn **SOUND** (SONG, SFX) to one of the eight to hear only that one, in its own pattern. SFX FX and SFX FX 2 give it
-the effects of any lane (a filter sweep over a wash, echo on the zaps). On EDIT the first eight white keys (F3 .. F4)
+Turn **SOUND** (PLAY, the SFX knob) to one of the eight to hear only that one, in its own pattern. SOUND and TRACKER
+give it the effects of any lane (a filter sweep over a wash, echo on the zaps). On EDIT the first eight white keys (F3 .. F4)
 switch WASH, RISER, IMPACT, ZAP, CRACKLE, BITS, SURF and GALE at the cursor.
 
 ## Keys
