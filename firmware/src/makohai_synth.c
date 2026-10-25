@@ -194,6 +194,7 @@ static void room(int32_t *out, uint32_t n)
     }
 }
 static int32_t f_low[NBUS], f_band[NBUS], crush_hold[NBUS], crush_n[NBUS], trem_g[NBUS];
+static int32_t pan_cl[NBUS], pan_cr[NBUS];                 /* each bus's pan gains as the last block ended (Q8) */
 static uint32_t wob_ph[NLANE];
 static uint32_t lane_last_inc[NLANE][3];
 static volatile uint32_t lane_hit_ms[NLANE];
@@ -430,11 +431,15 @@ static void shape_voice(voice_t *v, uint32_t flags, uint32_t dur, int glide)
 }
 
 /* a voice start (now): melodic notes or a drum hit, with the lane's slide memory */
+/* AUTOPAN: each new note (or chord, or the hits of one moment) on the other side; notes within 10 ms share one */
+static uint8_t ap_side[NLANE];
+static uint32_t ap_last[NLANE];
 static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags, uint32_t dur, uint32_t lvl,
                  uint32_t kind_or_inst, int32_t original)
 {
     uint32_t i;
     lane_hit_ms[lane] = fm1_ms;
+    if (fx[lane].autopan > 0 && smp - ap_last[lane] > 441u) { ap_side[lane] ^= 1u; ap_last[lane] = smp; }
     if (lane == L_DRUMS) { start_drum(note[0], lvl, kind_or_inst, original); return; }
     if (lane == L_SFX) { start_sfx(note[0], note[1], dur, lvl); return; }
     {
@@ -961,7 +966,13 @@ static void app_audio(int32_t *out, uint32_t n)
     for (l = 0; l < NBUS; l++) {
         const lanefx_t *F = &fx[BUS_LANE[l]];
         int32_t lv = F->level * 480 / 100, pn = F->pan + PAN_OFF[l], sd = F->send * 256 / 100;   /* Q8: 80 -> 1.5 */
-        int32_t pl = pan_gain(pn < -100 ? -100 : pn > 100 ? 100 : pn, 0), pr = pan_gain(pn < -100 ? -100 : pn > 100 ? 100 : pn, 1);
+        int32_t tl, tr, gl, gr, dl, dr;
+        if (F->autopan > 0) pn += ap_side[BUS_LANE[l]] ? F->autopan : -F->autopan;   /* AUTOPAN: this note's side */
+        if (pn < -100) pn = -100; else if (pn > 100) pn = 100;
+        tl = pan_gain(pn, 0); tr = pan_gain(pn, 1);
+        gl = pan_cl[l] << 16; gr = pan_cr[l] << 16;                     /* glide to the new place over the block: no clicks */
+        dl = (tl - pan_cl[l]) * 65536 / (int32_t)(n ? n : 1u); dr = (tr - pan_cr[l]) * 65536 / (int32_t)(n ? n : 1u);
+        pan_cl[l] = tl; pan_cr[l] = tr;
         lane_fx(l, bus[l], n);
         if (F->trem > 0 || F->tremor > 0) {                             /* TREMOLO and TREMOR, in time with the beat */
             uint32_t L = seq_step_len_q8 >> 8, t0 = seq_playing ? (blk_step0 & 1u) * L + (blk_acc0 >> 8) : blk_smp0 % (2u * (L ? L : 1u));
@@ -979,8 +990,9 @@ static void app_audio(int32_t *out, uint32_t n)
         } else trem_g[l] = 32768;
         for (k = 0; k < n; k++) {
             int32_t s = (bus[l][k] * lv) >> 8;
-            out[2u * k] += (s * pl) >> 8;
-            out[2u * k + 1u] += (s * pr) >> 8;
+            out[2u * k] += (s * (gl >> 16)) >> 8;
+            out[2u * k + 1u] += (s * (gr >> 16)) >> 8;
+            gl += dl; gr += dr;
             sendb[k] += (s * sd) >> 8;
         }
     }

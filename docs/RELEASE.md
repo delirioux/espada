@@ -1,3 +1,8 @@
+Since 1.0:
+
+- AUTOPAN (TRACKER, after PAN): each new note on the other side of the lane's pan, as far as you set it.
+- Settings and sets saved by 1.0 are read and kept.
+
 Makohai 1.0 (formerly Espada): the first release of a generative groovebox for the M-VAVE FM-1 in the style of early-90s PC tracker music.
 
 - Six lanes (lead, arp, pad, bass, drums, sfx) with FM voices, five synthesized drum kits of nine hits (kick, snare, hat, open hat, clap, tom, rim shot, kettle drum, crash) and eight noise effects (wash, surf, gale, crackle, bits, impact, zap, riser); notes scroll past a fixed play line.

@@ -11,7 +11,7 @@ lines, melodies, drum patterns and noise in the manner of the S3M scene, played 
 glides, swells and an echo channel. You do not program steps; you mix styles. Queue the next style, blend it in lane by
 lane from the bottom up, or launch it at once with its own tempo. Shape each lane with a
 filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, porta, vibrato, tremolo, tremor, gate, swing,
-retrigger, a bit crusher, echo, and an equal-power pan per lane. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
+retrigger, a bit crusher, echo, and an equal-power pan per lane with an autopan that sends each note to the other side. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
 
 <p align="center"><img src="docs/screens/main.png" width="320" alt="Makohai's screen: the VOLUME setting, all six lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
 
