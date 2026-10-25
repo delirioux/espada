@@ -6,6 +6,7 @@ Since 1.0:
 - CRACKLE and BITS (sfx) at a tenth of their old level: far in the background.
 - Pictures on SETUP's free knobs: SCOPE, LANES, STEREO (a goniometer), SPECTRUM (a landscape), and RESET's three
   knobs each picking one of CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, FIRE, LOGO, SCOPE, SPECTRUM.
+- Every lane starts at PAN 0; the lead and the arp at AUTOPAN 20.
 - The keys light up the notes the marked lane plays (drums and sfx: their keys as they hit).
 - A voice budget (SETUP, VOICES: now, peak, LIMIT): all that sounds may cost at most LIMIT units, so echo on every
   lane can no longer make the sound late (a crack); past it the quietest fading voice stops first.

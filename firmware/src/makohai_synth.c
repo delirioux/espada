@@ -246,7 +246,7 @@ static void synth_init(void)
     fx[L_SFX].level = 30;
     fx[L_LEAD].level = 50;                                        /* the lead: the ear hears its range most; 50 sits it in the mix */
     fx[L_ARP].level = 60;                                         /* the arp beside it */
-    fx[L_LEAD].pan = 45; fx[L_ARP].pan = -45;                      /* lead a little right, the arp a little left */
+    fx[L_LEAD].autopan = 20; fx[L_ARP].autopan = 20;               /* every lane in the middle; lead and arp move a little, note by note */
 }
 
 static inline int32_t noise(void) { noise_s = noise_s * 1664525u + 1013904223u; return (int32_t)noise_s >> 17; }

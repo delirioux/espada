@@ -178,7 +178,7 @@ lane faded out, a save waiting, the keys' octave off 0.
     can swing while the bass stays straight.
   - **PAN** (8xx): the lane from left to right, with equal power: a lane sounds as loud wherever you put it, and in
     the middle exactly as before. The pad's and the sfx's voices keep their spread around it, the hats stay right
-    of the drums. The lead starts a little right, the arp a little left.
+    of the drums. Every lane starts in the middle (PAN 0); the lead and the arp start with AUTOPAN at 20.
   - **AUTOPAN**: how far the lane moves away from PAN, to either side (100: from hard left to hard right, around
     the middle). How it moves is PAN RATE.
   - **PAN RATE**: NOTE puts each new note on the other side, left, right, left: a chord moves as one, and so do
@@ -193,8 +193,8 @@ lane faded out, a save waiting, the keys' octave off 0.
   notes, so it stays a pattern); the rate sets 1 to 3 repeats per 16th. **Crush** lowers the bits and the sample rate.
   **Echo** plays two quieter copies a dotted 8th apart.
 - **Stereo:** as a tracker spreads its channels left and right, Makohai spreads its voices: the pad's and the sfx's
-  every other voice to the right, hats and crash right of centre, the lead a little right, bass and kick in the
-  middle. STRINGS and BRASS play as sections (two more players a little out of tune) and the strings swell in.
+  every other voice to the right, hats and crash right of centre, the lead and the arp moving a little from note
+  to note (AUTOPAN), bass and kick in the middle. STRINGS and BRASS play as sections (two more players a little out of tune) and the strings swell in.
   HYPERSPACE's pad is chopped: the chord struck every 16th with an accent pattern, as a tracker re-strikes a long
   pad sample.
 - **The form.** A piece has an INTRO, INTERs and an END, played by hand:
