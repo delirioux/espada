@@ -38,7 +38,7 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 
 | Group | Button | Settings (KNOB 1..4 = the four lanes in the window) |
 | --- | --- | --- |
-| PLAY | HOME | melody, rhythm, pitch, change, density, octave, style, sound, level |
+| PLAY | HOME | melody, rhythm, pitch, change, density, octave, style, sound, volume |
 | SOUND | FX | filter, resonance, wobble, drive, brightness, crush, vary, reverb |
 | TRACKER | ARP | slide, retrigger, rate, echo, porta, vibrato, tremolo, tremor, gate, swing, pan |
 
@@ -108,7 +108,7 @@ lane faded out, a save waiting, the keys' octave off 0.
 
 - **Energy** (SONG, LIVE) adds to or takes from every lane's density at once: one knob for a build or a breakdown.
 - **Space** (SONG, LIVE) is the room, a stereo reverb, and how loud it is. **Reverb** (SOUND) is how much of each lane goes into it. It starts with the sfx all the way in (100), the pad much (60),
-  the lead some (35), the drums a little (18) and the bass hardly (3). LEVEL starts at 80, the lead and the arp at
+  the lead some (35), the drums a little (18) and the bass hardly (3). VOLUME starts at 80, the lead and the arp at
   60, the sfx at 30.
 - **The arc** is off until you turn it on (SONG, ARC, knob 1). On: it starts with a few drum hits and builds bass,
   pad and lead in as the energy rises, breaks, drops and builds again; the ARC row draws it. DROP works without it.

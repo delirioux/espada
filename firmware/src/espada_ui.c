@@ -415,7 +415,7 @@ static void s_rep(char *o) { int32_t b = cursor >> 4; if (b < 1) s_cat(o, "FROM 
 static const card_t ROW_PLAY[] = {
     {"MELODY", t_mel, v_mel, s_mel}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"PITCH", t_pit, v_pit, s_pit}, {"CHANGE", t_chg, v_chg, s_chg},
     {"DENSITY", t_dens, v_dens, 0}, {"OCTAVE", t_oct, v_oct, 0}, {"STYLE", t_lprof, v_lprof, 0}, {"SOUND", t_inst, v_inst, s_inst},
-    {"LEVEL", t_level, v_level, 0}};
+    {"VOLUME", t_level, v_level, 0}};
 static const card_t ROW_SOUND[] = {
     {"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0},
     {"BRIGHT", t_bright, v_bright, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary}, {"REVERB", t_send, v_send, 0}};
