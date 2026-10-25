@@ -63,12 +63,19 @@ Hold **HOME** for SETUP; HOME (or any group button, or EDIT) leaves it. PRESETS 
 
 | SETUP | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
-| LOOK | palette: MAKOHAI (its colours), AMBER, GREEN, CYAN, RED, MONO | screen: 100, 75, 50 or 25 % | lights: the keys' and buttons' glow on or off | |
+| LOOK | palette: MAKOHAI (its colours), AMBER, GREEN, CYAN, RED, MONO | screen: 100, 75, 50 or 25 % | lights: the keys' and buttons' glow on or off | SCOPE (a picture) |
 | MIDI | the lead's channel | the pad's | the bass's | the drums' (1..16 or OFF) |
-| MIDI 2 | the arp's channel | | | |
-| RESET | defaults: five clicks to the right puts everything back as it comes (patterns cleared); SAVE keeps it | | | |
+| MIDI 2 | the arp's channel | LANES (a picture) | STEREO (a picture) | SPECTRUM (a picture) |
+| RESET | defaults: five clicks to the right puts everything back as it comes (patterns cleared); SAVE keeps it | COPPER (a picture) | STARS (a picture) | MAKO (a picture) |
 | SYSTEM | stack: free, of 23 K (the least it has had free since power-on) | the interrupts' stack: the same, of 7 K | RAM free | the pool free (the big buffers) |
 | AUDIO | the audio interrupt's worst time, µs | its average over the last half second | the worst as a share of the 5805 µs it has | any knob here starts the worst again |
+
+The pictures fill the knobs SETUP has no use for; turning those knobs does nothing. **SCOPE** draws the output's
+wave, held still on a rising zero as a tracker's scope does. **LANES** is a level meter per lane in its colour,
+**STEREO** the left and right output with a dot for the balance (it follows AUTOPAN and PAN RATE), **SPECTRUM** what
+sounds by pitch, from the bass on the left to the hats on the right. **COPPER** moves three raster bars and flashes
+them on the drums, **STARS** flies through a starfield at the tempo, and in **MAKO** a fin crosses the sea, bobbing
+on the bass.
 
 SAVE keeps the setup with everything else. SYSTEM and AUDIO only show; they are how a firmware that runs short of
 memory or time is caught before it crackles or crashes. In the browser, SYSTEM shows N/A (there is no FM-1 memory

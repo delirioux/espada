@@ -194,7 +194,7 @@ static int32_t inst_eff(int32_t l) { return fxu[l].inst >= 0 ? fxu[l].inst : l =
 /* ---- the knobs' functions: turn, and the value (and a second line) as the cards show them */
 typedef void (*turn_fn)(int32_t d);
 typedef void (*val_fn)(char *o);
-typedef struct { const char *name; turn_fn turn; val_fn val, sub; } card_t;
+typedef struct { const char *name; turn_fn turn; val_fn val, sub; void (*draw)(int32_t x); } card_t;   /* draw: a picture instead */
 static int32_t clampi(int32_t v, int32_t a, int32_t b) { return v < a ? a : v > b ? b : v; }
 /* EDIT reaches your part's bars and the one right after it (writing there makes the part a bar longer), up to MAXB */
 static int32_t nav_bars(int32_t l) { return ln[l].up.bars < MAXB ? ln[l].up.bars + 1 : MAXB; }
@@ -537,6 +537,127 @@ static const card_t ROW_EDIT[5][4] = {
     {{"FROM", t_from, v_from, s_range}, {"TO", t_to, v_to, s_range}, {"PASTE", t_paste, v_paste, s_paste}, {"CLEAR", t_clear, v_clear, s_clear}}};
 static const char *const EDIT_PAGE[5] = {"NOTES", "FX", "PART", "BAR", "RANGE"};
 static int32_t edit_row, rec_on;                               /* the EDIT page; RECORD (REC on EDIT) */
+/* ---- the pictures on SETUP's free knobs: SCOPE (the output), LANES and STEREO (levels), SPECTRUM (what plays, by
+ * pitch), COPPER, STARS and MAKO (to look at). The sound is read once a frame (vis_prep), then drawn in both strips
+ * of the knob row; turning those knobs does nothing */
+#define VIS_Y (KNOB_Y + 20)
+#define VIS_H (KNOB_H - 24)
+#define VIS_W (COL_W - 6)
+static int16_t vis_sc[56];
+static int32_t vis_lane[NLANE], vis_out[2], vis_band[8];
+static uint32_t vis_t, vis_rng = 0x9E3779B9u;
+static int32_t star_x[24], star_y[24], star_z[24];
+static uint32_t vis_rand(void) { vis_rng ^= vis_rng << 13; vis_rng ^= vis_rng >> 17; vis_rng ^= vis_rng << 5; return vis_rng; }
+static int32_t vis_fall(int32_t now, int32_t was) { return now > was ? now : was * 13 / 16; }   /* up at once, down slowly */
+static void vis_prep(void)
+{
+    static const uint8_t KBAND[] = {0, 0, 0, 4, 7, 6, 1, 5, 7, 2, 5, 5, 4, 1, 3, 6, 6, 3, 5};   /* a drum's or a noise's band, by kind */
+    static int16_t snap[256];
+    int32_t b[8], trig = 0, l, k;
+    uint32_t w = scope_w, i;
+    vis_t++;
+    for (i = 0; i < 256u; i++) snap[i] = scope_buf[(w + i) & 255u];    /* oldest first */
+    for (i = 1; i < 144u; i++) if (snap[i - 1] < 0 && snap[i] >= 0) { trig = (int32_t)i; break; }   /* a rising zero: a still picture */
+    for (k = 0; k < 56; k++) vis_sc[k] = snap[trig + k * 2];
+    for (l = 0; l < (int32_t)NLANE; l++) { int32_t p = lane_pk[l]; lane_pk[l] = 0; vis_lane[l] = vis_fall(p, vis_lane[l]); }
+    for (k = 0; k < 2; k++) { int32_t p = out_pk[k]; out_pk[k] = 0; vis_out[k] = vis_fall(p, vis_out[k]); }
+    for (k = 0; k < 8; k++) b[k] = 0;
+    for (i = 0; i < NVOICE; i++) {                                       /* every voice that sounds, by its pitch */
+        const voice_t *x = &vc[i];
+        int32_t a = x->amp < 0 ? -x->amp : x->amp, band;
+        if (x->kind == V_OFF || x->kind >= sizeof KBAND) continue;
+        if (x->kind == V_FM) { uint32_t hz = x->inc / 97392u; band = hz < 80u ? 0 : hz < 160u ? 1 : hz < 320u ? 2 : hz < 640u ? 3 : hz < 1280u ? 4 : hz < 2560u ? 5 : hz < 5120u ? 6 : 7; }
+        else band = KBAND[x->kind];
+        b[band] += a;
+        if (band > 0) b[band - 1] += a / 3;
+        if (band < 7) b[band + 1] += a / 3;
+    }
+    for (k = 0; k < 8; k++) vis_band[k] = vis_fall(b[k], vis_band[k]);
+    for (k = 0; k < 24; k++) {                                           /* the stars fly out, faster with the tempo */
+        star_z[k] -= 1 + (int32_t)seq_bpm / 50;
+        if (star_z[k] <= 2 || star_x[k] * 24 / star_z[k] > VIS_W / 2 || star_x[k] * 24 / star_z[k] < -VIS_W / 2 ||
+            star_y[k] * 24 / star_z[k] > VIS_H / 2 || star_y[k] * 24 / star_z[k] < -VIS_H / 2 || star_z[k] > 64) {
+            star_x[k] = (int32_t)(vis_rand() % 61u) - 30; star_y[k] = (int32_t)(vis_rand() % 61u) - 30; star_z[k] = 40 + (int32_t)(vis_rand() % 24u);
+        }
+    }
+}
+static int32_t vis_h(int32_t v, int32_t full) { int32_t h = v * VIS_H / full; return h < 0 ? 0 : h > VIS_H ? VIS_H : h; }
+static void vis_scope(int32_t x)
+{
+    int32_t k, mid = VIS_Y + VIS_H / 2, prev = mid;
+    fill(x + 3, mid, VIS_W, 1, C_GRID);
+    for (k = 0; k < 56 && k < VIS_W; k++) {
+        int32_t y = mid - vis_sc[k] * (VIS_H / 2) / 24000, a, z;
+        if (y < VIS_Y) y = VIS_Y; else if (y > VIS_Y + VIS_H - 1) y = VIS_Y + VIS_H - 1;
+        a = k ? (prev < y ? prev : y) : y; z = k ? (prev > y ? prev : y) : y;      /* joined up, as a line */
+        fill(x + 3 + k, a, 1, z - a + 1, C_CYAN);
+        prev = y;
+    }
+}
+static void vis_lanes(int32_t x)
+{
+    int32_t r, bw = VIS_W / (int32_t)NLANE;
+    for (r = 0; r < (int32_t)NLANE; r++) {
+        int32_t l = LROW[r], h = vis_h(vis_lane[l], 16000);
+        fill(x + 3 + r * bw, VIS_Y, bw - 2, VIS_H, cscale(LCOL[l], 30));
+        fill(x + 3 + r * bw, VIS_Y + VIS_H - h, bw - 2, h, LCOL[l]);
+    }
+}
+static void vis_stereo(int32_t x)
+{
+    int32_t k, bw = VIS_W / 2 - 4, d, cx;
+    for (k = 0; k < 2; k++) {
+        int32_t h = vis_h(vis_out[k], 30000), bx = x + 3 + k * (VIS_W / 2 + 4);
+        fill(bx, VIS_Y, bw, VIS_H, C_GRID);
+        fill(bx, VIS_Y + VIS_H - h, bw, h, h > VIS_H * 9 / 10 ? RGBC(0xff7a5a) : C_CREAM);
+    }
+    d = vis_out[0] + vis_out[1];                                         /* the balance: a dot from left to right */
+    cx = x + 3 + (d ? vis_out[1] * (VIS_W - 1) / d : (VIS_W - 1) / 2);
+    fill(cx - 1, VIS_Y - 4, 3, 3, C_CYAN);
+}
+static void vis_spectrum(int32_t x)
+{
+    int32_t k, bw = VIS_W / 8;
+    for (k = 0; k < 8; k++) {
+        int32_t h = vis_h(vis_band[k], 30000), j;
+        for (j = 0; j < h; j += 3) fill(x + 3 + k * bw, VIS_Y + VIS_H - 2 - j, bw - 1, 2, j > VIS_H * 2 / 3 ? RGBC(0xff7a9a) : j > VIS_H / 3 ? RGBC(0xffb04a) : RGBC(0x7ee88c));
+    }
+}
+static void vis_copper(int32_t x)
+{
+    static const uint16_t SHADE[9] = {50, 90, 140, 200, 256, 200, 140, 90, 50};
+    int32_t k, j, hit = (int32_t)(fm1_ms - lane_hit_ms[L_DRUMS]) < 90 && seq_playing;
+    for (k = 0; k < 3; k++) {
+        int32_t c = VIS_Y + VIS_H / 2 - 4 + SIN[(vis_t * 9u + (uint32_t)k * 340u) & 1023u] * (VIS_H / 2 - 5) / 32768;
+        for (j = 0; j < 9; j++) fill(x + 1, c + j, COL_W - 2, 1, cscale(LCOL[LROW[k * 2]], SHADE[j] * (hit ? 5 : 4) / 4));
+    }
+}
+static void vis_stars(int32_t x)
+{
+    int32_t k, cx = x + COL_W / 2, cy = VIS_Y + VIS_H / 2;
+    for (k = 0; k < 24; k++) {
+        int32_t sx2 = cx + star_x[k] * 24 / star_z[k], sy2 = cy + star_y[k] * 24 / star_z[k], s = star_z[k] < 16 ? 2 : 1;
+        if (sx2 < x + 2 || sx2 > x + COL_W - 3 || sy2 < VIS_Y || sy2 > VIS_Y + VIS_H - 2) continue;
+        fill(sx2, sy2, s, s, star_z[k] < 24 ? C_CREAM : star_z[k] < 44 ? C_LIGHT : C_DIMG);
+    }
+}
+static void vis_mako(int32_t x)
+{
+    int32_t k, sea = VIS_Y + VIS_H * 2 / 3, span = VIS_W + 24, fx = x + 3 + (int32_t)(vis_t % (uint32_t)span) - 12;
+    int32_t bob = (int32_t)(fm1_ms - lane_hit_ms[L_BASS]) < 120 && seq_playing ? 2 : 0;
+    for (k = 0; k < 18; k++) {                                           /* the fin, swimming right: a straight back, a curved front */
+        int32_t y = sea - 18 + k - bob, x0 = fx, x1 = fx + 1 + k * 14 / 18 + (k * k) / 40;
+        if (x0 < x + 2) x0 = x + 2;
+        if (x1 > x + COL_W - 3) x1 = x + COL_W - 3;
+        if (x1 > x0) fill(x0, y, x1 - x0, 1, RGBC(0x6f8fa8));
+    }
+    for (k = 0; k < VIS_W; k++) {                                        /* the sea, rolling */
+        int32_t y = sea + SIN[((uint32_t)k * 40u + vis_t * 24u) & 1023u] * 2 / 32768;
+        fill(x + 3 + k, y, 1, VIS_Y + VIS_H - y, cscale(C_CYAN, 70));
+        fill(x + 3 + k, y, 1, 1, C_CYAN);
+    }
+}
+static void v_vis(char *o) { o[0] = 0; }
 /* SETUP (hold HOME): the look, the MIDI channels, the defaults */
 static int32_t setup_on, setup_row, reset_turns;
 static void defaults(void);
@@ -597,10 +718,10 @@ static void s_load(char *o) { s_cat(o, "OF 5.8MS"); }
 static void v_tr(char *o) { s_cat(o, "TURN"); }
 static void s_tr(char *o) { s_cat(o, "WORST"); }
 static const srow_t ROW_SETUP[] = {
-    {"LOOK", -1, {{"PALETTE", t_pal, v_pal, 0}, {"SCREEN", t_scr, v_scr, 0}, {"LIGHTS", t_glow, v_glow, s_glow}, {0, 0, 0, 0}}},
+    {"LOOK", -1, {{"PALETTE", t_pal, v_pal, 0}, {"SCREEN", t_scr, v_scr, 0}, {"LIGHTS", t_glow, v_glow, s_glow}, {"SCOPE", t_none, v_vis, 0, vis_scope}}},
     {"MIDI", -1, {{"LEAD", t_ch0, v_ch0, s_ch}, {"PAD", t_ch1, v_ch1, s_ch}, {"BASS", t_ch2, v_ch2, s_ch}, {"DRUMS", t_ch3, v_ch3, s_ch}}},
-    {"MIDI 2", -1, {{"ARP", t_ch5, v_ch5, s_ch}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
-    {"RESET", -1, {{"DEFAULTS", t_reset, v_reset, s_reset}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+    {"MIDI 2", -1, {{"ARP", t_ch5, v_ch5, s_ch}, {"LANES", t_none, v_vis, 0, vis_lanes}, {"STEREO", t_none, v_vis, 0, vis_stereo}, {"SPECTRUM", t_none, v_vis, 0, vis_spectrum}}},
+    {"RESET", -1, {{"DEFAULTS", t_reset, v_reset, s_reset}, {"COPPER", t_none, v_vis, 0, vis_copper}, {"STARS", t_none, v_vis, 0, vis_stars}, {"MAKO", t_none, v_vis, 0, vis_mako}}},
     {"SYSTEM", -1, {{"STACK", t_none, v_stk, s_stk}, {"IRQ", t_none, v_irq, s_irq}, {"RAM", t_none, v_ram, s_free}, {"POOL", t_none, v_pool, s_free}}},
     {"AUDIO", -1, {{"WORST", t_isr, v_worst, s_msw}, {"AVERAGE", t_isr, v_avg, s_msw}, {"LOAD", t_isr, v_load, s_load}, {"RESET", t_isr, v_tr, s_tr}}},
 };
@@ -923,18 +1044,20 @@ static void draw_title(int force)
 static uint32_t knobs_hash;
 static void draw_knobs(int force)
 {
-    int32_t c, k;
+    int32_t c, k, pics = 0;
     uint32_t h = 2166136261u;
     char v[4][24], sb[4][24];
     for (c = 0; c < 4; c++) {
         int32_t lane; uint32_t i;
         const card_t *C = knob_card(c, &lane);
         card_text(C, lane, v[c], sb[c]);
+        if (C->name && C->draw) pics = 1;
         for (i = 0; v[c][i]; i++) h = (h ^ (uint8_t)v[c][i]) * 16777619u;
         for (i = 0; sb[c][i]; i++) h = (h ^ (uint8_t)sb[c][i]) * 16777619u;
         h = (h ^ (uint32_t)(uintptr_t)C ^ (uint32_t)(lane >= 0 ? ln[lane].mute : 0) << 3) * 16777619u;
     }
     h ^= (uint32_t)(last_enc * 131 + (fm1_ms - last_enc_ms < 1500u) + sel * 7919 + win * 104729 + grp * 31 + edit_on * 101 + setup_on * 3001 + setup_row * 17);
+    if (pics) { vis_prep(); h ^= vis_t * 2654435761u; }                /* a picture moves: every frame */
     if (!force && h == knobs_hash) return;
     knobs_hash = h;
     for (k = 0; k < 2; k++) {
@@ -954,6 +1077,7 @@ static void draw_knobs(int force)
             label = grp != G_SONG && !edit_on && !setup_on ? LNAME[lane] : C->name;
             if (tw(label, 1) <= COL_W - 2) textc(cx, KNOB_Y + 8, label, off ? cscale(col, 100) : col, 1);
             else text7(cx - tw7(label) / 2, KNOB_Y + 8, label, col);
+            if (C->draw) { C->draw(x); continue; }
             for (n = 0; val[n]; n++) ;
             if (n && val[n - 1] == '%') {                           /* a share: the number large, the bar */
                 val[--n] = 0;
@@ -970,6 +1094,7 @@ static void draw_knobs(int force)
             if (sb[c][0]) { if (tw7(sb[c]) > COL_W - 2) sb[c][8] = 0; text7(cx - tw7(sb[c]) / 2, KNOB_Y + 72, sb[c], off ? C_CREAM : C_MUTE); }
         }
         cs_end();
+        if (pics) platform_poll();
     }
 }
 
