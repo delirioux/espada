@@ -215,7 +215,12 @@ static void set_sel(int32_t l)
 }
 static void t_lprof(int32_t d) { ln[sel].prof = (uint8_t)fmodp(ln[sel].prof + (d > 0 ? 1 : -1), NPROF); invalidate(); }
 static void v_lprof(char *o) { s_cat(o, PSHORT[ln[sel].prof]); }
-static void t_prof(int32_t d) { target = fmodp(target + (d > 0 ? 1 : -1), NPROF); invalidate(); }
+static void t_prof(int32_t d)                                   /* playing: the next style (SEQ or BLEND bring it in); stopped: at once */
+{
+    target = fmodp(target + (d > 0 ? 1 : -1), NPROF);
+    if (!seq_playing) { launch_tempo = 1; commit_launch(); form_arm(); }
+    else invalidate();
+}
 static void v_prof(char *o) { s_cat(o, PSHORT[target]); }
 static void t_blend(int32_t d) { blend = clampi(blend + (d > 0 ? 1 : -1), 0, 4); invalidate(); }
 static void v_blend(char *o) { s_pct(o, blend * 25); }

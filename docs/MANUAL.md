@@ -44,7 +44,7 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 
 | SONG (GLO) | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
-| LIVE | style (the next one) | blend | energy | space (the room) |
+| LIVE | style: playing, the next one; stopped, every lane at once | blend | energy | space (the room) |
 | KEY | key | scale | chords | bars per chord |
 | ARC | arc on / off | build | peak | auto drop |
 
@@ -186,6 +186,8 @@ lane faded out, a save waiting, the keys' octave off 0.
   down into the next chord; timpani on the one with a roll into each phrase, a bass drum every other bar, a cymbal
   on the phrase and a cymbal swell (sfx) before it; a march snare when the energy is up.
 - **A lane's style** (PLAY) sets that lane alone; the queued style (SONG, LIVE) is the one blend and launch move to.
+  While Espada is stopped there is nothing to blend into: SONG's STYLE then switches every lane (not the locked ones)
+  at once, with the style's tempo.
 - **The lead** follows the chords: every beat is a chord tone, the notes between lead into the next one by scale
   steps, and each 4-bar phrase states a motif, answers it, varies it and lands on the root or third. Density adds a
   16th into a beat, never a stray note.
