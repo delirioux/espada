@@ -66,6 +66,7 @@ typedef struct {
 #define EV_GLIDE 8u             /* the note glides in from the lane's last one (a tracker's tone portamento) */
 #define EV_SWELL 16u            /* the note swells in over most of its length (volume slide up) */
 #define EV_FADE 32u             /* the note fades out over its length (volume slide down) */
+#define EV_ORCH 64u             /* played on the orchestra hit, whatever the lane's sound (the styles' hits) */
 /* the effect column of your own parts, as a tracker row has it: a code and a value 0..15 */
 enum { FX_NONE, FX_VOL, FX_SLIDE, FX_UP, FX_DOWN, FX_VIB, FX_RETRIG, FX_CUT, FX_DELAY, NFX };
 #define MAXEV 80u

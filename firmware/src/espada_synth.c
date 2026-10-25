@@ -432,7 +432,7 @@ static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags,
     if (lane == L_DRUMS) { start_drum(note[0], lvl, kind_or_inst, original); return; }
     if (lane == L_SFX) { start_sfx(note[0], note[1], dur, lvl); return; }
     {
-        const patch_t *P = &PATCH[kind_or_inst < NPATCH ? kind_or_inst : 0];
+        const patch_t *P = &PATCH[flags & EV_ORCH ? NPATCH - 1u : kind_or_inst < NPATCH ? kind_or_inst : 0];   /* ORCH HIT is the last patch */
         int32_t chord = n > 1u && !(flags & EV_ARP);
         uint32_t l2 = chord ? (lvl * 115u) >> 8 : lvl;                    /* chords: quieter per voice */
         if (flags & EV_ARP) {

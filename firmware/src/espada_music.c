@@ -136,9 +136,25 @@ static const prof_t PROF[] = {
      {S_RIFF, S_CLAV, S_SLAP, S_DFUNK}, {11, 13, 1, 1, 0, 13}, 0, 112, 10, 0, 0, {AP_RANDOM, 1, 1}},
     /* the rave: four on the floor, an acid bass that slides, organ stabs, brass chord hits */
     {"RAVE", AEO, {{0, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {8, Q_MAJ}, {3, Q_MAJ}, {3, Q_MAJ}, {10, Q_MAJ}, {7, Q_S4}},
-     {S_STAB, S_SUS, S_ACID, S_DRAVE}, {4, 7, 0, 2, 0, 17}, 0, 138, 20, 0, 35, {AP_UP, 1, 2}},
+     {S_STAB, S_SUS, S_ACID, S_DRAVE}, {4, 7, 0, 3, 0, 17}, 0, 138, 20, 0, 35, {AP_UP, 1, 2}},
 };
 #define NPROF (int32_t)(sizeof PROF / sizeof PROF[0])
+/* how each style plays the lanes, on top of your settings (as VARY): swing, tremolo, trance gate (tremor), gate and
+ * stereo per lane, in LEAD PAD BASS DRUMS SFX ARP order. The notes' own effects are in style_fx */
+typedef struct { int8_t swing[NLANE], pan[NLANE]; uint8_t trem[NLANE], tremor[NLANE], gate[NLANE]; } sstyle_t;
+static const sstyle_t SSTYLE[] = {
+    /* EPIC */       {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
+    /* HYPERSPACE */ {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 30}},
+    /* FUSION */     {{0, 0, 0, 20, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
+    /* OLDSKOOL */   {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
+    /* SYMPHONY */   {{0, 0, 0, 0, 0, 0}, {10, 0, 0, 0, 0, -20}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
+    /* TROPIC */     {{0, 0, 0, 30, 0, 30}, {20, 0, 0, 0, 0, -25}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
+    /* STEEL */      {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
+    /* DRIFT */      {{0, 0, 0, 0, 0, 0}, {25, 0, 0, 0, 0, -25}, {0, 30, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
+    /* FUNK */       {{0, 0, 0, 35, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 40, 30, 0, 0, 0}},
+    /* RAVE */       {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 2, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
+};
+typedef char sstyle_count[sizeof SSTYLE / sizeof SSTYLE[0] == sizeof PROF / sizeof PROF[0] ? 1 : -1];
 
 /* ---- the SONG page: key, scale, suggested progressions (scale degrees, chords stacked in the scale) */
 typedef struct { const char *name; int8_t pcs[7]; int8_t n; const int8_t *chord; } scale_t;
@@ -774,6 +790,58 @@ static void gen_arp(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, 
     }
 }
 
+/* how a style plays its notes, as the trackers' effect columns did: vibrato on long notes, slides, a dive off the
+ * phrase's last note, cut-off stabs, retriggered snare fills, volume slides; and the orchestra hit (one note on the
+ * pad lane: the hit is its own chord) at the phrase, the drop or the climax */
+static void style_fx(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t p, int32_t b, const arc_t *A)
+{
+    uint32_t i, last = 0;
+    int end = b % 4 == 3;
+    for (i = 0; i < G->n; i++) if (G->ev[i].st >= G->ev[last].st) last = i;
+    for (i = 0; i < G->n; i++) {
+        ev_t *e = &G->ev[i];
+        if (e->fx) continue;
+        switch (p) {
+        case 0:                                                     /* EPIC: the long lead notes sing */
+            if (l == L_LEAD && e->len >= 4 && chance(r, 50)) e->fx = FX_VIB << 4 | 6;
+            break;
+        case 1:                                                     /* HYPERSPACE: stabs cut short, the bass dives into the phrase */
+            if (l == L_LEAD && e->n > 1 && chance(r, 60)) e->fx = FX_CUT << 4 | 2;
+            else if (l == L_BASS && end && i == last) e->fx = FX_DOWN << 4 | 10;
+            break;
+        case 2:                                                     /* FUSION: now and then a vibrato or a slide */
+            if (l == L_LEAD) { if (e->len >= 3 && chance(r, 20)) e->fx = FX_VIB << 4 | 5; else if (chance(r, 10)) e->fx = FX_SLIDE << 4; }
+            break;
+        case 3:                                                     /* OLDSKOOL: the 4-channel tricks */
+            if (l == L_LEAD) { if (e->len >= 3 && chance(r, 30)) e->fx = FX_VIB << 4 | 7; else if (chance(r, 15)) e->fx = FX_SLIDE << 4; }
+            else if (l == L_DRUMS && end && e->st >= 12 && e->note[0] == DK_SNARE) e->fx = FX_RETRIG << 4 | 2;
+            else if (l == L_PAD) e->fx = (uint8_t)(FX_VOL << 4 | (15 - (e->st % 8) * 3 / 2));   /* a volume slide down each half bar */
+            break;
+        case 4:                                                     /* SYMPHONY: the strings' vibrato */
+            if ((l == L_LEAD && e->len >= 3) || (l == L_PAD && e->len >= 8)) e->fx = (uint8_t)(FX_VIB << 4 | (l == L_LEAD ? 5 : 3));
+            break;
+        case 6:                                                     /* STEEL: the lead dives off the phrase, the bass chugs */
+            if (l == L_LEAD && end && i == last) e->fx = FX_DOWN << 4 | 12;
+            else if (l == L_BASS) e->fx = FX_CUT << 4 | 3;
+            break;
+        case 7:                                                     /* DRIFT: a slow vibrato on the long lead notes */
+            if (l == L_LEAD && e->len >= 3) e->fx = FX_VIB << 4 | 4;
+            break;
+        case 8:                                                     /* FUNK: the clav short, the bass slides now and then */
+            if (l == L_PAD) e->fx = FX_CUT << 4 | 1;
+            else if (l == L_BASS && chance(r, 20)) e->fx = FX_SLIDE << 4;
+            break;
+        default: break;
+        }
+    }
+    if (l == L_PAD) {
+        int hit = (p == 0 && (b % 4 == 0 || A->drop))
+               || (p == 4 && (A->drop || (A->mode == A_OFF && b > 0 && b % 16 == 0)))
+               || (p == 9 && (A->drop || (A->mode == A_OFF && b > 0 && b % 8 == 0)));
+        if (hit) { ev_t *e = NOTE(G, 0, 2, ct(T, 0)); if (e) e->flags |= EV_ORCH; g_sort(G); }
+    }
+}
+
 /* MY STYLE: what your bars do, counted per place in the 4-bar phrase: how often each 16th has a note (or each
  * sound), which scale-step jumps follow each other, the range. Built again only when the part changed. */
 typedef struct {
@@ -1067,6 +1135,7 @@ static void gen_bar(int32_t b, bar_t *B)
         if (l != L_SFX && l != L_ARP) densify(l, &G, &r, &T, b, dens);
         if (!B->user[l] && l != L_ARP) pitch_shape(l, &G, &r, &T);
         if (!HITS(l)) play_shape(l, &G, &r, p);
+        if (!B->user[l]) style_fx(l, &G, &r, &T, p, b, &A);
         if (A.drop && l == L_DRUMS) {
             int has_c = 0, has_k = 0;
             for (i = 0; i < G.n; i++) if (G.ev[i].st == 0) { if (G.ev[i].note[0] == DK_CRASH) has_c = 1; if (G.ev[i].note[0] == DK_KICK) has_k = 1; }
@@ -1227,7 +1296,14 @@ static void fx_apply(void)
             fade_q8[l] = fade_q8[l] < to ? (fade_q8[l] + st > to ? to : fade_q8[l] + st) : (fade_q8[l] - st < to ? to : fade_q8[l] - st);
         }
         F->level = U->level * fade_q8[l] >> 8; F->inst = U->inst; F->vary = v; F->send = U->send;
-        F->porta = U->porta; F->vibr = U->vibr; F->trem = U->trem; F->gate = U->gate; F->tremor = U->tremor; F->swing = U->swing; F->pan = U->pan;
+        {                                                           /* the style's way with the lane, on top of yours */
+            const sstyle_t *S = &SSTYLE[eff_prof(l, cur_bar())];
+            int32_t pn = U->pan + S->pan[l];
+            F->porta = U->porta; F->vibr = U->vibr;
+            F->trem = clamp100(U->trem + S->trem[l]); F->gate = clamp100(U->gate + S->gate[l]); F->swing = clamp100(U->swing + S->swing[l]);
+            F->tremor = U->tremor ? U->tremor : S->tremor[l];
+            F->pan = pn < -100 ? -100 : pn > 100 ? 100 : pn;
+        }
         vary_char[l] = c;
     }
 }

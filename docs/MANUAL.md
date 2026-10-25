@@ -118,8 +118,8 @@ lane faded out, a save waiting, the keys' octave off 0.
   STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS, VIOLINS, CELLOS, SUPERSAW, ORCH HIT), or one of four drum
   kits (STANDARD, TRACKER, ELECTRO, DEEP). SUPERSAW is not FM: seven saws detuned around the note, wide and bright,
   for big chords and leads. ORCH HIT is the orchestra hit: one key plays the note with its fifth, octave and tenth
-  above, brassy, with a burst of noise on the attack, gone in half a second; for stabs on the lead or the pad. DEEP has a kick that drops to about 33 Hz and rings long, with a dry kit around it; the
-  styles never pick these two, you do. (A small speaker hardly plays DEEP's kick: use headphones or the output.) A kit has nine hits: kick, snare, hat, kettle drum, crash, clap (three quick bursts and a
+  above, brassy, with a burst of noise on the attack, gone in half a second; for stabs on the lead or the pad. DEEP has a kick that drops to about 33 Hz and rings long, with a dry kit around it; RAVE
+  plays on it, and the styles use the orchestra hit in their own places (below); SUPERSAW is RAVE's arp. (A small speaker hardly plays DEEP's kick: use headphones or the output.) A kit has nine hits: kick, snare, hat, kettle drum, crash, clap (three quick bursts and a
   tail), open hat (the closed hat cuts it off), tom (toms in a row step down, as in a fill) and rim shot. RAZOR is a cutting, saw-like lead; PULSE a hollow one; PIANO and E.PIANO ring out. CHAOS is
   three sounds in one: a light saw lead, a heavy pad under it (two detuned oscillators, one an octave down, fading
   in slowly and out late) and brown noise that breathes with the pad. STRINGS, VIOLINS, CELLOS, BRASS and FLUTE carry
@@ -180,6 +180,16 @@ lane faded out, a save waiting, the keys' octave off 0.
 - **How a style plays.** As a tracker musician plays the notes by hand: some lead notes glide in from the last one
   (STEEL most, DRIFT and FUSION often), long chords swell in or fade out (DRIFT and SYMPHONY most), and the lead
   gets an echo, a quieter copy three 16ths later (DRIFT, OLDSKOOL, RAVE). The style's echo adds to the lane's ECHO.
+- **The styles use the tracker's effects** too, mostly note by note in their own effect column, as the modules'
+  composers did: EPIC's long lead notes sing with vibrato and an orchestra hit opens each phrase and lands the drop;
+  HYPERSPACE cuts its stabs short and dives the bass into the phrase; FUSION slides some lead notes in and swings the
+  drums a little; OLDSKOOL does the 4-channel tricks (vibrato and slides on the lead, volume slides on the arpeggio
+  chords, a retriggered snare fill); SYMPHONY gives its strings vibrato and an orchestra hit at the climax (the drop,
+  or every 16 bars with the arc off); TROPIC swings drums and arp and spreads lead and arp wide; STEEL dives the lead
+  off the phrase's last note and chugs the bass; DRIFT gives the pad a slow tremolo and the lead vibrato, spread wide;
+  FUNK swings the drums, plays the clav and bass short and slides the bass; RAVE chops the pad in 16ths (a trance
+  gate), hits the orchestra on the drop (every 8 bars with the arc off), on the DEEP kit with a supersaw arp. All of
+  it comes on top of your settings: your knobs show yours, the lanes play both.
 - **SYMPHONY** is the orchestra: two bars a chord in minor with a major dominant before the
   return; strings in open voicing (root, fifth, tenth) with a suspension resolving on each new chord and the inner
   voice moving on the last bar; a legato violin line in long arcs; cellos and basses holding the root and walking

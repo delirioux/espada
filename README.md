@@ -77,7 +77,9 @@ the kind of setting, PRESETS steps through them.
   in four kits (DEEP: a very low, long kick); each style has its own grooves and fills. SUPERSAW, seven detuned
   saws, for big chords and leads; ORCH HIT, the orchestra hit on one key.
 - **Played by hand.** Lead notes glide in from the last one, long chords swell in or fade out, the lead has an echo
-  channel, as in the trackers; strings carry bow noise and the drums ring as recorded ones.
+  channel, as in the trackers; strings carry bow noise and the drums ring as recorded ones. Each style also plays the
+  tracker's effects its own way: vibrato, slides, dives, cut-off stabs, volume slides, swing, trance gates, wide
+  stereo and orchestra hits.
 - **The music of a lane.** MELODY (which idea), RHYTHM, PITCH and CHANGE (how soon new material comes, from frozen
   to every 16 bars), side by side for all four lanes. LFO: a new idea now. ENV fades a lane out and in.
 - **Long arcs.** The lead plays 16-bar sections of two 8-bar periods: a motif stated, answered, sequenced, closed

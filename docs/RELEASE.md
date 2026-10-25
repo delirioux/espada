@@ -3,6 +3,7 @@ Espada 0.1: the first version of a generative groovebox for the M-VAVE FM-1 in t
 - Six lanes (lead, arp, pad, bass, drums, sfx) with FM voices, four synthesized drum kits of nine hits (kick, snare, hat, open hat, clap, tom, rim shot, kettle drum, crash) and eight noise effects (wash, surf, gale, crackle, bits, impact, zap, riser); notes scroll past a fixed play line.
 - Ten styles: EPIC, HYPERSPACE, FUSION, OLDSKOOL, SYMPHONY, TROPIC, STEEL, DRIFT, FUNK, RAVE, each with its chords, parts, instruments, tempo and way of playing. Queue, blend lane by lane, launch at once, lock a lane. Every change is heard at once.
 - An arp lane: arpeggios through the chord that plays, each style its own pattern and sound.
+- Every style plays the tracker's effects its own way, note by note: vibrato, slides, dives, cut-off stabs, volume slides, retriggered fills, swing, a trance gate, wide stereo, orchestra hits.
 - Played as in a tracker: lead notes glide in, long chords swell and fade, an echo channel on the lead; strings with bow noise, darker and longer snares and cymbals.
 - One screen as a mixing desk: a group button (PLAY, SOUND, TRACKER, SONG), PRESETS through its settings, KNOB 1-4 the setting for four lanes side by side; ALGORITHM slides that window over all six lanes.
 - MELODY, RHYTHM, PITCH and CHANGE per lane. The lead plays 16-bar arcs of two 8-bar periods, closed on the root.
