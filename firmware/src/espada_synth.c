@@ -126,9 +126,18 @@ static const uint8_t BUS_LANE[NBUS] = {0, 1, 2, 3, 4, 5, L_PAD, L_SFX, L_DRUMS};
 static int32_t bus[NBUS][HALF_FRAMES];
 static int32_t sendb[HALF_FRAMES];                      /* the lanes' sends to the room */
 static volatile int32_t space = 35;                     /* 0..100: the room (MAIN) */
-/* where each lane sits (Q8 left, right): lead a little right, the arp a little left, pad and sfx spread, bass and drums in the middle. How
- * much of each goes to the room is the lane's REVERB (fx.send) */
-static const uint16_t PAN_L[NBUS] = {150, 256, 256, 256, 256, 256, 80, 90, 130}, PAN_R[NBUS] = {256, 80, 256, 256, 90, 150, 256, 256, 256};
+/* where each lane sits: its PAN (lead a little right, the arp a little left, the rest in the middle), and around it
+ * its buses: the pad's and the sfx's voices spread left and right, the hats right of the drums. How much of each
+ * goes to the room is the lane's REVERB (fx.send) */
+static const int8_t PAN_OFF[NBUS] = {0, -70, 0, 0, -68, 0, 70, 68, 50};   /* a bus's place around its lane's PAN: pad and sfx spread, the hats right of the drums */
+static int32_t pan_gain(int32_t pan, int right)                   /* equal power, Q8: the middle at 256 on both sides (as before),
+                                                                 * a lane panned anywhere as loud (hard left: 362 on one side) */
+{
+    int32_t th = (pan + 100) * 256 / 200, g;                        /* 0 .. a quarter of the sine table */
+    if (th < 0) th = 0; else if (th > 256) th = 256;
+    g = (362 * SIN[right ? th : th + 256]) >> 15;
+    return g < 0 ? 0 : g;
+}
 
 /* ---- the room: Schroeder / Moorer, at 22 kHz; comb and allpass lines in the pool */
 #define RV_C0 557u
@@ -178,7 +187,7 @@ static void room(int32_t *out, uint32_t n)
         out[2u * k] += l; out[2u * k + 1u] += r; out[2u * k + 2u] += l; out[2u * k + 3u] += r;
     }
 }
-static int32_t f_low[NBUS], f_band[NBUS], crush_hold[NBUS], crush_n[NBUS];
+static int32_t f_low[NBUS], f_band[NBUS], crush_hold[NBUS], crush_n[NBUS], trem_g[NBUS];
 static uint32_t wob_ph[NLANE];
 static uint32_t lane_last_inc[NLANE][3];
 static volatile uint32_t lane_hit_ms[NLANE];
@@ -192,7 +201,7 @@ static volatile uint32_t isr_us_max, isr_us_last, isr_us_sum, isr_n;
 static uint32_t seq_step, seq_acc_q8, smp;      /* the step playing, samples into it (Q8), samples since boot */
 
 /* ---- retrigger repeats and echo copies: voice starts that wait for their sample time */
-typedef struct { uint32_t when, dur; uint8_t lane, n, flags, lvl, kind, slide; uint8_t note[3]; } pend_t;
+typedef struct { uint32_t when, dur; uint8_t lane, n, flags, lvl, kind, orig; uint8_t note[3]; } pend_t;   /* orig: the note itself (swung), not a copy */
 #define NPEND 64u
 static pend_t pend[NPEND];
 static uint32_t npend;
@@ -218,6 +227,7 @@ static void synth_init(void)
     for (i = 0; i < NLANE; i++) { fx[i].level = 80; fx[i].bright = 25; fx[i].rtg_rate = 1; fx[i].inst = -1; fx[i].res = 30; fx[i].send = SEND0[i]; }
     fx[L_SFX].level = 30;
     fx[L_ARP].level = 60;                                         /* the arp sits under the lead */
+    fx[L_LEAD].pan = 45; fx[L_ARP].pan = -45;                      /* lead a little right, the arp a little left */
 }
 
 static inline int32_t noise(void) { noise_s = noise_s * 1664525u + 1013904223u; return (int32_t)noise_s >> 17; }
@@ -440,7 +450,7 @@ static void pend_add(uint32_t when, uint32_t lane, const ev_t *e, uint32_t dur, 
     if (npend >= NPEND) return;
     p = &pend[npend++];
     p->when = when; p->dur = dur; p->lane = (uint8_t)lane; p->n = e->n; p->flags = e->flags; p->lvl = (uint8_t)(lvl > 255u ? 255u : lvl);
-    p->kind = (uint8_t)kind; p->note[0] = e->note[0]; p->note[1] = e->note[1]; p->note[2] = e->note[2];
+    p->kind = (uint8_t)kind; p->note[0] = e->note[0]; p->note[1] = e->note[1]; p->note[2] = e->note[2]; p->orig = 0;
 }
 
 /* an event at its step: the note now, its stutter repeats, its echo copies */
@@ -450,18 +460,23 @@ static void trigger(uint32_t lane, const ev_t *e, uint32_t kind)
     int32_t rt = fx[lane].retrig > 0 && (int32_t)(e->rv * 100u >> 8) < fx[lane].retrig;
     uint32_t seg = rt ? step / (uint32_t)(fx[lane].rtg_rate < 1 ? 1 : fx[lane].rtg_rate) : total;
     uint32_t reps = rt ? total / (seg ? seg : 1u) : 1u, dur = rt ? seg * 7u / 10u : total * 95u / 100u, k, c;
+    uint32_t late = (e->st & 1u) && fx[lane].swing > 0 ? step * (uint32_t)fx[lane].swing / 300u : 0u;   /* SWING: the off 16ths */
     if (reps > 16u) reps = 16u;
     if (!reps) reps = 1;
+    if (fx[lane].gate > 0 && lane != L_DRUMS && lane != L_SFX) {                 /* GATE: cut short */
+        dur = dur * (uint32_t)(100 - fx[lane].gate * 85 / 100) / 100u;
+        if (dur < 441u) dur = 441u;
+    }
     uint32_t base = e->flags & EV_ACC2 ? 112u : e->flags & EV_ACC1 ? 176u : 256u;   /* the accent */
     for (c = 0; c < 3u; c++) {                                       /* the note, then two echo copies */
         uint32_t lvl = c == 0 ? base : c == 1 ? (uint32_t)fx[lane].echo * 141u / 100u * base >> 8
                                               : (uint32_t)(fx[lane].echo * fx[lane].echo) * 77u / 10000u * base >> 8;
-        uint32_t at = smp + c * 3u * step;
+        uint32_t at = smp + late + c * 3u * step;
         if (c && fx[lane].echo <= 0) break;
         if (!lvl) continue;
         for (k = 0; k < reps; k++) {
-            if (c == 0 && k == 0) fire(lane, e->note, e->n, e->flags, dur, lvl, kind, 1);
-            else pend_add(at + k * seg, lane, e, dur, lvl, kind);
+            if (c == 0 && k == 0 && !late) fire(lane, e->note, e->n, e->flags, dur, lvl, kind, 1);
+            else { pend_add(at + k * seg, lane, e, dur, lvl, kind); if (c == 0 && k == 0 && npend) pend[npend - 1].orig = 1; }
         }
     }
 }
@@ -497,6 +512,13 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                 if (v->glide_k) {
                     int32_t d = (int32_t)(v->target - v->inc);
                     v->inc += (uint32_t)(int32_t)(((int64_t)d * v->glide_k) >> 15);
+                }
+                if (fx[v->lane].porta) {                                    /* PORTA: up or down, up to an octave a second */
+                    int32_t pt = fx[v->lane].porta;
+                    v->inc += (uint32_t)(int32_t)(((int64_t)v->inc * pt * 21) >> 22);
+                    v->target += (uint32_t)(int32_t)(((int64_t)v->target * pt * 21) >> 22);
+                    if (v->inc < HZ_INC(20)) v->inc = v->target = HZ_INC(20);
+                    if (v->inc > 400000000u) v->inc = v->target = 400000000u;
                 }
                 if (v->chaos == 1u) {
                     int32_t to = v->stage == 2u ? 0 : v->peak;
@@ -553,9 +575,12 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
         switch (v->kind) {
         case V_FM: {
             uint32_t inc = v->inc, off;
-            if (v->vib && v->ctr > 15435u) {                            /* vibrato after 0.35 s: 5.6 Hz, 0.7 % */
-                v->vph += 545400u;
-                inc += (uint32_t)(((int32_t)(inc >> 16) * SIN[v->vph >> 22]) >> 6);
+            {                                                           /* vibrato: the patch's after 0.35 s (0.7 %), VIBRATO's from the start, 5.6 Hz */
+                int32_t vd = (v->vib && v->ctr > 15435u ? 512 : 0) + fx[v->lane].vibr * 20;
+                if (vd) {
+                    v->vph += 545400u;
+                    inc += (uint32_t)((((int32_t)(inc >> 16) * (SIN[v->vph >> 22] >> 4)) >> 11) * vd);
+                }
             }
             if (v->chaos == 3u) {                                       /* SUPERSAW: the note's saw and six around it */
                 static const int16_t DT[6] = {-2180, -1230, -420, 420, 1230, 2180};   /* Q16: -3.3 % .. +3.3 % */
@@ -825,6 +850,7 @@ static void audition(uint32_t lane, uint32_t note, uint32_t kind)
 static void app_audio(int32_t *out, uint32_t n)
 {
     uint32_t t0 = fm1_ticks(), i = 0, l, k;
+    uint32_t blk_step0 = seq_step, blk_acc0 = seq_acc_q8, blk_smp0 = smp;   /* where the block starts (TREMOLO, TREMOR) */
     for (l = 0; l < NBUS; l++)
         for (k = 0; k < n; k++) bus[l][k] = 0;
     if (aud_req) { uint8_t nt[3] = {(uint8_t)aud_note, (uint8_t)(62 + key_off), 0}; fire(aud_lane, nt, 1, 0, aud_lane == L_SFX ? 33075u : 9000u, 256, aud_kind, 0); aud_req = 0; }
@@ -852,7 +878,7 @@ static void app_audio(int32_t *out, uint32_t n)
         }
         for (p = 0; p < npend;) {                                           /* fire what is due */
             if ((int32_t)(pend[p].when - smp) <= 0) {
-                fire(pend[p].lane, pend[p].note, pend[p].n, pend[p].flags, pend[p].dur, pend[p].lvl, pend[p].kind, 0);
+                fire(pend[p].lane, pend[p].note, pend[p].n, pend[p].flags, pend[p].dur, pend[p].lvl, pend[p].kind, pend[p].orig);
                 pend[p] = pend[--npend];
             } else p++;
         }
@@ -864,8 +890,24 @@ static void app_audio(int32_t *out, uint32_t n)
     }
     for (k = 0; k < n; k++) sendb[k] = 0;
     for (l = 0; l < NBUS; l++) {
-        int32_t lv = fx[BUS_LANE[l]].level * 480 / 100, pl = PAN_L[l], pr = PAN_R[l], sd = fx[BUS_LANE[l]].send * 256 / 100;   /* Q8: 80 -> 1.5 */
+        const lanefx_t *F = &fx[BUS_LANE[l]];
+        int32_t lv = F->level * 480 / 100, pn = F->pan + PAN_OFF[l], sd = F->send * 256 / 100;   /* Q8: 80 -> 1.5 */
+        int32_t pl = pan_gain(pn < -100 ? -100 : pn > 100 ? 100 : pn, 0), pr = pan_gain(pn < -100 ? -100 : pn > 100 ? 100 : pn, 1);
         lane_fx(l, bus[l], n);
+        if (F->trem > 0 || F->tremor > 0) {                             /* TREMOLO and TREMOR, in time with the beat */
+            uint32_t L = seq_step_len_q8 >> 8, t0 = seq_playing ? (blk_step0 & 1u) * L + (blk_acc0 >> 8) : blk_smp0 % (2u * (L ? L : 1u));
+            uint32_t per = F->tremor == 1 ? 2u * L : F->tremor == 2 ? L : L / 2u, depth = (uint32_t)F->trem * 327u;
+            int32_t *g = &trem_g[l];
+            if (!L) L = 1;
+            if (!per) per = 1;
+            for (k = 0; k < n; k++) {
+                uint32_t t = t0 + k, target = 32768u;
+                if (depth) target -= (depth * (uint32_t)(32768 - SIN[((t % (2u * L)) * 1024u / (2u * L) + 256u) & 1023u]) >> 16);   /* a cycle each 8th */
+                if (F->tremor > 0 && (t % per) >= per / 2u) target = 0;
+                *g += ((int32_t)target - *g) >> 5;                      /* no clicks */
+                bus[l][k] = (int32_t)(((int64_t)bus[l][k] * *g) >> 15);
+            }
+        } else trem_g[l] = 32768;
         for (k = 0; k < n; k++) {
             int32_t s = (bus[l][k] * lv) >> 8;
             out[2u * k] += (s * pl) >> 8;

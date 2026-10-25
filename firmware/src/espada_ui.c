@@ -243,6 +243,25 @@ static void v_vary(char *o) { s_pct(o, fxu[sel].vary); }
 static void s_vary(char *o) { if (fxu[sel].vary) s_cat(o, VARYN[vary_char[sel]]); }
 static void t_level(int32_t d) { fxu[sel].level = clampi(fxu[sel].level + d, 0, 100); }
 static void v_level(char *o) { s_pct(o, fxu[sel].level); }
+/* the tracker's effects: PORTA (1xx/2xx), VIBRATO (4xy), TREMOLO (7xy), TREMOR (Ixy), GATE (ECx), SWING (EDx), PAN (8xx) */
+static void t_porta(int32_t d) { if (!HITS(sel)) fxu[sel].porta = clampi(fxu[sel].porta + d, -100, 100); }
+static void v_porta(char *o) { if (HITS(sel)) s_cat(o, "--"); else s_int(o, fxu[sel].porta); }
+static void s_porta(char *o) { if (!HITS(sel)) s_cat(o, fxu[sel].porta > 0 ? "UP" : fxu[sel].porta < 0 ? "DOWN" : "OFF"); }
+static void t_vibr(int32_t d) { if (!HITS(sel)) fxu[sel].vibr = clampi(fxu[sel].vibr + d, 0, 100); }
+static void v_vibr(char *o) { if (HITS(sel)) s_cat(o, "--"); else s_pct(o, fxu[sel].vibr); }
+static void t_trem(int32_t d) { fxu[sel].trem = clampi(fxu[sel].trem + d, 0, 100); }
+static void v_trem(char *o) { s_pct(o, fxu[sel].trem); }
+static void s_trem(char *o) { if (fxu[sel].trem) s_cat(o, "8THS"); }
+static void t_tremor(int32_t d) { fxu[sel].tremor = clampi(fxu[sel].tremor + (d > 0 ? 1 : -1), 0, 3); }
+static void v_tremor(char *o) { static const char *const N[4] = {"OFF", "8THS", "16THS", "32NDS"}; s_cat(o, N[fxu[sel].tremor & 3]); }
+static void t_gate(int32_t d) { if (!HITS(sel)) fxu[sel].gate = clampi(fxu[sel].gate + d, 0, 100); }
+static void v_gate(char *o) { if (HITS(sel)) s_cat(o, "--"); else s_pct(o, fxu[sel].gate); }
+static void s_gate(char *o) { if (!HITS(sel) && fxu[sel].gate) s_cat(o, "SHORTER"); }
+static void t_swing(int32_t d) { fxu[sel].swing = clampi(fxu[sel].swing + d, 0, 100); }
+static void v_swing(char *o) { s_pct(o, fxu[sel].swing); }
+static void t_pan(int32_t d) { fxu[sel].pan = clampi(fxu[sel].pan + d, -100, 100); }
+static void v_pan(char *o) { s_int(o, fxu[sel].pan); }
+static void s_pan(char *o) { s_cat(o, fxu[sel].pan > 0 ? "RIGHT" : fxu[sel].pan < 0 ? "LEFT" : "MIDDLE"); }
 static void t_slide(int32_t d) { if (!HITS(sel)) fxu[sel].slide = clampi(fxu[sel].slide + d, 0, 100); }
 static void v_slide(char *o) { if (HITS(sel)) s_cat(o, "--"); else s_pct(o, fxu[sel].slide); }
 static void t_rtg(int32_t d) { fxu[sel].retrig = clampi(fxu[sel].retrig + d, 0, 100); }
@@ -368,7 +387,9 @@ static const card_t ROW_SOUND[] = {
     {"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0},
     {"BRIGHT", t_bright, v_bright, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary}, {"REVERB", t_send, v_send, 0}};
 static const card_t ROW_TRK[] = {
-    {"SLIDE", t_slide, v_slide, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}, {"ECHO", t_echo, v_echo, 0}};
+    {"SLIDE", t_slide, v_slide, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}, {"ECHO", t_echo, v_echo, 0},
+    {"PORTA", t_porta, v_porta, s_porta}, {"VIBRATO", t_vibr, v_vibr, 0}, {"TREMOLO", t_trem, v_trem, s_trem}, {"TREMOR", t_tremor, v_tremor, 0},
+    {"GATE", t_gate, v_gate, s_gate}, {"SWING", t_swing, v_swing, 0}, {"PAN", t_pan, v_pan, s_pan}};
 typedef struct { const char *name; int8_t lane; card_t c[4]; } srow_t;     /* lane: -1 the song, else that lane's */
 /* the arp lane's settings, as heard: the pattern MELODY gives, the step RHYTHM gives, the octaves PITCH gives */
 static void s_apat(char *o)
@@ -397,11 +418,12 @@ static const srow_t ROW_SONG[] = {
     {"SFX PART", L_SFX, {{"STYLE", t_lprof, v_lprof, 0}, {"DENSITY", t_dens, v_dens, 0}, {"MELODY", t_mel, v_mel, 0}, {"VARY", t_vary, v_vary, s_vary}}},
     {"SFX FX", L_SFX, {{"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0}}},
     {"SFX FX 2", L_SFX, {{"CRUSH", t_crush, v_crush, 0}, {"ECHO", t_echo, v_echo, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}}},
-    {"SFX ROOM", L_SFX, {{"REVERB", t_send, v_send, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+    {"SFX ROOM", L_SFX, {{"REVERB", t_send, v_send, 0}, {"PAN", t_pan, v_pan, s_pan}, {"TREMOLO", t_trem, v_trem, s_trem}, {"TREMOR", t_tremor, v_tremor, 0}}},
     {"ARP", L_ARP, {{"SOUND", t_inst, v_inst, s_inst}, {"MELODY", t_mel, v_mel, s_apat}, {"RHYTHM", t_rhy, v_rhy, s_astep}, {"LEVEL", t_level, v_level, 0}}},
     {"ARP PART", L_ARP, {{"STYLE", t_lprof, v_lprof, 0}, {"PITCH", t_pit, v_pit, s_aoct}, {"DENSITY", t_dens, v_dens, 0}, {"CHANGE", t_chg, v_chg, s_chg}}},
     {"ARP FX", L_ARP, {{"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0}, {"DRIVE", t_drive, v_drive, 0}}},
     {"ARP FX 2", L_ARP, {{"ECHO", t_echo, v_echo, 0}, {"SLIDE", t_slide, v_slide, 0}, {"CRUSH", t_crush, v_crush, 0}, {"REVERB", t_send, v_send, 0}}},
+    {"ARP MIX", L_ARP, {{"PAN", t_pan, v_pan, s_pan}, {"GATE", t_gate, v_gate, s_gate}, {"SWING", t_swing, v_swing, 0}, {"TREMOR", t_tremor, v_tremor, 0}}},
 };
 static const card_t ROW_EDIT[2][4] = {
     {{"STEP", t_step, v_step, s_step}, {"LENGTH", t_len, v_len, 0}, {"BAR", t_bar, v_bar, s_bar}, {"PATTERN", t_use, v_use, 0}},
@@ -853,7 +875,7 @@ static void draw_frame(int force)
 /* ---- saving: settings (256 B) and patterns (their own sector), only while stopped (an erase stalls the sound) */
 typedef struct {
     uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy; uint8_t space;
-    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; } l[NLANE];
+    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; int8_t porta, pan; uint8_t vibr, trem, gate, tremor, swing; } l[NLANE];
     uint8_t palette, screen, glow;
 } save_t;
 typedef char save_fits[sizeof(save_t) <= 256u ? 1 : -1];          /* settings_save takes at most 256 bytes */
@@ -917,7 +939,7 @@ static void do_save(void)
 {
     static save_t S;
     int32_t l, rc;
-    S.ver = 9; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
+    S.ver = 10; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
     for (l = 0; l < (int32_t)NLANE; l++) {
         S.l[l].prof = ln[l].prof; S.l[l].lock = ln[l].lock; S.l[l].dens = ln[l].dens; S.l[l].oct = ln[l].oct; S.l[l].filt = (int8_t)fxu[l].filt;
@@ -925,6 +947,8 @@ static void do_save(void)
         S.l[l].slide = (uint8_t)fxu[l].slide; S.l[l].retrig = (uint8_t)fxu[l].retrig; S.l[l].rate = (uint8_t)fxu[l].rtg_rate; S.l[l].crush = (uint8_t)fxu[l].crush;
         S.l[l].echo = (uint8_t)fxu[l].echo; S.l[l].level = (uint8_t)fxu[l].level; S.l[l].inst = (int8_t)fxu[l].inst; S.l[l].vary = (uint8_t)fxu[l].vary;
         S.l[l].mel = ln[l].mel; S.l[l].rhy = ln[l].rhy; S.l[l].pit = ln[l].pit; S.l[l].chg = ln[l].chg; S.l[l].mute = ln[l].mute; S.l[l].send = (uint8_t)fxu[l].send; S.l[l].midi = midi_chan[l];
+        S.l[l].porta = (int8_t)fxu[l].porta; S.l[l].pan = (int8_t)fxu[l].pan; S.l[l].vibr = (uint8_t)fxu[l].vibr; S.l[l].trem = (uint8_t)fxu[l].trem;
+        S.l[l].gate = (uint8_t)fxu[l].gate; S.l[l].tremor = (uint8_t)fxu[l].tremor; S.l[l].swing = (uint8_t)fxu[l].swing;
     }
     rc = settings_save(&S, sizeof S);
     if (!rc) rc = parts_save();
@@ -934,7 +958,7 @@ static void do_load(void)
 {
     static save_t S;
     int32_t l;
-    if (settings_load(&S, sizeof S) == 0 && S.ver == 9) {
+    if (settings_load(&S, sizeof S) == 0 && S.ver == 10) {
         palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0;
         energy = clampi(S.energy, -50, 50); space = clampi(S.space, 0, 100);
         set_key(S.key % 12u); scale_sel = S.scale < NSCALE ? S.scale : 0; prog_sel = S.prog <= NPROG ? S.prog : 0; bpc = clampi(S.bpc, 1, 4);
@@ -946,7 +970,9 @@ static void do_load(void)
             fxu[l].crush = clampi(S.l[l].crush, 0, 100); fxu[l].echo = clampi(S.l[l].echo, 0, 100); fxu[l].level = clampi(S.l[l].level, 0, 100);
             fxu[l].vary = clampi(S.l[l].vary, 0, 100);
             ln[l].mel = (uint8_t)(S.l[l].mel % 100u); ln[l].rhy = (uint8_t)clampi(S.l[l].rhy, 0, 100); ln[l].pit = (uint8_t)clampi(S.l[l].pit, 0, 100);
-            ln[l].chg = (uint8_t)clampi(S.l[l].chg, 0, 100); ln[l].mute = S.l[l].mute != 0; fxu[l].send = clampi(S.l[l].send, 0, 100); midi_chan[l] = (uint8_t)(S.l[l].midi > 16u ? 16u : S.l[l].midi);
+            ln[l].chg = (uint8_t)clampi(S.l[l].chg, 0, 100); ln[l].mute = S.l[l].mute != 0; fxu[l].send = clampi(S.l[l].send, 0, 100);
+            fxu[l].porta = clampi(S.l[l].porta, -100, 100); fxu[l].pan = clampi(S.l[l].pan, -100, 100); fxu[l].vibr = clampi(S.l[l].vibr, 0, 100);
+            fxu[l].trem = clampi(S.l[l].trem, 0, 100); fxu[l].gate = clampi(S.l[l].gate, 0, 100); fxu[l].tremor = clampi(S.l[l].tremor, 0, 3); fxu[l].swing = clampi(S.l[l].swing, 0, 100); midi_chan[l] = (uint8_t)(S.l[l].midi > 16u ? 16u : S.l[l].midi);
             fxu[l].inst = clampi(S.l[l].inst, -1, l == L_SFX ? (int32_t)NSX - 1 : l == L_DRUMS ? (int32_t)NKIT - 1 : (int32_t)NPATCH - 1);
         }
     }

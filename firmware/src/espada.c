@@ -41,6 +41,14 @@ typedef struct {                /* written by the main loop, read by the audio i
     volatile int32_t inst;      /* -1 = AUTO (the profile's), else a patch (melodic), a kit (drums), one sound (sfx) */
     volatile int32_t vary;      /* 0..100: how far each phrase's character moves the effects (VARY) */
     volatile int32_t send;      /* 0..100: how much of the lane goes to the room (REVERB) */
+    /* the tracker's effects (TRACKER) */
+    volatile int32_t porta;     /* -100..100: every note keeps falling or rising, up to an octave a second (1xx / 2xx) */
+    volatile int32_t vibr;      /* 0..100: vibrato from the start, up to half a semitone (4xy) */
+    volatile int32_t trem;      /* 0..100: tremolo, the volume wobbling an 8th note a cycle (7xy) */
+    volatile int32_t gate;      /* 0..100: notes cut short, at 100 to 15 % of their length (ECx) */
+    volatile int32_t tremor;    /* 0 off, 1..3: the sound chopped on and off in 8ths, 16ths, 32nds (Ixy) */
+    volatile int32_t swing;     /* 0..100: the off 16ths later, at 100 by a third of a step (EDx) */
+    volatile int32_t pan;       /* -100..100: left .. right, equal power (8xx) */
 } lanefx_t;
 static lanefx_t fx[NLANE];      /* what plays: your settings plus the phrase's character (the audio interrupt reads it) */
 static lanefx_t fxu[NLANE];     /* your settings (the encoders) */

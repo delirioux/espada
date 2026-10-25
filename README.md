@@ -8,8 +8,8 @@ Six lanes (lead, arp, pad, bass, drums and sfx) play parts that are composed liv
 lines, melodies, drum patterns and noise in the manner of the S3M scene, played as a tracker musician plays them, with
 glides, swells and an echo channel. You do not program steps; you mix styles. Queue the next style, blend it in lane by
 lane from the bottom up, or launch it at once with its own tempo. Shape each lane with a
-filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, retrigger, a bit crusher and
-echo. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
+filter, a tempo-synced wobble, FM brightness and drive, or with tracker effects: slide, porta, vibrato, tremolo, tremor, gate, swing,
+retrigger, a bit crusher, echo, and an equal-power pan per lane. An arc builds the piece up from the drums to a drop, and DROP lets you call the break yourself.
 
 <p align="center"><img src="docs/screens/main.png" width="320" alt="Espada's screen: the MELODY setting, all six lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
 
@@ -26,7 +26,7 @@ the kind of setting, PRESETS steps through them.
 <tr>
 <td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="PLAY, MELODY"><br><b>PLAY</b> (HOME): melody, rhythm, pitch, change, density, octave, style, sound, level.</td>
 <td align="center" width="33%"><img src="docs/screens/sound.png" width="240" alt="SOUND, FILTER"><br><b>SOUND</b> (FX): filter, resonance, wobble, drive, brightness, crush, vary, reverb. The lanes darken what the filter cuts.</td>
-<td align="center" width="33%"><img src="docs/screens/tracker.png" width="240" alt="TRACKER, RATE"><br><b>TRACKER</b> (ARP): slide, retrigger, rate, echo.</td>
+<td align="center" width="33%"><img src="docs/screens/tracker.png" width="240" alt="TRACKER, RATE"><br><b>TRACKER</b> (ARP): slide, retrigger, rate, echo, porta, vibrato, tremolo, tremor, gate, swing, pan.</td>
 </tr>
 <tr>
 <td align="center"><img src="docs/screens/song.png" width="240" alt="SONG, KEY"><br><b>SONG</b> (GLO): the knobs are four settings of their own. KEY: key, scale, chords, bars per chord, the chord playing lit.</td>

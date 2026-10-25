@@ -38,7 +38,7 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | --- | --- | --- |
 | PLAY | HOME | melody, rhythm, pitch, change, density, octave, style, sound, level |
 | SOUND | FX | filter, resonance, wobble, drive, brightness, crush, vary, reverb |
-| TRACKER | ARP | slide, retrigger, rate, echo |
+| TRACKER | ARP | slide, retrigger, rate, echo, porta, vibrato, tremolo, tremor, gate, swing, pan |
 
 | SONG (GLO) | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
@@ -49,11 +49,12 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | SFX PART | style | density | melody | vary |
 | SFX FX | filter | resonance | wobble | drive |
 | SFX FX 2 | crush | echo | retrigger | rate |
-| SFX ROOM | reverb | | | |
+| SFX ROOM | reverb | pan | tremolo | tremor |
 | ARP | sound | melody: the pattern | rhythm: 16ths, 8ths or quarters | level |
 | ARP PART | style | pitch: 1 to 3 octaves | density | change |
 | ARP FX | filter | resonance | wobble | drive |
 | ARP FX 2 | echo | slide | crush | reverb |
+| ARP MIX | pan | gate | swing | tremor |
 
 | EDIT | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
@@ -132,6 +133,18 @@ lane faded out, a save waiting, the keys' octave off 0.
   (brightness and drive), FILTER (a low-pass with resonance) or STUTTER (retrigger). VARY sets how far it reaches;
   the value shows the phrase's character. The lead starts at 40 %, the other lanes at 0. Your own settings stay as
   you set them; the lane on screen shows what plays.
+- **The tracker's effects** (TRACKER), per lane, as the effect column has them:
+  - **PORTA** (1xx / 2xx): every note keeps rising (right) or falling (left) while it sounds, up to an octave a second.
+  - **VIBRATO** (4xy): the pitch wobbles from the start of each note, up to half a semitone, 5.6 times a second.
+  - **TREMOLO** (7xy): the volume wobbles, a cycle every 8th note, in time with the beat.
+  - **TREMOR** (Ixy): the sound chopped on and off in 8ths, 16ths or 32nds: the trance gate.
+  - **GATE** (ECx): notes cut short, at 100 % to 15 % of their length: staccato.
+  - **SWING** (EDx): the off 16ths come later, at 100 % by a third of a step (triplet feel); a lane each, so the hats
+    can swing while the bass stays straight.
+  - **PAN** (8xx): the lane from left to right, with equal power: a lane sounds as loud wherever you put it, and in
+    the middle exactly as before. The pad's and the sfx's voices keep their spread around it, the hats stay right
+    of the drums. The lead starts a little right, the arp a little left.
+  Porta, vibrato and gate act on notes, so the drums and the sfx show "--" for them.
 - **Filter:** one knob, left = low-pass, right = high-pass, centre = off. **Wobble** moves the cutoff in time with the
   tempo (1/1 to 1/16). On screen the filter darkens what it cuts away.
 - **Brightness** raises the FM modulation: from a soft sine toward a buzzy saw. **Drive** saturates.

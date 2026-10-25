@@ -1212,6 +1212,7 @@ static void fx_apply(void)
             fade_q8[l] = fade_q8[l] < to ? (fade_q8[l] + st > to ? to : fade_q8[l] + st) : (fade_q8[l] - st < to ? to : fade_q8[l] - st);
         }
         F->level = U->level * fade_q8[l] >> 8; F->inst = U->inst; F->vary = v; F->send = U->send;
+        F->porta = U->porta; F->vibr = U->vibr; F->trem = U->trem; F->gate = U->gate; F->tremor = U->tremor; F->swing = U->swing; F->pan = U->pan;
         vary_char[l] = c;
     }
 }
