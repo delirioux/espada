@@ -26,7 +26,7 @@ the kind of setting, PRESETS steps through them.
 <table>
 <tr>
 <td align="center" width="33%"><img src="docs/screens/main.png" width="240" alt="PLAY, VOLUME"><br><b>PLAY</b> (HOME): volume, style, sound, melody, rhythm, pitch, density, octave, change.</td>
-<td align="center" width="33%"><img src="docs/screens/sound.png" width="240" alt="SOUND, FILTER"><br><b>SOUND</b> (FX): filter, reverb, resonance, wobble, brightness, drive, crush, vary. The lanes darken what the filter cuts.</td>
+<td align="center" width="33%"><img src="docs/screens/sound.png" width="240" alt="SOUND, FILTER"><br><b>SOUND</b> (FX): reverb, filter, resonance, wobble, brightness, drive, crush, vary. The lanes darken what the filter cuts.</td>
 <td align="center" width="33%"><img src="docs/screens/tracker.png" width="240" alt="TRACKER, RATE"><br><b>TRACKER</b> (ARP): slide, retrigger, rate, echo, porta, vibrato, tremolo, tremor, gate, swing, pan.</td>
 </tr>
 <tr>

@@ -416,8 +416,8 @@ static const card_t ROW_PLAY[] = {                              /* the mix, the 
     {"VOLUME", t_level, v_level, 0}, {"STYLE", t_lprof, v_lprof, 0}, {"SOUND", t_inst, v_inst, s_inst},
     {"MELODY", t_mel, v_mel, s_mel}, {"RHYTHM", t_rhy, v_rhy, s_rhy}, {"PITCH", t_pit, v_pit, s_pit},
     {"DENSITY", t_dens, v_dens, 0}, {"OCTAVE", t_oct, v_oct, 0}, {"CHANGE", t_chg, v_chg, s_chg}};
-static const card_t ROW_SOUND[] = {                             /* the two used most, then the filter's own, the tone, the rough ones, VARY */
-    {"FILTER", t_filt, v_filt, s_filt}, {"REVERB", t_send, v_send, 0}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0},
+static const card_t ROW_SOUND[] = {                             /* the room, the filter with its own two, the tone, the rough ones, VARY */
+    {"REVERB", t_send, v_send, 0}, {"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0},
     {"BRIGHT", t_bright, v_bright, 0}, {"DRIVE", t_drive, v_drive, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary}};
 static const card_t ROW_TRK[] = {
     {"SLIDE", t_slide, v_slide, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}, {"ECHO", t_echo, v_echo, 0},

@@ -39,7 +39,7 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | Group | Button | Settings (KNOB 1..4 = the four lanes in the window) |
 | --- | --- | --- |
 | PLAY | HOME | volume, style, sound, melody, rhythm, pitch, density, octave, change |
-| SOUND | FX | filter, reverb, resonance, wobble, brightness, drive, crush, vary |
+| SOUND | FX | reverb, filter, resonance, wobble, brightness, drive, crush, vary |
 | TRACKER | ARP | slide, retrigger, rate, echo, porta, vibrato, tremolo, tremor, gate, swing, pan |
 
 | SONG (GLO) | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
