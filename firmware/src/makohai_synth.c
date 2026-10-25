@@ -196,9 +196,9 @@ static void room(int32_t *out, uint32_t n)
 static int32_t f_low[NBUS], f_band[NBUS], crush_hold[NBUS], crush_n[NBUS], trem_g[NBUS];
 static int32_t pan_cl[NBUS], pan_cr[NBUS];                 /* each bus's pan gains as the last block ended (Q8) */
 /* for the pictures on SETUP (the screen reads them, a frame at a time): each lane's and the output's peak since the
- * screen last looked, and the last 1024 samples of the output, every 4th one kept */
+ * screen last looked, and the last 1024 samples of the output, every 4th one kept (halved), left and right */
 static volatile int32_t lane_pk[NLANE], out_pk[2];
-static int16_t scope_buf[256];
+static int16_t scope_l[256], scope_r[256];
 static volatile uint32_t scope_w;
 static const uint8_t AP_STEPS[8] = {0, 128, 64, 32, 16, 8, 4, 2};   /* PAN RATE: a sweep's cycle in 16ths */
 static uint32_t wob_ph[NLANE];
@@ -1016,7 +1016,7 @@ static void app_audio(int32_t *out, uint32_t n)
         out[k] = s;
         if ((s < 0 ? -s : s) > out_pk[k & 1u]) out_pk[k & 1u] = s < 0 ? -s : s;
     }
-    for (k = 0; k < n; k += 4u) scope_buf[scope_w++ & 255u] = (int16_t)((out[2u * k] + out[2u * k + 1u]) >> 1);
+    for (k = 0; k < n; k += 4u) { uint32_t j = scope_w & 255u; scope_l[j] = (int16_t)(out[2u * k] >> 1); scope_r[j] = (int16_t)(out[2u * k + 1u] >> 1); scope_w++; }
     vis_step = seq_step;
     vis_frac = seq_step_len_q8 ? (seq_acc_q8 >> 8) * 65536u / (seq_step_len_q8 >> 8 ? seq_step_len_q8 >> 8 : 1u) : 0u;
     isr_us_last = (fm1_ticks() - t0) / FM1_TICKS_PER_US;

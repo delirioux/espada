@@ -3,7 +3,8 @@ Since 1.0:
 - AUTOPAN and PAN RATE (TRACKER, after PAN): each new note on the other side of the lane's pan, or a slow sweep
   from side to side in time (8 bars to an 8th a cycle), as far as you set it.
 - Settings and sets saved by 1.0 are read and kept.
-- Pictures on SETUP's free knobs: SCOPE, LANES, STEREO, SPECTRUM, COPPER, STARS, MAKO.
+- Pictures on SETUP's free knobs: SCOPE, LANES, STEREO (a goniometer), SPECTRUM (a landscape), and RESET's three
+  knobs each picking one of CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, COPPER, MAKO.
 - A new identity, FM-1_47625642 (1.0 reported FM-1_960, as another firmware does), the same for every version: the FM-1 Firmware Hub tells Makohai apart by it.
 
 Makohai 1.0 (formerly Espada): the first release of a generative groovebox for the M-VAVE FM-1 in the style of early-90s PC tracker music.
