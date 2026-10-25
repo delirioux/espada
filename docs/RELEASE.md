@@ -1,4 +1,4 @@
-Makohai 0.1 (formerly Espada): the first version of a generative groovebox for the M-VAVE FM-1 in the style of early-90s PC tracker music.
+Makohai 1.0 (formerly Espada): the first release of a generative groovebox for the M-VAVE FM-1 in the style of early-90s PC tracker music.
 
 - Six lanes (lead, arp, pad, bass, drums, sfx) with FM voices, five synthesized drum kits of nine hits (kick, snare, hat, open hat, clap, tom, rim shot, kettle drum, crash) and eight noise effects (wash, surf, gale, crackle, bits, impact, zap, riser); notes scroll past a fixed play line.
 - Ten styles: EPIC, HYPERSPACE, FUSION, OLDSKOOL, SYMPHONY, TROPIC, STEEL, DRIFT, FUNK, RAVE, each with its chords, parts, instruments, tempo and way of playing. It starts with OLDSKOOL. Queue, blend lane by lane, launch at once, lock a lane. Every change is heard at once.

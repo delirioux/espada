@@ -112,8 +112,8 @@ def main(pkg, version, out):
 <body><main>
 <img src="makohai-logo.png" alt="Makohai">
 <h1>MAKOHAI</h1>
-<p>Generative tracker grooves for the M-VAVE FM-1, razor sharp. Four lanes in the style of early-90s PC tracker
-music, on FM: queue a profile, blend it in, call the drop.</p>
+<p>Generative tracker grooves for the M-VAVE FM-1. Six lanes in the style of early-90s PC tracker music, on FM:
+queue a style, blend it in, call the drop, or write your own parts.</p>
 <a class="b" href="install/">Install on the FM-1</a>{try_link}
 <small>Makohai {version} · GPL-3.0 · <a href="https://github.com/delirioux/makohai">Source</a> ·
 <a href="https://github.com/delirioux/makohai/blob/main/docs/MANUAL.md">Manual</a><br>

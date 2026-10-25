@@ -4,7 +4,8 @@ How Makohai is made and where it is going: the agreements, how changes reach Git
 and why, how to build and test it, the open risks and what comes next. What Makohai is and how to play it is in
 the [README](../README.md) and the [manual](MANUAL.md); the chip's rules are in [RULES.md](RULES.md).
 
-Status: 20 October 2026. Version 0.1 runs on the FM-1; playing on the hardware is being tested. Six lanes,
+Status: 25 October 2026. Version 1.0 runs on the FM-1; hours-long runs were tested on a computer, not yet on the
+hardware. Six lanes,
 ten styles played as in a tracker, long lead arcs, the one-screen interface, the browser version and the web
 installer are in.
 
@@ -130,8 +131,8 @@ In order of value; open to change as Makohai is played.
    played on the FM-1 and tuned: the order of the settings, what reads at arm's length.
 2. **Measured on the FM-1.** The interrupt's worst time with every style, the room trimmed if needed.
 3. **Tuned by ear.** Patch levels, the orchestra's balance, the drums against the bass.
-4. **Scenes (slots).** Save and recall a whole set: the styles per lane, the four knobs, levels, mutes and your own
-   parts, to move between them live.
+4. **Parts in the sets.** The eight sets (SONG, SETS) hold everything but your own parts; a set could take its
+   parts along.
 5. **More of the trackers' moves.** A key change up a step for the last chorus, a breakdown with only the pad,
    sample-offset style stutters, vibrato that sets in late on long notes.
 6. **MIDI clock.** Follow an external clock and send one, so Makohai plays in time with other gear.
@@ -139,13 +140,13 @@ In order of value; open to change as Makohai is played.
 
 ## Release checklist
 
-Before 1.0:
+Before 1.0 (25 October 2026: released on the computer's and the browser's tests; 1 and 2 still open):
 
 1. **It works on the FM-1**: every style played, the interrupt's time measured, the way back to the stock
    firmware tried (OCT- at power-on, the official V15 from the installer).
 2. **The name**: search "Makohai" in the EUIPO and BOIP registers (classes 9 and 15). Release as "Makohai for
    FM-1" at least.
 3. **Licences and credits**: GPL-3.0-only; Dinghy's, SLOOP's and Felucca's credits in the README and on the
-   site; the JieLi files' Apache-2.0 and the fonts' licences in `LICENSES/`.
+   site; the JieLi files' Apache-2.0 and the fonts' licences (LICENSING.md says where).
 4. **Other names**: "for the M-VAVE FM-1" in words only, no logos, nothing that suggests it is official.
 5. **Release notes**: [RELEASE.md](RELEASE.md) brought up to date, a tag `v1.0`.

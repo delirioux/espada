@@ -4,7 +4,7 @@
 
 **A generative groovebox for the M-VAVE FM-1, in the style of early-90s PC tracker music.**
 
-Makohai is Finnish for the longfin mako shark. It was called Espada before 0.1.
+Makohai is Finnish for the longfin mako shark. It was called Espada before 1.0.
 
 Six lanes (lead, arp, pad, bass, drums and sfx) play parts that are composed live in one of ten styles: chords, bass
 lines, melodies, drum patterns and noise in the manner of the S3M scene, played as a tracker musician plays them, with
@@ -15,7 +15,8 @@ retrigger, a bit crusher, echo, and an equal-power pan per lane. An arc builds t
 
 <p align="center"><img src="docs/screens/main.png" width="320" alt="Makohai's screen: the VOLUME setting, all six lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
 
-> **Status: 0.1, in development.** It boots and runs on the FM-1; playing on the hardware is still being tested.
+> **Status: 1.0.** It runs on the FM-1. Long sessions were tested on a computer and in the browser, not yet for hours
+> on the hardware: if the sound ever turns to crackles, SETUP's SYSTEM and AUDIO rows show what the FM-1 was doing.
 > Install it over the official firmware and keep the USB rescue in mind (below).
 
 ## The screens
@@ -135,7 +136,7 @@ build, and brings back the official V15), the [FM-1 Firmware Hub](https://fm1.de
 line (once: `pip3 install mido python-rtmidi`):
 
 ```
-python3 tools/fm1_install.py makohai-0.1.fwsc
+python3 tools/fm1_install.py makohai-1.0.fwsc
 ```
 
 Install over M-VAVE's official firmware. If anything goes wrong: hold **OCT-** while switching on for the USB rescue,
@@ -152,7 +153,7 @@ tools/get_toolchain.sh
 git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
     https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK
 ./build.sh                         # -> build/makohai.fwsc
-./build.sh --release 0.1           # -> build/makohai-0.1.fwsc, identity FM-1_961
+./build.sh --release 1.0           # -> build/makohai-1.0.fwsc, identity FM-1_961
 ```
 
 GitHub Actions builds the package on every push (the run's artifact `makohai-firmware`).
