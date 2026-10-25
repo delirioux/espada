@@ -12,7 +12,7 @@
  *   settings            one 4 KiB flash sector with a CRC (settings_load / settings_save)
  *   crash screen        the PC of a fault, then a reboot
  *
- * The app (espada.c) includes this file first and supplies:
+ * The app (makohai.c) includes this file first and supplies:
  *   static void app_audio(int32_t *out, uint32_t n)   audio ISR: n stereo frames, L R L R, Q15 (+-32767), out is zero
  *   static void app_main(void)                        never returns; calls platform_poll() often (every few ms)
  */
@@ -26,7 +26,7 @@ enum { ENC_SELECT = 0, ENC_ALGORITHM = 1, ENC_KNOB1 = 2, ENC_KNOB2 = 3, ENC_KNOB
 #ifdef DINGHY_HOST
 #include "../../tests/host.c"                  /* on a computer: a fake FM-1 (tests/host.c) */
 #elif defined(DINGHY_WEB)
-#include "../../web/emu/espada_web.c"          /* in a browser: a simulated FM-1, for Felucca's page (web/emu) */
+#include "../../web/emu/makohai_web.c"          /* in a browser: a simulated FM-1, for Felucca's page (web/emu) */
 #else
 #include <stdint.h>
 #include "fm1_time.h"
@@ -70,9 +70,9 @@ static volatile uint32_t fm1_ms;                /* milliseconds since power-on (
 
 /* ---- flash: read anywhere; erase / program only the update's staging area and the settings sector */
 #define SETTINGS_AT 0x000FC000u                 /* one 4 KiB sector of Felucca's globals area */
-#define LONGS_AT 0x00097000u                    /* Espada: its own parts, at the start of Felucca's free store */
+#define LONGS_AT 0x00097000u                    /* Makohai: its own parts, at the start of Felucca's free store */
 #define LONGS_LEN 0x00025000u                   /* 148 KiB (37 sectors), well inside 0x97000..0xE0000 (ends 0xBC000) */
-#define SLOTS_AT 0x000BC000u                    /* Espada: the sets (SONG, SETS), one sector right after the parts */
+#define SLOTS_AT 0x000BC000u                    /* Makohai: the sets (SONG, SETS), one sector right after the parts */
 #define SLOTS_LEN 0x00001000u
 #define FL_RANGE_OK(off, n) (FL_IN(off, n, FL_OTA_LO, FL_OTA_HI) || FL_IN(off, n, SETTINGS_AT, SETTINGS_AT + 0x1000u) || \
                              FL_IN(off, n, LONGS_AT, LONGS_AT + LONGS_LEN) || FL_IN(off, n, SLOTS_AT, SLOTS_AT + SLOTS_LEN))
@@ -177,7 +177,7 @@ static int settings_save(const void *p, uint32_t n)   /* p in RAM, n <= 256 */
     return fl_write(SETTINGS_AT, (const uint8_t *)h, sizeof h);   /* the header last: a cut save stays invalid */
 }
 
-/* ---- Espada's own parts: LONGS_LEN bytes of Felucca's free store (its projects' area, which Espada does not use
+/* ---- Makohai's own parts: LONGS_LEN bytes of Felucca's free store (its projects' area, which Makohai does not use
  * otherwise). Every erase, write and read is checked against that window; the app keeps its own header and CRC. An
  * erase stops the sound for ~50 ms: only while stopped. */
 static int longs_erase(uint32_t off)            /* the 4 KiB sector at off */

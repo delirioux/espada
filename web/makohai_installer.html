@@ -1,13 +1,13 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-only
-     Espada's web installer: after Felucca's installer (web/index_pkg.html, Leo Kuroshita, Hügelton Instruments), for
-     Espada's package, with the same update protocol (fm1pkg.js, fm1ota.js, inlined by web/espada_make_site.py). -->
+     Makohai's web installer: after Felucca's installer (web/index_pkg.html, Leo Kuroshita, Hügelton Instruments), for
+     Makohai's package, with the same update protocol (fm1pkg.js, fm1ota.js, inlined by web/makohai_make_site.py). -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Espada installer</title>
-<link rel="icon" href="../espada-logo.png">
+<title>Makohai installer</title>
+<link rel="icon" href="../makohai-logo.png">
 <style>
   :root { color-scheme: dark; --bg: #050707; --surf: #101616; --fg: #efe6c8; --dim: #8f9a96; --theme: #3fe0e0; --warn: #ff8c64; }
   :root[data-theme="light"] { color-scheme: light; --bg: #f6f3ea; --surf: #e8e3d4; --fg: #0c1212; --dim: #55605c; --theme: #0f8a8a; --warn: #c0482a; }
@@ -34,8 +34,8 @@
 </head>
 <body>
 <main>
-  <img class="logo" src="../espada-logo.png" alt="">
-  <h1>Espada</h1>
+  <img class="logo" src="../makohai-logo.png" alt="">
+  <h1>Makohai</h1>
   <p class="sub">Generative tracker grooves for the M-VAVE FM-1, razor sharp</p>
 
   <div class="card">
@@ -47,20 +47,20 @@
     <p id="status"></p>
   </div>
 
-  <p class="small">Espada is in development and was built for fun: it comes with no warranty. If the FM-1 misbehaves,
+  <p class="small">Makohai is in development and was built for fun: it comes with no warranty. If the FM-1 misbehaves,
     return to the official firmware below, or install another firmware from the
-    <a href="https://fm1.designburgapps.com" target="_blank" rel="noopener">FM-1 Firmware Hub</a>. Espada keeps its
+    <a href="https://fm1.designburgapps.com" target="_blank" rel="noopener">FM-1 Firmware Hub</a>. Makohai keeps its
     own settings and patterns in flash: what another firmware saved there is not kept, so back it up first. If an
-    install is cut off, press Install again: the FM-1 stays in update mode until it is finished. If Espada does not
+    install is cut off, press Install again: the FM-1 stays in update mode until it is finished. If Makohai does not
     start, hold <b>OCT-</b> while switching on: the USB rescue, where this page still reaches the FM-1. An FM-1 that
     no longer starts at all needs a
     <a href="https://github.com/kurogedelic/FM-1-transporter" target="_blank" rel="noopener">Transporter</a>.</p>
 
   <details class="card">
     <summary>Install a test build</summary>
-    <p class="small">An Espada package from a test build (GitHub: Actions &gt; the run &gt; Artifacts &gt;
-      espada-firmware, its .fwsc). It is checked here, in the browser, and not sent anywhere. Install above puts the
-      published Espada back.</p>
+    <p class="small">A Makohai package from a test build (GitHub: Actions &gt; the run &gt; Artifacts &gt;
+      makohai-firmware, its .fwsc). It is checked here, in the browser, and not sent anywhere. Install above puts the
+      published Makohai back.</p>
     <p><input id="test-file" type="file" accept=".fwsc"></p>
     <p><button id="test-go" disabled>Install test build</button></p>
   </details>
@@ -69,14 +69,14 @@
     <summary>Return to the official firmware (V15)</summary>
     <p class="small">Get the official FM-1 V15 from <a href="https://www.m-vave.com/download" target="_blank"
       rel="noopener">M-VAVE</a> and select its unmodified FM-1.fwsc. It is checked here, in the browser, and not sent
-      anywhere. Espada's saved settings and patterns are not kept.</p>
+      anywhere. Makohai's saved settings and patterns are not kept.</p>
     <p><input id="stock-file" type="file" accept=".fwsc"></p>
     <p><button id="stock-go" disabled>Return to official V15</button></p>
   </details>
 
-  <p class="small">GPL-3.0, no warranty. <a href="https://github.com/delirioux/espada">Source</a> ·
-    <a href="../firmware/LICENSES/">licences</a> · <a href="../">Espada</a>. The update protocol is Felucca's (Leo
-    Kuroshita, Hügelton Instruments). Espada is not affiliated with or endorsed by M-VAVE or Hügelton Instruments;
+  <p class="small">GPL-3.0, no warranty. <a href="https://github.com/delirioux/makohai">Source</a> ·
+    <a href="../firmware/LICENSES/">licences</a> · <a href="../">Makohai</a>. The update protocol is Felucca's (Leo
+    Kuroshita, Hügelton Instruments). Makohai is not affiliated with or endorsed by M-VAVE or Hügelton Instruments;
     M-VAVE and FM-1 are trademarks of their respective owners.</p>
   <pre id="log"></pre>
 </main>
@@ -86,7 +86,7 @@ const $ = (id) => document.getElementById(id);
 const meta = /*META*/;
 const TEXT = {
   start: "Starting", verify: "Verifying", loader: "Switching to update mode", write: "Writing",
-  reboot: "Restarting", done: "Done: Espada is installed.", stopped: "Stopped. Replug the USB cable and press Install again.",
+  reboot: "Restarting", done: "Done: Makohai is installed.", stopped: "Stopped. Replug the USB cable and press Install again.",
   error: "Error: ",
   denied: "MIDI (SysEx) access was not allowed. Allow MIDI in the site settings (address bar) and press Install again.",
   notfound: "FM-1 not found. Check the USB cable (a data cable), close other apps that use MIDI, and press Install again.",
@@ -98,7 +98,7 @@ const TEXT = {
   badpkg: "The file to install is damaged. Reload the page.",
   nomidi: "This browser cannot do it. Open the page in Chrome or Edge on a computer.",
   loadfail: "Could not load: ", stockValid: "Official V15 verified.", stockError: "Not the official V15: ",
-  stockConfirm: "Return this FM-1 to the official V15 firmware? Espada's saved settings and patterns are not kept.",
+  stockConfirm: "Return this FM-1 to the official V15 firmware? Makohai's saved settings and patterns are not kept.",
   stockDone: "Done: the official V15 is back.", leave: "Writing. Do not close the page.",
 };
 const sayK = (k, arg = "") => { $("status").textContent = (TEXT[k] || k) + arg; };
@@ -157,7 +157,7 @@ async function write(img, product, doneKey) {
     const pkg = new Uint8Array(await r.arrayBuffer());
     if (productOf(pkg) !== meta.product) { sayK("badpkg"); return; }
     image = logicalImage(pkg);
-    say(`Espada ${meta.version}`);
+    say(`Makohai ${meta.version}`);
     lock(false);
   } catch (e) { sayK("loadfail", e.message); }
 })();
@@ -187,13 +187,13 @@ $("test-file").addEventListener("change", async () => {
     if (epoch !== testEpoch) return;
     const product = productOf(pkg);
     if (!/^FM-1_9[0-9][0-9]$/.test(product) || !hasMark(pkg, "FELUCCA-LOADER-1")) {
-      say("Not an Espada (or other platform) package for the FM-1.");
+      say("Not a Makohai (or other platform) package for the FM-1.");
       return;
     }
     test = { image: logicalImage(pkg), product, name: file.name };
     say(`Test build ${file.name} verified.`);
     lock(false);
-  } catch (e) { if (epoch === testEpoch) say("Not an Espada package: " + e.message); }
+  } catch (e) { if (epoch === testEpoch) say("Not a Makohai package: " + e.message); }
 });
 $("test-go").addEventListener("click", async () => {
   if (writing || !test || !confirm(`Install the test build ${test.name}?`)) return;

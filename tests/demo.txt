@@ -1,4 +1,4 @@
-# A tour of Espada in host mode: build/host/espada build/host/demo tests/demo.txt
+# A tour of Makohai in host mode: build/host/makohai build/host/demo tests/demo.txt
 # buttons: 2 FX, 3 SEL, 4 ENV, 5 LFO, 6 EDIT, 7 GLO, 8 HOME, 9 SAVE, 10 ARP, 11 SEQ, 12 PLAY, 13 REC
 # encoders: 0 SELECT, 1 ALGORITHM, 2..5 KNOB1..4, 6 PRESETS; keys: bit 0 = F3 .. bit 26 = G5
 # (the first 1.5 s are the splash: the tour starts after it)

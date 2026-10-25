@@ -1,4 +1,4 @@
-# Playing Espada
+# Playing Makohai
 
 ## The screen
 
@@ -63,7 +63,7 @@ Hold **HOME** for SETUP; HOME (or any group button, or EDIT) leaves it. PRESETS 
 
 | SETUP | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
-| LOOK | palette: ESPADA (its colours), AMBER, GREEN, CYAN, RED, MONO | screen: 100, 75, 50 or 25 % | lights: the keys' and buttons' glow on or off | |
+| LOOK | palette: MAKOHAI (its colours), AMBER, GREEN, CYAN, RED, MONO | screen: 100, 75, 50 or 25 % | lights: the keys' and buttons' glow on or off | |
 | MIDI | the lead's channel | the pad's | the bass's | the drums' (1..16 or OFF) |
 | MIDI 2 | the arp's channel | | | |
 | RESET | defaults: five clicks to the right puts everything back as it comes (patterns cleared); SAVE keeps it | | | |
@@ -97,7 +97,7 @@ lane faded out, a save waiting, the keys' octave off 0.
 
 - **The musical settings** (PLAY: MELODY, RHYTHM, PITCH, and CHANGE at the end): **MELODY** picks the idea: every position is its own melody, riff,
   voicing or drum pattern, and turning back brings one back. Without a saved set every power-on sets each lane's
-  MELODY at random, so Espada starts with a new song each time; after a SAVE it comes back as you saved it. **RHYTHM** goes from slow long notes to busy 16ths (on
+  MELODY at random, so Makohai starts with a new song each time; after a SAVE it comes back as you saved it. **RHYTHM** goes from slow long notes to busy 16ths (on
   the other lanes: sparser or busier). **PITCH** goes from small steps to wide leaps and a higher register (the bass
   jumps octaves, the pad's chords open up, the drums bring in the timpani). **CHANGE** says how soon new material
   comes: FROZEN (the same 16 bars over and over), 64, 32 or 16 bars. Every change is heard at once, from the next
@@ -150,20 +150,20 @@ lane faded out, a save waiting, the keys' octave off 0.
 - **Slide** glides each note in from the last one. **Retrigger** makes a share of the notes stutter (always the same
   notes, so it stays a pattern); the rate sets 1 to 3 repeats per 16th. **Crush** lowers the bits and the sample rate.
   **Echo** plays two quieter copies a dotted 8th apart.
-- **Stereo:** as a tracker spreads its channels left and right, Espada spreads its voices: the pad's and the sfx's
+- **Stereo:** as a tracker spreads its channels left and right, Makohai spreads its voices: the pad's and the sfx's
   every other voice to the right, hats and crash right of centre, the lead a little right, bass and kick in the
   middle. STRINGS and BRASS play as sections (two more players a little out of tune) and the strings swell in.
   HYPERSPACE's pad is chopped: the chord struck every 16th with an accent pattern, as a tracker re-strikes a long
   pad sample.
 - **The form.** A piece has an INTRO, INTERs and an END, played by hand:
   - **INTRO** (PLAY): pad, drums or bass starts alone, chosen at random; the other two follow two bars apart, then
-    the lead with the arp, and the sfx. All in after six bars. While Espada is stopped the lanes already show the INTRO that
+    the lead with the arp, and the sfx. All in after six bars. While Makohai is stopped the lanes already show the INTRO that
     PLAY will start; each stop picks a new one.
   - **INTER** (a tap on REC): the marked lane alone for two bars, then the others back one by one, a bar apart, in a
     random order.
   - **DROP** (holding REC): the marked lane alone for as long as you hold; everything back at once when you let go.
   - **END** (PLAY while playing): lead (with the arp), sfx and pad fade out one by one, a bar apart, then bass or drums; the one
-    left (chosen at random) plays alone two bars and fades last. Then Espada stops. The title says INTRO, INTER or
+    left (chosen at random) plays alone two bars and fades last. Then Makohai stops. The title says INTRO, INTER or
     END while one is running.
 - **The ten styles.** Each is a chord progression, a part for each lane, an instrument for each, a tempo, and a way
   of playing. Change the mood with STYLE (SONG, LIVE) and SEQ.
@@ -200,7 +200,7 @@ lane faded out, a save waiting, the keys' octave off 0.
   down into the next chord; timpani on the one with a roll into each phrase, a bass drum every other bar, a cymbal
   on the phrase and a cymbal swell (sfx) before it; a march snare when the energy is up.
 - **A lane's style** (PLAY) sets that lane alone; the queued style (SONG, LIVE) is the one blend and launch move to.
-  While Espada is stopped there is nothing to blend into: SONG's STYLE then switches every lane (not the locked ones)
+  While Makohai is stopped there is nothing to blend into: SONG's STYLE then switches every lane (not the locked ones)
   at once, with the style's tempo.
 - **The lead** follows the chords: every beat is a chord tone, the notes between lead into the next one by scale
   steps, and each 4-bar phrase states a motif, answers it, varies it and lands on the root or third. Density adds a
@@ -266,7 +266,7 @@ grid says NEW BAR). Writing there makes the part a bar longer; you cannot go fur
 its end, and at 512 bars BAR says FULL and there is no new bar. SEL + EDIT clears the bar you are on (on the last bar
 it goes, and the part is a bar shorter); RANGE, CLEAR from bar 1 to the last clears the whole part.
 
-**Recording.** On EDIT, REC switches RECORD on (the band shows a red light). While Espada plays, the keys then play
+**Recording.** On EDIT, REC switches RECORD on (the band shows a red light). While Makohai plays, the keys then play
 the lane as usual and what you play goes into your part at the bar playing, on the nearest 16th; a note you hold
 gets its length when you let go. Past your last bar the part grows by the bar right after it (so recording from the
 song's start writes bar after bar); further on it goes round your bars, so you can overdub a loop. What you record
@@ -289,13 +289,13 @@ comes after your last bar:
 
 - **LOOP**: your part again from its bar 1.
 - **PROFILE**: the lane's generated part.
-- **MY STYLE**: new bars in your manner. Espada counts what your bars do at each place in the 4-bar phrase: which
+- **MY STYLE**: new bars in your manner. Makohai counts what your bars do at each place in the 4-bar phrase: which
   16ths have notes (or which drums), which scale-step jumps you make, how high and low you go. Each new bar takes one
   of your bars at the same place in the phrase, keeps most of its rhythm (or draws it from your counts), keeps some
   of its notes and moves the rest by your kind of jumps; the last bar of each phrase closes on your note. Drums keep
   most of your hits there and add the ones you often play. The more bars you write, the more it sounds like you.
 
-SAVE keeps all parts (in a part of the FM-1's flash Espada has to itself: every write is checked against it, and the
+SAVE keeps all parts (in a part of the FM-1's flash Makohai has to itself: every write is checked against it, and the
 whole 6 x 512 bars with their effects always fit). A save of long parts takes up to two seconds; it waits until you
 stop, as always. Parts saved before the effect column came in are not read: enter them again.
 

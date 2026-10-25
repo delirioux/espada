@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Make Espada's site (GitHub Pages, .github/workflows/firmware.yml):
+"""Make Makohai's site (GitHub Pages, .github/workflows/firmware.yml):
 
   index.html                    the start page: the logo, Install, Source
-  install/index.html            web/espada_installer.html, self-contained (fm1pkg.js and fm1ota.js inlined, as
+  install/index.html            web/makohai_installer.html, self-contained (fm1pkg.js and fm1ota.js inlined, as
                                 Felucca's installer does)
-  firmware/espada-VER.fwsc      the package (+ LICENSE, LICENSING.md, LICENSES/: it holds JieLi SDK files under
+  firmware/makohai-VER.fwsc      the package (+ LICENSE, LICENSING.md, LICENSES/: it holds JieLi SDK files under
                                 Apache-2.0, see LICENSING.md)
-  espada-logo.png
-  try/                          Espada in the browser (build/espada_emu, web/emu/espada_build.sh), when it was built
+  makohai-logo.png
+  try/                          Makohai in the browser (build/makohai_emu, web/emu/makohai_build.sh), when it was built
 
-  python3 web/espada_make_site.py build/espada.fwsc VERSION OUT_DIR
+  python3 web/makohai_make_site.py build/makohai.fwsc VERSION OUT_DIR
 
 The package must carry the platform's own loader (FELUCCA-LOADER-1, no vendor files); its identity (FM-1_9xx) is what
 the FM-1 must report after the install.
@@ -47,21 +47,21 @@ def main(pkg, version, out):
         raise SystemExit(f"{pkg}: identity {product!r} is not a package of the platform (FM-1_9xx)")
     if b"FELUCCA-LOADER-1" not in raw:              # the platform's loader: never publish a package with vendor files
         raise SystemExit(f"{pkg}: no platform loader in it; the site ships only packages built by tools/build.py")
-    html = (HERE / "espada_installer.html").read_text(encoding="utf-8")
+    html = (HERE / "makohai_installer.html").read_text(encoding="utf-8")
     lib = strip_module((HERE / "fm1pkg.js").read_text(encoding="utf-8")) + "\n" + \
         strip_module((HERE / "fm1ota.js").read_text(encoding="utf-8"))
     safe = re.sub(r"[^A-Za-z0-9.-]", "-", version)
-    name = f"espada-{safe}.fwsc"
+    name = f"makohai-{safe}.fwsc"
     meta = json.dumps({"version": version, "product": product, "pkg": "../firmware/" + name})
     for mark in ("/*LIB*/", "/*META*/"):
         if html.count(mark) != 1:
-            raise SystemExit(f"espada_installer.html must contain {mark} once")
+            raise SystemExit(f"makohai_installer.html must contain {mark} once")
     html = html.replace("/*LIB*/", lib).replace("/*META*/", meta)
 
     inst, fw = out / "install", out / "firmware"
     for d in (inst, fw, fw / "LICENSES"):
         d.mkdir(parents=True, exist_ok=True)
-    for old in fw.glob("espada-*.fwsc"):            # one package: the current one
+    for old in fw.glob("makohai-*.fwsc"):            # one package: the current one
         old.unlink()
     (inst / "index.html").write_text(html, encoding="utf-8")
     shutil.copy(pkg, fw / name)
@@ -72,7 +72,7 @@ def main(pkg, version, out):
         shutil.copy(t, fw / "LICENSES" / t.name)
     names = [t.name for t in texts]
     (fw / "LICENSES" / "index.html").write_text(
-        '<!doctype html><meta charset="utf-8"><title>Espada licences</title><h1>Licence texts</h1><ul>'
+        '<!doctype html><meta charset="utf-8"><title>Makohai licences</title><h1>Licence texts</h1><ul>'
         + "".join(f'<li><a href="{n}">{n}</a></li>' for n in names)
         + '</ul><p><a href="../LICENSING.md">LICENSING.md</a> · <a href="../LICENSE">LICENSE (GPL-3.0)</a></p>\n',
         encoding="utf-8")
@@ -81,11 +81,11 @@ def main(pkg, version, out):
 
     # the logo, small enough for a page
     Image.open(ROOT / "assets/logo.png").convert("RGB").resize((256, 256), Image.LANCZOS) \
-        .save(out / "espada-logo.png", optimize=True)
+        .save(out / "makohai-logo.png", optimize=True)
 
-    emu = ROOT / "build/espada_emu"
+    emu = ROOT / "build/makohai_emu"
     try_link = ""
-    if (emu / "espada.wasm").exists():
+    if (emu / "makohai.wasm").exists():
         dst = out / "try"
         if dst.exists():
             shutil.rmtree(dst)
@@ -94,7 +94,7 @@ def main(pkg, version, out):
 
     (out / "index.html").write_text(f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Espada</title><link rel="icon" href="espada-logo.png">
+<title>Makohai</title><link rel="icon" href="makohai-logo.png">
 <meta name="description" content="Generative tracker grooves for the FM-1, razor sharp.">
 <style>
   :root {{ color-scheme: dark; }}
@@ -110,13 +110,13 @@ def main(pkg, version, out):
   small {{ display: block; margin-top: 28px; color: #8f9a96; }}
 </style></head>
 <body><main>
-<img src="espada-logo.png" alt="Espada">
-<h1>ESPADA</h1>
+<img src="makohai-logo.png" alt="Makohai">
+<h1>MAKOHAI</h1>
 <p>Generative tracker grooves for the M-VAVE FM-1, razor sharp. Four lanes in the style of early-90s PC tracker
 music, on FM: queue a profile, blend it in, call the drop.</p>
 <a class="b" href="install/">Install on the FM-1</a>{try_link}
-<small>Espada {version} · GPL-3.0 · <a href="https://github.com/delirioux/espada">Source</a> ·
-<a href="https://github.com/delirioux/espada/blob/main/docs/MANUAL.md">Manual</a><br>
+<small>Makohai {version} · GPL-3.0 · <a href="https://github.com/delirioux/makohai">Source</a> ·
+<a href="https://github.com/delirioux/makohai/blob/main/docs/MANUAL.md">Manual</a><br>
 On the FM-1 platform of Felucca (Leo Kuroshita, Hügelton Instruments), SLOOP and Dinghy</small>
 </main></body></html>
 """, encoding="utf-8")

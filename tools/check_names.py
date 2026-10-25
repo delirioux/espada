@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Fail when the app and the platform declare a file-scope variable or an enum constant of the same name.
 
-espada.c includes the whole platform (platform.c, usb.c, ota.c, ...) into one translation unit. Two
+makohai.c includes the whole platform (platform.c, usb.c, ota.c, ...) into one translation unit. Two
 `static volatile uint32_t mo_w;` there are not an error in C: they are tentative definitions of ONE variable,
 so the app and the USB driver silently share it. An enum constant of the same name is a compile error, but only in
 the firmware build. Host mode and the browser build see neither (they stand in for the platform). This check can.
@@ -14,9 +14,9 @@ import sys
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parent.parent / "firmware" / "src"
-APP = sorted(SRC.glob("espada*.c"))
+APP = sorted(SRC.glob("makohai*.c"))
 PLATFORM = [SRC / n for n in ("platform.c", "usb.c", "ota.c", "lcd.c", "gfx.c", "libc.c", "recovery.c")] + \
-    [SRC.parent.parent / "web/emu/espada_web.c", SRC.parent.parent / "tests/host.c"]   # the stand-ins: the same unit
+    [SRC.parent.parent / "web/emu/makohai_web.c", SRC.parent.parent / "tests/host.c"]   # the stand-ins: the same unit
 
 
 def file_scope_vars(path):

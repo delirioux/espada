@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Espada's music, in the main loop: what each lane plays, bar by bar.
+/* Makohai's music, in the main loop: what each lane plays, bar by bar.
  *
  *   harmony     a chord per bar: from the profile (explicit chords, borrowed ones allowed), or from the SONG
  *               page (key, scale, a suggested progression). Lines move through a "local scale": the scale

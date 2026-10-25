@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# Espada's firmware package for the FM-1, built on GitHub's Linux runners: JieLi's toolchain and three files of the
+# Makohai's firmware package for the FM-1, built on GitHub's Linux runners: JieLi's toolchain and three files of the
 # JieLi AC79 SDK (Apache-2.0) come from JieLi's own servers. Every push builds the package (the run's artifact
-# "espada-firmware") and runs the host mode (artifact "espada-host": screens as PNG, the sound as WAV).
+# "makohai-firmware") and runs the host mode (artifact "makohai-host": screens as PNG, the sound as WAV).
 # A tag vX.Y builds the release package (identity FM-1_96Y) and attaches it to a GitHub release.
 # A push to main also publishes the site on GitHub Pages: the web installer with that package
-# (web/espada_make_site.py) and Espada in the browser (web/emu). The site needs Settings > Pages > Source:
+# (web/makohai_make_site.py) and Makohai in the browser (web/emu). The site needs Settings > Pages > Source:
 # GitHub Actions.
 name: Firmware
 
@@ -32,10 +32,10 @@ jobs:
       - name: Host mode (the default script and the tour)
         run: |
           sh tests/run_host.sh
-          build/host/espada build/host/demo tests/demo.txt
+          build/host/makohai build/host/demo tests/demo.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: espada-host
+          name: makohai-host
           path: |
             build/host/*.png
             build/host/*.wav
@@ -62,49 +62,49 @@ jobs:
           git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
               https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git "$HOME/fw-AC79_AIoT_SDK"
 
-      - name: Build Espada
+      - name: Build Makohai
         run: |
           if [ "${GITHUB_REF_TYPE}" = tag ]; then ./build.sh --release "${GITHUB_REF_NAME#v}"; else ./build.sh; fi
 
       - name: No 64-bit division or soft-float routines in the image (a routine like __mulsf3 crashed an FM-1 in Tuna)
         run: |
           NM=$(find "$HOME/.jieli/toolchain/" -name "*nm" -type f -perm -u+x | head -1)
-          if "$NM" build/espada.elf | grep -E '\s__(u?divdi3|u?moddi3)$|\s__(add|sub|mul|div|neg)[sd]f[23]$|\s__(fix|float|extend|trunc)\w*[sd]f\w*$|\s__(eq|ne|lt|le|gt|ge|unord|cmp)[sd]f2$'; then
-            echo "helper routines the chip does not have (Espada is integers only: docs/RULES.md)"; exit 1
+          if "$NM" build/makohai.elf | grep -E '\s__(u?divdi3|u?moddi3)$|\s__(add|sub|mul|div|neg)[sd]f[23]$|\s__(fix|float|extend|trunc)\w*[sd]f\w*$|\s__(eq|ne|lt|le|gt|ge|unord|cmp)[sd]f2$'; then
+            echo "helper routines the chip does not have (Makohai is integers only: docs/RULES.md)"; exit 1
           fi
           echo "none"
 
       - name: Package
         run: |
           mkdir -p dist/debug
-          cp build/espada*.fwsc dist/
+          cp build/makohai*.fwsc dist/
           cp LICENSE LICENSING.md dist/
-          "$(find "$HOME/.jieli/toolchain/" -name "*nm" -type f -perm -u+x | head -1)" -n build/espada.elf > dist/debug/espada.sym
-          gzip -c build/espada.dis > dist/debug/espada.dis.gz
+          "$(find "$HOME/.jieli/toolchain/" -name "*nm" -type f -perm -u+x | head -1)" -n build/makohai.elf > dist/debug/makohai.sym
+          gzip -c build/makohai.dis > dist/debug/makohai.dis.gz
           ls -l dist dist/debug
 
       - uses: actions/upload-artifact@v4
         with:
-          name: espada-firmware
+          name: makohai-firmware
           path: dist/
 
       - name: Release
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/espada-*.fwsc --title "Espada ${GITHUB_REF_NAME#v}" --notes-file docs/RELEASE.md
+        run: gh release create "$GITHUB_REF_NAME" dist/makohai-*.fwsc --title "Makohai ${GITHUB_REF_NAME#v}" --notes-file docs/RELEASE.md
 
-      - name: Espada in the browser (WebAssembly, on Felucca's page)
+      - name: Makohai in the browser (WebAssembly, on Felucca's page)
         if: github.ref == 'refs/heads/main'
         continue-on-error: true            # (the site goes out without it)
         run: |
           command -v wasm-ld >/dev/null || sudo apt-get install -y -q lld
-          sh web/emu/espada_build.sh "$(git describe --tags --always)"
-          node web/emu/espada_emu_test.mjs build/espada_emu/espada.wasm
+          sh web/emu/makohai_build.sh "$(git describe --tags --always)"
+          node web/emu/makohai_emu_test.mjs build/makohai_emu/makohai.wasm
 
       - name: Site (the web installer with this package)
         if: github.ref == 'refs/heads/main'
-        run: python3 web/espada_make_site.py build/espada.fwsc "$(git describe --tags --always)" _site
+        run: python3 web/makohai_make_site.py build/makohai.fwsc "$(git describe --tags --always)" _site
 
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main'

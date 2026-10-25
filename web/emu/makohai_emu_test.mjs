@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Espada's browser build without a browser: the worklet's calls, from Node. Boots, presses PLAY, turns to a
+// Makohai's browser build without a browser: the worklet's calls, from Node. Boots, presses PLAY, turns to a
 // channel, plays a key, and checks that sound comes out, the screen changes and the LEDs answer.
-//   node web/emu/espada_emu_test.mjs build/espada_emu/espada.wasm [screen.ppm]
+//   node web/emu/makohai_emu_test.mjs build/makohai_emu/makohai.wasm [screen.ppm]
 import fs from "node:fs";
 const [wasmPath, ppm] = process.argv.slice(2);
 const { instance } = await WebAssembly.instantiate(fs.readFileSync(wasmPath), {});

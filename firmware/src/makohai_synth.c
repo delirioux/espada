@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Espada's sound: runs in the audio interrupt (44.1 kHz, 256 frames a call). Integers only.
+/* Makohai's sound: runs in the audio interrupt (44.1 kHz, 256 frames a call). Integers only.
  *
  *   FM voices     two operators (a modulator into a carrier's phase), an index envelope, an amplitude
  *                 envelope, slide, vibrato, the tracker arpeggio (a chord cycled every 42 ms), square option;

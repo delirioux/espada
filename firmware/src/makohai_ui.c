@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Espada's screen and panel: one overview, a mixing desk of settings.
+/* Makohai's screen and panel: one overview, a mixing desk of settings.
  *
  *   header 0..20     the group (PLAY, SOUND, TRACKER, SONG; EDIT and its lane), the bar in the phrase, the tempo
  *   title 22..58     the setting in large letters, its place in the group, the status (launch, break, next)
@@ -44,9 +44,9 @@ static const char *const SXNAME[NSX] = {"WASH", "RISER", "IMPACT", "ZAP", "CRACK
 #define COL_W 60
 static int32_t pan_y = LANE_Y, pan_h = LANES_H;    /* where the step grid, the song and the arc draw */
 
-/* ---- the look (SETUP): a palette (ESPADA in its colours, or one colour in shades, as Felucca's) and the screen's
+/* ---- the look (SETUP): a palette (MAKOHAI in its colours, or one colour in shades, as Felucca's) and the screen's
  * level. Every colour drawn passes through paint(). */
-static const char *const PALN[6] = {"ESPADA", "AMBER", "GREEN", "CYAN", "RED", "MONO"};
+static const char *const PALN[6] = {"MAKOHAI", "AMBER", "GREEN", "CYAN", "RED", "MONO"};
 static const uint8_t PALC[6][3] = {{0, 0, 0}, {255, 166, 40}, {120, 255, 146}, {140, 222, 255}, {255, 112, 92}, {226, 226, 226}};
 static int32_t palette, screen_lvl = 100, glow_on = 1;
 static uint16_t paint(uint16_t c)

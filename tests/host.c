@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* A fake FM-1 on a computer: the app (firmware/src/espada.c) runs unchanged on it. platform.c includes
+/* A fake FM-1 on a computer: the app (firmware/src/makohai.c) runs unchanged on it. platform.c includes
  * this file instead of the hardware when DINGHY_HOST is set. A script presses keys over time; out come
  * the screen (PPM, at the times SHOT asks) and the sound (WAV, as the FM-1 sends it over USB).
  *
  *   mkdir -p build/host
- *   cc -O2 -Wall -DDINGHY_HOST -Ifirmware/src -Ifirmware/gen -o build/host/espada firmware/src/espada.c
- *   build/host/espada build/host/espada        (-> build/host/espada.wav, build/host/espada-<ms>.ppm)
- *   build/host/espada OUT script.txt [FPS]    (your own script; with FPS: OUT-NNNNN.ppm, a frame every 1/FPS s:
+ *   cc -O2 -Wall -DDINGHY_HOST -Ifirmware/src -Ifirmware/gen -o build/host/makohai firmware/src/makohai.c
+ *   build/host/makohai build/host/makohai        (-> build/host/makohai.wav, build/host/makohai-<ms>.ppm)
+ *   build/host/makohai OUT script.txt [FPS]    (your own script; with FPS: OUT-NNNNN.ppm, a frame every 1/FPS s:
  *                                             a film of your firmware, e.g. ffmpeg -r 30 -i OUT-%05d.ppm ...)
  *
  * Change SCRIPT below to try your own app. */
@@ -16,7 +16,7 @@
 #include <string.h>
 
 #ifndef APP_NAME
-#define APP_NAME "ESPADA"
+#define APP_NAME "MAKOHAI"
 #endif
 #ifndef APP_VER
 #define APP_VER "0.0"
@@ -112,7 +112,7 @@ static void app_main(void);
  * argument) replaces it, a line each: "T keys MASK" (hex or decimal), "T btn ID" (pressed), "T rel ID"
  * (released), "T enc ID DELTA" (an encoder turned), "T midi ST D1 D2", "T shot" (a screenshot), "T end" */
 typedef struct { uint32_t t, keys; int btn; uint8_t st, d1, d2; int enc, delta, rel; } host_ev_t;
-/* Espada's default script: play from the top, let the arc build, change a few things, a drop */
+/* Makohai's default script: play from the top, let the arc build, change a few things, a drop */
 #define B_(t, id) {t, 0, id, 0, 0, 0, 0, 0, 0}
 #define R_(t, id) {t, 0, id, 0, 0, 0, 0, 0, 1}
 #define E_(t, e, d) {t, 0, -1, 0, 0, 0, (e) + 1, d, 0}
@@ -159,7 +159,7 @@ static void read_script(const char *path)
     no_shots = 1;                               /* a script takes its own screenshots ("T shot") */
 }
 
-static const char *host_out = "build/host/espada";
+static const char *host_out = "build/host/makohai";
 static int16_t *wav;
 static uint32_t wav_n;
 

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Espada: a generative groovebox for the M-VAVE FM-1 in the style of early-90s PC tracker music.
+/* Makohai: a generative groovebox for the M-VAVE FM-1 in the style of early-90s PC tracker music.
  * Five lanes (lead, pad, bass, drums, sfx) play generated parts from a profile; you mix profiles live (queue,
  * blend bottom-up, launch on the phrase), shape each lane with filter, wobble, FM brightness, drive,
  * slide, retrigger, crush and echo, write your own parts step by step, set key, scale and chords, and let
@@ -7,19 +7,19 @@
  * impact on it, washes, zaps, crackle and 8-bit noise.
  *
  * One compilation unit, as Dinghy: platform.c first (the FM-1: boot, USB, updates, panel, screen,
- * settings), then Espada's parts:
- *   espada_synth.c   the audio interrupt: FM voices, drum voices, lane effects, the step clock
- *   espada_music.c   harmony, profiles, generators, density, the arc, your patterns, the bar cache
- *   espada_ui.c      the screen, the pages, the panel, saving; app_main
+ * settings), then Makohai's parts:
+ *   makohai_synth.c   the audio interrupt: FM voices, drum voices, lane effects, the step clock
+ *   makohai_music.c   harmony, profiles, generators, density, the arc, your patterns, the bar cache
+ *   makohai_ui.c      the screen, the pages, the panel, saving; app_main
  *
  * Rules of the chip (docs/RULES.md): integers only, no float, no 64-bit division. */
-#define APP_NAME "ESPADA"
+#define APP_NAME "MAKOHAI"
 #ifdef DINGHY_HOST
-static void espada_host_stats(void);
-#define HOST_STATS_HOOK espada_host_stats
+static void makohai_host_stats(void);
+#define HOST_STATS_HOOK makohai_host_stats
 #endif
 #include "platform.c"
-#include "espada_logo.h"
+#include "makohai_logo.h"
 
 /* ---- shared between the main loop and the audio interrupt (one writer each) */
 #define NLANE 6u
@@ -87,12 +87,12 @@ enum { SX_WASH = 0, SX_RISER, SX_IMPACT, SX_ZAP, SX_CRACKLE, SX_BITS, SX_SURF, S
 
 static volatile int32_t key_off;    /* the key: semitones from D, -6..5 (the kettle drum is tuned to it) */
 
-#include "espada_synth.c"
-#include "espada_music.c"
-#include "espada_ui.c"
+#include "makohai_synth.c"
+#include "makohai_music.c"
+#include "makohai_ui.c"
 
 #ifdef DINGHY_HOST
-static void espada_host_stats(void)            /* host mode: the audio interrupt's worst time and the frames drawn */
+static void makohai_host_stats(void)            /* host mode: the audio interrupt's worst time and the frames drawn */
 {
     printf("audio interrupt: worst %u us, average %u us of 5805 (on this computer)\n", isr_us_max, isr_n ? isr_us_sum / isr_n : 0);
 }

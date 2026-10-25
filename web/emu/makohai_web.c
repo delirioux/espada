@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Espada in the browser: a simulated FM-1 for firmware/src/espada.c, compiled to WebAssembly and run in an
+/* Makohai in the browser: a simulated FM-1 for firmware/src/makohai.c, compiled to WebAssembly and run in an
  * AudioWorklet by Felucca's browser page and worklet (web/emu/index.html, worklet.js: Leo Kuroshita, Hügelton
  * Instruments, after charlesvestal's X0X, GPL-3.0). platform.c includes this file in place of the hardware when
- * DINGHY_WEB is set; nothing of Espada changes for it.
+ * DINGHY_WEB is set; nothing of Makohai changes for it.
  *
  *   - the clock: platform_poll() is one millisecond of the device (as in host mode); the audio interrupt
  *     (app_audio) renders each 256-frame half as it comes due, into a ring the worklet drains. web_render(n)
@@ -11,11 +11,11 @@
  *   - the screen: lcd_fill / lcd_blit into a 240 x 240 RGB565 frame (the panel's byte order).
  *   - the flash: a 1 MiB image; settings and patterns in the sectors the page keeps (0xFC000, 0xFD000).
  * Not here: USB (MIDI out, audio, updates). MIDI in from the page's Web MIDI: start, continue, stop.
- *   web/emu/espada_build.sh  ->  build/espada_emu/{index.html, worklet.js, espada.wasm, ...} */
+ *   web/emu/makohai_build.sh  ->  build/makohai_emu/{index.html, worklet.js, makohai.wasm, ...} */
 #include <stdint.h>
 
 #ifndef APP_NAME
-#define APP_NAME "ESPADA"
+#define APP_NAME "MAKOHAI"
 #endif
 #ifndef APP_VER
 #define APP_VER "WEB"
@@ -35,7 +35,7 @@ static struct { uint32_t notes, buttons; } fm1_in;
 static uint32_t web_ticks;
 static uint32_t fm1_ticks(void) { return web_ticks; }
 
-/* ---- the panel: Espada's button ids and encoders, set by the page's labels and roles */
+/* ---- the panel: Makohai's button ids and encoders, set by the page's labels and roles */
 static uint32_t web_edges, web_rel, web_notes_prev;
 static int32_t web_enc_steps[7];
 static uint32_t fm1_input_edges(uint32_t *released) { uint32_t b = web_edges; web_edges = 0; *released = web_rel; web_rel = 0; return b; }
@@ -195,7 +195,7 @@ EXPORT uint32_t web_now_ms(void) { return fm1_ms; }
 EXPORT uint16_t *web_screen(void) { return web_fb; }
 EXPORT uint32_t web_screen_draws(void) { return web_draws; }
 
-/* the page's buttons by label (Felucca's panel.c order) and knobs by role, as Espada's ids */
+/* the page's buttons by label (Felucca's panel.c order) and knobs by role, as Makohai's ids */
 static const uint8_t LABEL_BTN[14] = {BTN_FX, BTN_SEL, BTN_ENV, BTN_LFO, BTN_EDIT, BTN_GLO, BTN_HOME, BTN_SAVE,
                                       BTN_ARP, BTN_SEQ, BTN_PLAY, BTN_REC, BTN_OCT_DOWN, BTN_OCT_UP};
 static const uint8_t ROLE_ENC[7] = {ENC_SELECT, ENC_ALGORITHM, ENC_PRESETS, ENC_KNOB1, ENC_KNOB2, ENC_KNOB3, ENC_KNOB4};
