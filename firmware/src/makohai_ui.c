@@ -1534,7 +1534,7 @@ static void defaults(void)
     for (l = 0; l < NLANE; l++) { fxu[l] = fx[l]; midi_chan[l] = CH0[l]; }
     fxu[L_LEAD].vary = 40;
     set_key(2); set_bpm(125); scale_sel = 0; prog_sel = 0; bpc = 1; energy = 0; space = 35;
-    arc_on = 0; build_ph = 6; peak_ph = 4; auto_drop = 1; target = 2; blend = 0;
+    arc_on = 0; build_ph = 6; peak_ph = 4; auto_drop = 1; target = PROF_START; blend = 0;
     palette = 0; screen_lvl = 100; glow_on = 1; fm1_glow_all();
     if (seq_playing) invalidate_from(cur_bar()); else form_arm();
     area_dirty = 1;
