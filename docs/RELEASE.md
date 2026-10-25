@@ -6,7 +6,7 @@ Since 1.0:
 - The timpani are tuned: SYMPHONY's play the chord's root and fifth, an octave higher than before, so a small speaker plays them too.
 - CRACKLE and BITS (sfx) at a tenth of their old level: far in the background.
 - Pictures on SETUP's free knobs: SCOPE, LANES, STEREO (a goniometer), SPECTRUM (a landscape), and RESET's three
-  knobs each picking one of CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, COPPER, MAKO, FIRE, LOGO, SCOPE, SPECTRUM.
+  knobs each picking one of CRYSTAL, TUNNEL, DOTS, PLASMA, TWIRL, STARS, FIRE, LOGO, SCOPE, SPECTRUM.
 - DEMO (SEL + HOME): the pictures full screen while the music plays, cut on the bar every 4, 8 or 16 bars with
   flashes, blinds, wipes, dissolves, an iris, dips and pushes; a drop cuts with a flash.
 - A new identity, FM-1_47625642 (1.0 reported FM-1_960, as another firmware does), the same for every version: the FM-1 Firmware Hub tells Makohai apart by it.

@@ -868,31 +868,6 @@ static void pic_stars(void)
         vfill(sx2, sy2, sz, sz, SW(paint(star_z[k] < 24 ? C_CREAM : star_z[k] < 44 ? C_LIGHT : C_DIMG)));
     }
 }
-static void pic_copper(void)
-{
-    int32_t k, j, bh = vh / 8 + 1;
-    for (k = 0; k < 3; k++) {
-        int32_t c = vy0 + vh / 2 - bh / 2 + vsin(vis_t * 9u + (uint32_t)k * 340u) * (vh / 2 - bh / 2 - 1) / 32768;
-        for (j = 0; j < bh; j++) {
-            int32_t sh = 256 - (j * 2 - bh) * (j * 2 - bh) * 200 / (bh * bh);
-            vfill(vx0, c + j, vw, 1, SW(paint(cscale(LCOL[LROW[k * 2]], sh * (vis_hit ? 5 : 4) / 4))));
-        }
-    }
-}
-static void pic_mako(void)
-{
-    int32_t k, sz = vsize() * 256 / 54, sea = vy0 + vh * 2 / 3, span = vw + 24 * sz / 256, fx = vx0 + (int32_t)(vis_t * (uint32_t)(sz / 256 + 1) % (uint32_t)span) - 12 * sz / 256;
-    int32_t bob = (int32_t)(fm1_ms - lane_hit_ms[L_BASS]) < 120 && seq_playing ? 2 * sz / 256 : 0, fh = 18 * sz / 256;
-    for (k = 0; k < fh; k++) {                                                /* the fin, swimming right: a straight back, a curved front */
-        int32_t kk = k * 18 / fh, x1 = fx + (1 + kk * 14 / 18 + (kk * kk) / 40) * sz / 256;
-        vfill(fx, sea - fh + k - bob, x1 - fx, 1, SW(paint(RGBC(0x6f8fa8))));
-    }
-    for (k = 0; k < vw; k++) {                                                /* the sea, rolling */
-        int32_t y = sea + vsin((uint32_t)(k * 54 / vw) * 40u + vis_t * 24u) * 2 * sz / 256 / 32768;
-        vline(vx0 + k, y, vy0 + vh - 1, SW(paint(cscale(C_CYAN, 70))));
-        vpix(vx0 + k, y, SW(paint(C_CYAN)));
-    }
-}
 static uint16_t px_fire(int32_t u, int32_t v, int32_t W, int32_t H) { return fpal[flame[v * (FIRE_H - 2) / H][u * FIRE_W / W] >> 2]; }
 static void pic_fire(void) { render_px(px_fire); }
 static uint16_t px_logo(int32_t u, int32_t v, int32_t W, int32_t H)           /* the logo, raster bars where it is dark */
@@ -906,10 +881,10 @@ static uint16_t px_logo(int32_t u, int32_t v, int32_t W, int32_t H)           /*
 }
 static void pic_logo(void) { render_px(px_logo); }
 
-#define NPIC 12
-static const char *const PICN[NPIC] = {"CRYSTAL", "TUNNEL", "DOTS", "PLASMA", "TWIRL", "STARS", "COPPER", "MAKO", "FIRE", "LOGO", "SCOPE", "SPECTRUM"};
-static void (*const PICF[NPIC])(void) = {pic_crystal, pic_tunnel, pic_dots, pic_plasma, pic_twirl, pic_stars, pic_copper, pic_mako, pic_fire, pic_logo, pic_scope, pic_spectrum};
-static const uint8_t PIC_CHUNKY[NPIC] = {0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0};   /* per pixel: drawn in 2 x 2 full screen */
+#define NPIC 10
+static const char *const PICN[NPIC] = {"CRYSTAL", "TUNNEL", "DOTS", "PLASMA", "TWIRL", "STARS", "FIRE", "LOGO", "SCOPE", "SPECTRUM"};
+static void (*const PICF[NPIC])(void) = {pic_crystal, pic_tunnel, pic_dots, pic_plasma, pic_twirl, pic_stars, pic_fire, pic_logo, pic_scope, pic_spectrum};
+static const uint8_t PIC_CHUNKY[NPIC] = {0, 1, 0, 1, 1, 0, 1, 1, 0, 0};   /* per pixel: drawn in 2 x 2 full screen */
 static int32_t pick[3] = {0, 1, 2};
 
 /* on SETUP's knobs: the view is the knob's tile */

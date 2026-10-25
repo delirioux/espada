@@ -77,8 +77,7 @@ goniometer: left against right, turned so that one sound in the middle stands up
 bass on the left, hats on the right, as a landscape rolling away. RESET's three knobs each pick a picture:
 **CRYSTAL** (a see-through faceted body turning, swelling on the drums), **TUNNEL** (flying down a tunnel at the
 tempo), **DOTS** (a ball of dots that becomes a ring and back), **PLASMA**, **TWIRL** (a checker turning and
-zooming), **STARS**, **COPPER** (raster bars flashing on the drums), **MAKO** (a fin crossing the sea, bobbing on
-the bass), **FIRE**, **LOGO** (the logo with raster bars behind it), **SCOPE** and **SPECTRUM**. Which pictures RESET
+zooming), **STARS**, **FIRE**, **LOGO** (the logo with raster bars behind it), **SCOPE** and **SPECTRUM**. Which pictures RESET
 shows is not saved.
 
 SAVE keeps the setup with everything else. SYSTEM and AUDIO only show; they are how a firmware that runs short of
