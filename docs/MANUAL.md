@@ -205,7 +205,7 @@ lane faded out, a save waiting, the keys' octave off 0.
 | HYPERSPACE | 130 | techno minor: power chords, a chopped pad, chord stabs, straight drums, a clap every other bar |
 | FUSION | 125 | melodic major with a chromatic turn: a riff through every chord, a pedal bass, lush chords, the hat opening into the one |
 | OLDSKOOL | 125 | the 4-channel sound: arpeggio chords, an octave bass, a busy lead with an echo |
-| SYMPHONY | 110 | the orchestra: two bars a chord, swelling strings, a violin line, cellos, timpani |
+| SYMPHONY | 110 | the orchestra: two bars a chord, swelling strings, a violin line, cellos, timpani tuned to the chords (root and fifth, a roll into each phrase) |
 | TROPIC | 110 | sunny mixolydian: chords on the off-beat, a deep bass with rests, rim shots, congas, a flute |
 | STEEL | 140 | heavy: power chords, a galloping bass, double kick, tom fills, a saw lead that glides |
 | DRIFT | 96 | floating: sus chords resolving, two bars a chord, swells, a breathy lead with a long echo, no snare, a soft rim |

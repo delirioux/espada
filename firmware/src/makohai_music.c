@@ -554,14 +554,20 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
         if (last) { g_add(G, 0, 8, root - 12 >= 28 ? 2 : 1, root, root - 12, 0, 0); NOTE(G, 8, 4, move(T, root, -1)); NOTE(G, 12, 4, move(T, root, -2)); }
         else g_add(G, 0, 16, root - 12 >= 28 ? 2 : 1, root, root - 12, 0, 0);
         break; }
-    case S_DORCH:               /* orchestral percussion: timpani on the one, a roll into the phrase, the bass drum
-                                 * every other bar, a cymbal on the phrase; PITCH: timpani on three too */
-        DRUM(G, 0, DK_KETTLE);
-        if (GL->pit > 50 && b % 2) DRUM(G, 8, DK_KETTLE);
-        if (b % 2 == 0) { ev_t *e = DRUM(G, 0, DK_KICK); if (e) e->flags = EV_ACC1; }
+    case S_DORCH: {             /* orchestral percussion: timpani tuned to the chord, as an orchestra's are: the root on
+                                 * the one, the fifth on three (PITCH more often), a roll into the phrase on the root;
+                                 * the bass drum every other bar, a cymbal on the phrase */
+        int32_t tr = ct(T, 0), t5;
+        ev_t *e;
+        while (tr > 56) tr -= 12;
+        while (tr < 45) tr += 12;
+        t5 = tr + 7 > 57 ? tr - 5 : tr + 7;
+        if ((e = g_add(G, 0, 1, 1, DK_KETTLE, tr, 0, 0)) != 0) e->flags = EV_ACC1;
+        if (b % 2 || GL->pit > 50) g_add(G, 8, 1, 1, DK_KETTLE, t5, 0, 0);
+        if (b % 2 == 0) { e = DRUM(G, 0, DK_KICK); if (e) e->flags = EV_ACC1; }
         if (b % 8 == 0) DRUM(G, 0, DK_CRASH);
-        if (b % 4 == 3) for (s = 12; s < 16; s++) { ev_t *e = DRUM(G, s, DK_KETTLE); if (e) e->flags = s == 15 ? 0 : s < 14 ? EV_ACC2 : EV_ACC1; }
-        break;
+        if (b % 4 == 3) for (s = 12; s < 16; s++) { e = g_add(G, s, 1, 1, DK_KETTLE, tr, 0, 0); if (e) e->flags = s == 15 ? 0 : s < 14 ? EV_ACC2 : EV_ACC1; }
+        break; }
     case S_CHOP: {              /* a chopped pad (a tracker re-strikes a long sample by offset): the chord every 16th, accented */
         static const uint8_t AC[3][16] = {{0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 1},
                                           {0, 2, 2, 1, 2, 2, 1, 2, 0, 2, 2, 1, 2, 1, 2, 1},
