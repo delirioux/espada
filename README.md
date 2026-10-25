@@ -153,7 +153,7 @@ tools/get_toolchain.sh
 git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
     https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK
 ./build.sh                         # -> build/makohai.fwsc
-./build.sh --release 1.0           # -> build/makohai-1.0.fwsc, identity FM-1_961
+./build.sh --release 1.1           # -> build/makohai-1.1.fwsc, identity FM-1_47625642
 ```
 
 GitHub Actions builds the package on every push (the run's artifact `makohai-firmware`).

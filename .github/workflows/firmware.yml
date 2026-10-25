@@ -2,7 +2,7 @@
 # Makohai's firmware package for the FM-1, built on GitHub's Linux runners: JieLi's toolchain and three files of the
 # JieLi AC79 SDK (Apache-2.0) come from JieLi's own servers. Every push builds the package (the run's artifact
 # "makohai-firmware") and runs the host mode (artifact "makohai-host": screens as PNG, the sound as WAV).
-# A tag vX.Y builds the release package (identity FM-1_96Y) and attaches it to a GitHub release.
+# A tag vX.Y builds the release package (version X.Y, identity FM-1_47625642) and attaches it to a GitHub release.
 # A push to main also publishes the site on GitHub Pages: the web installer with that package
 # (web/makohai_make_site.py) and Makohai in the browser (web/emu). The site needs Settings > Pages > Source:
 # GitHub Actions.

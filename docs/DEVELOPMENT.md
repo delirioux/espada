@@ -103,7 +103,7 @@ tests/run_host.sh                            # host mode: screens as PNG, the so
 build/host/makohai OUT tests/demo.txt         # a scripted tour
 python3 tools/check_names.py                 # no variable or enum constant shared with the platform
 clang -fsyntax-only -w -m32 -ffreestanding -Ifirmware/hal -Ifirmware/src -Ifirmware/gen \
-    -DFELUCCA_ID='"FM-1_961"' -DAPP_VER='"x"' firmware/src/makohai.c     # the firmware's unit, without the toolchain
+    -DFELUCCA_ID='"FM-1_47625642"' -DAPP_VER='"x"' firmware/src/makohai.c     # the firmware's unit, without the toolchain
 web/emu/makohai_build.sh                      # the browser version: build/makohai_emu/
 node web/emu/makohai_emu_test.mjs build/makohai_emu/makohai.wasm
 ```

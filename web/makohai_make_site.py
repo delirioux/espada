@@ -12,7 +12,7 @@
 
   python3 web/makohai_make_site.py build/makohai.fwsc VERSION OUT_DIR
 
-The package must carry the platform's own loader (FELUCCA-LOADER-1, no vendor files); its identity (FM-1_9xx) is what
+The package must carry the platform's own loader (FELUCCA-LOADER-1, no vendor files); its identity (Makohai's FM-1_47625642) is what
 the FM-1 must report after the install.
 """
 import json
@@ -43,8 +43,8 @@ def main(pkg, version, out):
     pkg, out = Path(pkg), Path(out)
     raw = pkg.read_bytes()
     product = product_of(raw)
-    if not re.fullmatch(r"FM-1_9\d\d", product):
-        raise SystemExit(f"{pkg}: identity {product!r} is not a package of the platform (FM-1_9xx)")
+    if not re.fullmatch(r"FM-1_(9\d\d|47\d{6})", product):
+        raise SystemExit(f"{pkg}: identity {product!r} is not a package of the platform (FM-1_9xx, FM-1_47xxxxxx)")
     if b"FELUCCA-LOADER-1" not in raw:              # the platform's loader: never publish a package with vendor files
         raise SystemExit(f"{pkg}: no platform loader in it; the site ships only packages built by tools/build.py")
     html = (HERE / "makohai_installer.html").read_text(encoding="utf-8")
