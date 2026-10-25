@@ -1300,7 +1300,7 @@ static void fx_apply(void)
         {                                                           /* the style's way with the lane, on top of yours */
             const sstyle_t *S = &SSTYLE[eff_prof(l, cur_bar())];
             int32_t pn = U->pan + S->pan[l];
-            F->porta = U->porta; F->vibr = U->vibr; F->autopan = U->autopan;
+            F->porta = U->porta; F->vibr = U->vibr; F->autopan = U->autopan; F->aprate = U->aprate;
             F->trem = clamp100(U->trem + S->trem[l]); F->gate = clamp100(U->gate + S->gate[l]); F->swing = clamp100(U->swing + S->swing[l]);
             F->tremor = U->tremor ? U->tremor : S->tremor[l];
             F->pan = pn < -100 ? -100 : pn > 100 ? 100 : pn;

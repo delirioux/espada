@@ -276,7 +276,11 @@ static void v_pan(char *o) { s_int(o, fxu[sel].pan); }
 static void s_pan(char *o) { s_cat(o, fxu[sel].pan > 0 ? "RIGHT" : fxu[sel].pan < 0 ? "LEFT" : "MIDDLE"); }
 static void t_apan(int32_t d) { fxu[sel].autopan = clampi(fxu[sel].autopan + d, 0, 100); }
 static void v_apan(char *o) { s_pct(o, fxu[sel].autopan); }
-static void s_apan(char *o) { s_cat(o, fxu[sel].autopan ? "PER NOTE" : "OFF"); }
+static void s_apan(char *o) { s_cat(o, !fxu[sel].autopan ? "OFF" : fxu[sel].aprate ? "SWEEP" : "PER NOTE"); }
+static const char *const APRN[8] = {"NOTE", "8 BARS", "4 BARS", "2 BARS", "1/1", "1/2", "1/4", "1/8"};
+static void t_aprate(int32_t d) { fxu[sel].aprate = clampi(fxu[sel].aprate + (d > 0 ? 1 : -1), 0, 7); }
+static void v_aprate(char *o) { s_cat(o, APRN[fxu[sel].aprate & 7]); }
+static void s_aprate(char *o) { s_cat(o, fxu[sel].aprate ? "A CYCLE" : "FLIPS"); }
 static void t_slide(int32_t d) { if (!HITS(sel)) fxu[sel].slide = clampi(fxu[sel].slide + d, 0, 100); }
 static void v_slide(char *o) { if (HITS(sel)) s_cat(o, "--"); else s_pct(o, fxu[sel].slide); }
 static void t_rtg(int32_t d) { fxu[sel].retrig = clampi(fxu[sel].retrig + d, 0, 100); }
@@ -426,7 +430,7 @@ static void t_aglide(int32_t d) { if (sel == L_LEAD) { fxu[sel].aglide = clampi(
 static void v_aglide(char *o) { if (sel != L_LEAD) s_cat(o, "--"); else s_pct(o, fxu[sel].aglide); }
 static void s_aglide(char *o) { if (sel == L_LEAD) s_cat(o, "BY STYLE"); }
 static const card_t ROW_TRK[] = {                               /* place and groove, echo, the pitch, the volume, the repeats */
-    {"PAN", t_pan, v_pan, s_pan}, {"AUTOPAN", t_apan, v_apan, s_apan}, {"SWING", t_swing, v_swing, 0}, {"ECHO", t_echo, v_echo, 0}, {"SLIDE", t_slide, v_slide, 0},
+    {"PAN", t_pan, v_pan, s_pan}, {"AUTOPAN", t_apan, v_apan, s_apan}, {"PAN RATE", t_aprate, v_aprate, s_aprate}, {"SWING", t_swing, v_swing, 0}, {"ECHO", t_echo, v_echo, 0}, {"SLIDE", t_slide, v_slide, 0},
     {"GLIDES", t_aglide, v_aglide, s_aglide}, {"PORTA", t_porta, v_porta, s_porta}, {"VIBRATO", t_vibr, v_vibr, 0},
     {"TREMOLO", t_trem, v_trem, s_trem}, {"TREMOR", t_tremor, v_tremor, 0}, {"GATE", t_gate, v_gate, s_gate},
     {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}};
@@ -1002,22 +1006,23 @@ static void draw_frame(int force)
 /* ---- saving: settings (256 B) and patterns (their own sector), only while stopped (an erase stalls the sound) */
 typedef struct {
     uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy; uint8_t space;
-    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; int8_t porta, pan; uint8_t vibr, trem, gate, tremor, swing, aglide, uon, autopan; } l[NLANE];
+    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; int8_t porta, pan; uint8_t vibr, trem, gate, tremor, swing, aglide, uon, autopan, aprate; } l[NLANE];
     uint8_t palette, screen, glow;
 } save_t;
 typedef char save_fits[sizeof(save_t) <= 256u ? 1 : -1];          /* settings_save takes at most 256 bytes */
-#define SAVE_VER 12
-/* version 11 (1.0) had a lane one byte shorter (no AUTOPAN, the lane's last byte): read and brought up to date */
-#define SAVE_OLD (sizeof(save_t) - NLANE)
-typedef char save_bytes[sizeof(save_t) == 16u + NLANE * 34u ? 1 : -1];   /* bytes only, no padding: the copy below relies on it */
-static void save_up(const uint8_t *o, save_t *S)
+#define SAVE_VER 13
+/* older records had shorter lanes, the new settings at a lane's end: version 11 (1.0) two bytes (no AUTOPAN, PAN
+ * RATE), version 12 one (no PAN RATE); they are read and brought up to date */
+#define SAVE_OLD(v) (sizeof(save_t) - NLANE * (uint32_t)(SAVE_VER - (v)))
+typedef char save_bytes[sizeof(save_t) == 16u + NLANE * 35u ? 1 : -1];   /* bytes only, no padding: the copy below relies on it */
+static void save_up(const uint8_t *o, uint32_t v, save_t *S)
 {
     uint8_t *d = (uint8_t *)S;
-    uint32_t h = (uint32_t)((uint8_t *)S->l - d), L = sizeof S->l[0], l;
+    uint32_t h = (uint32_t)((uint8_t *)S->l - d), L = sizeof S->l[0], k = (uint32_t)(SAVE_VER - (int32_t)v), l;
     memset(S, 0, sizeof *S);
     memcpy(d, o, h);
-    for (l = 0; l < NLANE; l++) memcpy(d + h + l * L, o + h + l * (L - 1u), L - 1u);
-    memcpy(d + h + NLANE * L, o + h + NLANE * (L - 1u), sizeof *S - h - NLANE * L);
+    for (l = 0; l < NLANE; l++) memcpy(d + h + l * L, o + h + l * (L - k), L - k);
+    memcpy(d + h + NLANE * L, o + h + NLANE * (L - k), sizeof *S - h - NLANE * L);
     S->ver = SAVE_VER;
 }
 /* the own parts, in their store: [head 16 B][lanes 20 B][to 64][each lane's bars, 32 B each]; the CRC covers all
@@ -1091,7 +1096,7 @@ static void state_get(save_t *P)                                /* everything in
         S.l[l].echo = (uint8_t)fxu[l].echo; S.l[l].level = (uint8_t)fxu[l].level; S.l[l].inst = (int8_t)fxu[l].inst; S.l[l].vary = (uint8_t)fxu[l].vary;
         S.l[l].mel = ln[l].mel; S.l[l].rhy = ln[l].rhy; S.l[l].pit = ln[l].pit; S.l[l].chg = ln[l].chg; S.l[l].mute = ln[l].mute; S.l[l].send = (uint8_t)fxu[l].send; S.l[l].midi = midi_chan[l];
         S.l[l].porta = (int8_t)fxu[l].porta; S.l[l].pan = (int8_t)fxu[l].pan; S.l[l].vibr = (uint8_t)fxu[l].vibr; S.l[l].trem = (uint8_t)fxu[l].trem;
-        S.l[l].gate = (uint8_t)fxu[l].gate; S.l[l].tremor = (uint8_t)fxu[l].tremor; S.l[l].swing = (uint8_t)fxu[l].swing; S.l[l].aglide = (uint8_t)fxu[l].aglide; S.l[l].uon = ln[l].up.on; S.l[l].autopan = (uint8_t)fxu[l].autopan;
+        S.l[l].gate = (uint8_t)fxu[l].gate; S.l[l].tremor = (uint8_t)fxu[l].tremor; S.l[l].swing = (uint8_t)fxu[l].swing; S.l[l].aglide = (uint8_t)fxu[l].aglide; S.l[l].uon = ln[l].up.on; S.l[l].autopan = (uint8_t)fxu[l].autopan; S.l[l].aprate = (uint8_t)fxu[l].aprate;
     }
     *P = S;
 }
@@ -1123,7 +1128,7 @@ static void state_put(const save_t *P, int setup)
             ln[l].mel = (uint8_t)(S.l[l].mel % 100u); ln[l].rhy = (uint8_t)clampi(S.l[l].rhy, 0, 100); ln[l].pit = (uint8_t)clampi(S.l[l].pit, 0, 100);
             ln[l].chg = (uint8_t)clampi(S.l[l].chg, 0, 100); ln[l].mute = S.l[l].mute != 0; fxu[l].send = clampi(S.l[l].send, 0, 100);
             fxu[l].porta = clampi(S.l[l].porta, -100, 100); fxu[l].pan = clampi(S.l[l].pan, -100, 100); fxu[l].vibr = clampi(S.l[l].vibr, 0, 100);
-            fxu[l].trem = clampi(S.l[l].trem, 0, 100); fxu[l].gate = clampi(S.l[l].gate, 0, 100); fxu[l].tremor = clampi(S.l[l].tremor, 0, 3); fxu[l].swing = clampi(S.l[l].swing, 0, 100); fxu[l].aglide = clampi(S.l[l].aglide, 0, 100); fxu[l].autopan = clampi(S.l[l].autopan, 0, 100); if (!setup) ln[l].up.on = S.l[l].uon != 0; if (setup) midi_chan[l] = (uint8_t)(S.l[l].midi > 16u ? 16u : S.l[l].midi);
+            fxu[l].trem = clampi(S.l[l].trem, 0, 100); fxu[l].gate = clampi(S.l[l].gate, 0, 100); fxu[l].tremor = clampi(S.l[l].tremor, 0, 3); fxu[l].swing = clampi(S.l[l].swing, 0, 100); fxu[l].aglide = clampi(S.l[l].aglide, 0, 100); fxu[l].autopan = clampi(S.l[l].autopan, 0, 100); fxu[l].aprate = clampi(S.l[l].aprate, 0, 7); if (!setup) ln[l].up.on = S.l[l].uon != 0; if (setup) midi_chan[l] = (uint8_t)(S.l[l].midi > 16u ? 16u : S.l[l].midi);
             fxu[l].inst = clampi(S.l[l].inst, -1, l == L_SFX ? (int32_t)NSX - 1 : l == L_DRUMS ? (int32_t)NKIT - 1 : (int32_t)NPATCH - 1);
         }
     }
@@ -1134,7 +1139,8 @@ static int do_load(void)                                        /* 1: a saved se
     static uint8_t old[sizeof(save_t)];
     int got = 0;
     if (settings_load(&S, sizeof S) == 0 && S.ver == SAVE_VER) got = 1;
-    else if (settings_load(old, SAVE_OLD) == 0 && old[0] == 11) { save_up(old, &S); got = 1; }
+    else if (settings_load(old, SAVE_OLD(12)) == 0 && old[0] == 12) { save_up(old, 12, &S); got = 1; }
+    else if (settings_load(old, SAVE_OLD(11)) == 0 && old[0] == 11) { save_up(old, 11, &S); got = 1; }
     if (got) state_put(&S, 1);
     parts_load();
     return got;
@@ -1158,11 +1164,12 @@ static void sets_load(void)
     if (h[1] == sizeof(save_t)) {
         if (slots_read(16, sets, sizeof sets)) return;
         for (i = 0; i < sizeof sets; i++) c = c * 31u + ((const uint8_t *)sets)[i];
-    } else if (h[1] == SAVE_OLD) {                                  /* 1.0's sets: each brought up to date */
+    } else if (h[1] == SAVE_OLD(11) || h[1] == SAVE_OLD(12)) {        /* older sets: each brought up to date */
+        uint32_t v = h[1] == SAVE_OLD(11) ? 11u : 12u;
         for (k = 0; k < NSETS; k++) {
-            if (slots_read(16 + k * SAVE_OLD, old, SAVE_OLD)) return;
-            for (i = 0; i < SAVE_OLD; i++) c = c * 31u + old[i];
-            save_up(old, &sets[k]);
+            if (slots_read(16 + k * h[1], old, h[1])) return;
+            for (i = 0; i < h[1]; i++) c = c * 31u + old[i];
+            save_up(old, v, &sets[k]);
         }
     } else return;
     sets_used = c == h[3] ? h[2] : 0;

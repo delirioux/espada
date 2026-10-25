@@ -40,7 +40,7 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | --- | --- | --- |
 | PLAY | HOME | volume, style, sound, melody, rhythm, pitch, density, octave, change |
 | SOUND | FX | reverb, filter, resonance, wobble, brightness, drive, crush, vary |
-| TRACKER | ARP | pan, autopan, swing, echo, slide, glides (the lead: how many of the style's own glides it keeps), porta, vibrato, tremolo, tremor, gate, retrigger, rate |
+| TRACKER | ARP | pan, autopan, pan rate, swing, echo, slide, glides (the lead: how many of the style's own glides it keeps), porta, vibrato, tremolo, tremor, gate, retrigger, rate |
 
 | SONG (GLO) | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
@@ -143,9 +143,12 @@ lane faded out, a save waiting, the keys' octave off 0.
   - **PAN** (8xx): the lane from left to right, with equal power: a lane sounds as loud wherever you put it, and in
     the middle exactly as before. The pad's and the sfx's voices keep their spread around it, the hats stay right
     of the drums. The lead starts a little right, the arp a little left.
-  - **AUTOPAN**: each new note goes to the other side of PAN, left, right, left, this far from it (100: hard left
-    and right, around the middle). A chord moves as one, and so do the hits that fall together on the drums; the
-    echo and the retriggers bounce too. The sound glides across in a few milliseconds, so nothing clicks.
+  - **AUTOPAN**: how far the lane moves away from PAN, to either side (100: from hard left to hard right, around
+    the middle). How it moves is PAN RATE.
+  - **PAN RATE**: NOTE puts each new note on the other side, left, right, left: a chord moves as one, and so do
+    the hits that fall together on the drums; the echo and the retriggers bounce too. 8 BARS, 4 BARS, 2 BARS, 1/1,
+    1/2, 1/4 and 1/8 sweep the lane slowly from side to side instead, a cycle that long, in time with the beat.
+    Either way the sound glides across, so nothing clicks.
   Porta, vibrato and gate act on notes, so the drums and the sfx show "--" for them.
 - **Filter:** one knob, left = low-pass, right = high-pass, centre = off. **Wobble** moves the cutoff in time with the
   tempo (1/1 to 1/16). On screen the filter darkens what it cuts away.

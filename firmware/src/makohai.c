@@ -50,7 +50,8 @@ typedef struct {                /* written by the main loop, read by the audio i
     volatile int32_t swing;     /* 0..100: the off 16ths later, at 100 by a third of a step (EDx) */
     volatile int32_t pan;       /* -100..100: left .. right, equal power (8xx) */
     volatile int32_t aglide;    /* 0..100: how much of the style's own glides the lane keeps (GLIDES; 100 = all) */
-    volatile int32_t autopan;   /* 0..100: each note on the other side of PAN, this far from it (AUTOPAN) */
+    volatile int32_t autopan;   /* 0..100: how far AUTOPAN takes the lane from its PAN, to either side */
+    volatile int32_t aprate;    /* 0: each note on the other side; 1..7: a slow sweep, 8 bars .. an 8th a cycle (PAN RATE) */
 } lanefx_t;
 static lanefx_t fx[NLANE];      /* what plays: your settings plus the phrase's character (the audio interrupt reads it) */
 static lanefx_t fxu[NLANE];     /* your settings (the encoders) */

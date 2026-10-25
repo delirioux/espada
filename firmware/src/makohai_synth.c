@@ -195,6 +195,7 @@ static void room(int32_t *out, uint32_t n)
 }
 static int32_t f_low[NBUS], f_band[NBUS], crush_hold[NBUS], crush_n[NBUS], trem_g[NBUS];
 static int32_t pan_cl[NBUS], pan_cr[NBUS];                 /* each bus's pan gains as the last block ended (Q8) */
+static const uint8_t AP_STEPS[8] = {0, 128, 64, 32, 16, 8, 4, 2};   /* PAN RATE: a sweep's cycle in 16ths */
 static uint32_t wob_ph[NLANE];
 static uint32_t lane_last_inc[NLANE][3];
 static volatile uint32_t lane_hit_ms[NLANE];
@@ -439,7 +440,7 @@ static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags,
 {
     uint32_t i;
     lane_hit_ms[lane] = fm1_ms;
-    if (fx[lane].autopan > 0 && smp - ap_last[lane] > 441u) { ap_side[lane] ^= 1u; ap_last[lane] = smp; }
+    if (fx[lane].autopan > 0 && !fx[lane].aprate && smp - ap_last[lane] > 441u) { ap_side[lane] ^= 1u; ap_last[lane] = smp; }
     if (lane == L_DRUMS) { start_drum(note[0], lvl, kind_or_inst, original); return; }
     if (lane == L_SFX) { start_sfx(note[0], note[1], dur, lvl); return; }
     {
@@ -967,7 +968,12 @@ static void app_audio(int32_t *out, uint32_t n)
         const lanefx_t *F = &fx[BUS_LANE[l]];
         int32_t lv = F->level * 480 / 100, pn = F->pan + PAN_OFF[l], sd = F->send * 256 / 100;   /* Q8: 80 -> 1.5 */
         int32_t tl, tr, gl, gr, dl, dr;
-        if (F->autopan > 0) pn += ap_side[BUS_LANE[l]] ? F->autopan : -F->autopan;   /* AUTOPAN: this note's side */
+        if (F->autopan > 0 && !F->aprate) pn += ap_side[BUS_LANE[l]] ? F->autopan : -F->autopan;   /* AUTOPAN: this note's side */
+        else if (F->autopan > 0) {                                      /* or a sweep, in time: where it is as the block ends */
+            uint32_t L = seq_step_len_q8 >> 8, per = AP_STEPS[F->aprate & 7] * (L ? L : 1u), t;
+            t = seq_playing ? (blk_step0 % AP_STEPS[F->aprate & 7]) * L + (blk_acc0 >> 8) + n : blk_smp0 + n;
+            pn += F->autopan * SIN[(t % per) * 1024u / per & 1023u] >> 15;   /* starts in the middle, going right */
+        }
         if (pn < -100) pn = -100; else if (pn > 100) pn = 100;
         tl = pan_gain(pn, 0); tr = pan_gain(pn, 1);
         gl = pan_cl[l] << 16; gr = pan_cr[l] << 16;                     /* glide to the new place over the block: no clicks */
