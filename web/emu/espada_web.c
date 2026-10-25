@@ -110,6 +110,11 @@ static int settings_load(void *p, uint32_t n) { return web_load(WEB_SETTINGS, 0x
 static int settings_save(const void *p, uint32_t n) { return web_save(WEB_SETTINGS, 0x59474E44u, p, n); }
 static int longs_erase(uint32_t off) { if ((off & 0xFFFu) || !FL_IN(off, 0x1000u, 0, LONGS_LEN)) return -8; memset(nor + LONGS_AT + off, 0xFF, 0x1000u); return 0; }
 static int longs_write(uint32_t off, const void *p, uint32_t n) { if (!FL_IN(off, n, 0, LONGS_LEN)) return -8; memcpy(nor + LONGS_AT + off, p, n); web_flash_writes++; return 0; }
+#define SLOTS_AT 0xBC000u                          /* the sets: as on the FM-1 */
+#define SLOTS_LEN 0x1000u
+static int slots_erase(void) { memset(nor + SLOTS_AT, 0xFF, SLOTS_LEN); return 0; }
+static int slots_write(uint32_t off, const void *p, uint32_t n) { if (!FL_IN(off, n, 0, SLOTS_LEN)) return -8; memcpy(nor + SLOTS_AT + off, p, n); web_flash_writes++; return 0; }
+static int slots_read(uint32_t off, void *p, uint32_t n) { if (!FL_IN(off, n, 0, SLOTS_LEN)) return -8; memcpy(p, nor + SLOTS_AT + off, n); return 0; }
 static int longs_read(uint32_t off, void *p, uint32_t n) { if (!FL_IN(off, n, 0, LONGS_LEN)) return -8; memcpy(p, nor + LONGS_AT + off, n); return 0; }
 
 /* ---- MIDI: in from the page (Web MIDI), out nowhere */

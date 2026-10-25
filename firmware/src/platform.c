@@ -72,8 +72,10 @@ static volatile uint32_t fm1_ms;                /* milliseconds since power-on (
 #define SETTINGS_AT 0x000FC000u                 /* one 4 KiB sector of Felucca's globals area */
 #define LONGS_AT 0x00097000u                    /* Espada: its own parts, at the start of Felucca's free store */
 #define LONGS_LEN 0x00025000u                   /* 148 KiB (37 sectors), well inside 0x97000..0xE0000 (ends 0xBC000) */
+#define SLOTS_AT 0x000BC000u                    /* Espada: the sets (SONG, SETS), one sector right after the parts */
+#define SLOTS_LEN 0x00001000u
 #define FL_RANGE_OK(off, n) (FL_IN(off, n, FL_OTA_LO, FL_OTA_HI) || FL_IN(off, n, SETTINGS_AT, SETTINGS_AT + 0x1000u) || \
-                             FL_IN(off, n, LONGS_AT, LONGS_AT + LONGS_LEN))
+                             FL_IN(off, n, LONGS_AT, LONGS_AT + LONGS_LEN) || FL_IN(off, n, SLOTS_AT, SLOTS_AT + SLOTS_LEN))
 #include "fm1_flash.h"
 static uint8_t flash_ok;
 static int st_read(uint32_t off, void *dst, uint32_t n)
@@ -193,6 +195,9 @@ static int longs_write(uint32_t off, const void *p, uint32_t n)   /* p in RAM */
     fm1_wdt_feed();
     return fl_write(LONGS_AT + off, (const uint8_t *)p, n);
 }
+static int slots_erase(void) { uint32_t took; if (!flash_ok) return -8; fm1_wdt_feed(); return fl_erase4k(SLOTS_AT, &took); }
+static int slots_write(uint32_t off, const void *p, uint32_t n) { if (!flash_ok || !FL_IN(off, n, 0, SLOTS_LEN)) return -8; return fl_write(SLOTS_AT + off, (const uint8_t *)p, n); }
+static int slots_read(uint32_t off, void *p, uint32_t n) { if (!flash_ok || !FL_IN(off, n, 0, SLOTS_LEN)) return -8; return st_read(SLOTS_AT + off, p, n); }
 static int longs_read(uint32_t off, void *p, uint32_t n)
 {
     if (!flash_ok || !FL_IN(off, n, 0, LONGS_LEN))

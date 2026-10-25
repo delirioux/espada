@@ -40,13 +40,14 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | --- | --- | --- |
 | PLAY | HOME | volume, style, sound, melody, rhythm, pitch, density, octave, change |
 | SOUND | FX | reverb, filter, resonance, wobble, brightness, drive, crush, vary |
-| TRACKER | ARP | slide, retrigger, rate, echo, porta, vibrato, tremolo, tremor, gate, swing, pan |
+| TRACKER | ARP | pan, swing, echo, slide, glides (the lead: how many of the style's own glides it keeps), porta, vibrato, tremolo, tremor, gate, retrigger, rate |
 
 | SONG (GLO) | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
 | LIVE | style: playing, the next one; stopped, every lane at once | blend | energy | space (the room) |
 | KEY | key | scale | chords | bars per chord |
 | ARC | arc on / off | build | peak | auto drop |
+| SETS | set 1..8 (its style, or EMPTY) | load: turn right, the set at once | store: turn right, what plays now into the set | clear: three clicks right |
 
 | EDIT | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
@@ -95,8 +96,8 @@ lane faded out, a save waiting, the keys' octave off 0.
 ## What the knobs do
 
 - **The musical settings** (PLAY: MELODY, RHYTHM, PITCH, and CHANGE at the end): **MELODY** picks the idea: every position is its own melody, riff,
-  voicing or drum pattern, and turning back brings one back. Every power-on sets each lane's MELODY at random, so
-  Espada starts with a new song each time (a saved set keeps everything else). **RHYTHM** goes from slow long notes to busy 16ths (on
+  voicing or drum pattern, and turning back brings one back. Without a saved set every power-on sets each lane's
+  MELODY at random, so Espada starts with a new song each time; after a SAVE it comes back as you saved it. **RHYTHM** goes from slow long notes to busy 16ths (on
   the other lanes: sparser or busier). **PITCH** goes from small steps to wide leaps and a higher register (the bass
   jumps octaves, the pad's chords open up, the drums bring in the timpani). **CHANGE** says how soon new material
   comes: FROZEN (the same 16 bars over and over), 64, 32 or 16 bars. Every change is heard at once, from the next
@@ -115,9 +116,11 @@ lane faded out, a save waiting, the keys' octave off 0.
 - **Blend** moves lanes to the queued style from the bottom up: drums, then bass, pad, lead (the word under it
   says how far).
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.
-- **Sound** (PLAY): AUTO follows the style; or one of nineteen patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
-  STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS, VIOLINS, CELLOS, SUPERSAW, ORCH HIT), or one of four drum
-  kits (STANDARD, TRACKER, ELECTRO, DEEP). SUPERSAW is not FM: seven saws detuned around the note, wide and bright,
+- **Sound** (PLAY): AUTO follows the style; or one of twenty patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
+  STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS, VIOLINS, CELLOS, SUPERSAW, AH VOX, ORCH HIT), or one of
+  five drum kits (STANDARD, TRACKER, ELECTRO, DEEP, PUNCH). AH VOX is a choir's "aah": two voices a little apart, a
+  breath, through the vowel's formants, swelling in slowly; DRIFT's pad sings it. PUNCH is the sharp kit: the kick
+  clicks, the snare keeps its crack, the hats are bright. SUPERSAW is not FM: seven saws detuned around the note, wide and bright,
   for big chords and leads. ORCH HIT is the orchestra hit: one key plays the note with its fifth, octave and tenth
   above, brassy, with a burst of noise on the attack, gone in half a second; for stabs on the lead or the pad. DEEP has a kick that drops to about 33 Hz and rings long, with a dry kit around it; RAVE
   plays on it, and the styles use the orchestra hit in their own places (below); SUPERSAW is RAVE's arp. (A small speaker hardly plays DEEP's kick: use headphones or the output.) A kit has nine hits: kick, snare, hat, kettle drum, crash, clap (three quick bursts and a
@@ -182,7 +185,7 @@ lane faded out, a save waiting, the keys' octave off 0.
   (STEEL most, DRIFT and FUSION often), long chords swell in or fade out (DRIFT and SYMPHONY most), and the lead
   gets an echo, a quieter copy three 16ths later (DRIFT, OLDSKOOL, RAVE). The style's echo adds to the lane's ECHO.
 - **The styles use the tracker's effects** too, mostly note by note in their own effect column, as the modules'
-  composers did: EPIC's long lead notes sing with vibrato and an orchestra hit opens each phrase and lands the drop;
+  composers did: on every drop, in every style, the orchestra hits (also on DROP by hand); EPIC's long lead notes sing with vibrato and an orchestra hit opens each phrase and lands the drop;
   HYPERSPACE cuts its stabs short and dives the bass into the phrase; FUSION slides some lead notes in and swings the
   drums a little; OLDSKOOL does the 4-channel tricks (vibrato and slides on the lead, volume slides on the arpeggio
   chords, a retriggered snare fill); SYMPHONY gives its strings vibrato and an orchestra hit at the climax (the drop,

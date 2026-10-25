@@ -74,8 +74,11 @@ the kind of setting, PRESETS steps through them.
   DRIFT (sus chords, swells, no snare), FUNK (slap bass, clav, ghost notes) and RAVE (four on the floor, an acid bass).
   Each brings its chords, parts, instruments, tempo and way of playing.
 - **Drums.** Kick, snare, hats open and closed, clap, toms that step down in a fill, rim shot, kettle drum and crash,
-  in four kits (DEEP: a very low, long kick); each style has its own grooves and fills. SUPERSAW, seven detuned
-  saws, for big chords and leads; ORCH HIT, the orchestra hit on one key.
+  in five kits (DEEP: a very low, long kick; PUNCH: the sharp one); each style has its own grooves and fills. SUPERSAW,
+  seven detuned saws, for big chords and leads; AH VOX, a choir's aah for the pad; ORCH HIT, the orchestra hit on one
+  key, on every drop.
+- **Sets.** Eight sets of everything but your parts (styles, knobs, mutes, key, tempo, effects), to load at once while
+  playing (SONG, SETS).
 - **Played by hand.** Lead notes glide in from the last one, long chords swell in or fade out, the lead has an echo
   channel, as in the trackers; strings carry bow noise and the drums ring as recorded ones. Each style also plays the
   tracker's effects its own way: vibrato, slides, dives, cut-off stabs, volume slides, swing, trance gates, wide

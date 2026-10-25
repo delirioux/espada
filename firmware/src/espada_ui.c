@@ -419,16 +419,24 @@ static const card_t ROW_PLAY[] = {                              /* the mix, the 
 static const card_t ROW_SOUND[] = {                             /* the room, the filter with its own two, the tone, the rough ones, VARY */
     {"REVERB", t_send, v_send, 0}, {"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0},
     {"BRIGHT", t_bright, v_bright, 0}, {"DRIVE", t_drive, v_drive, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary}};
-static const card_t ROW_TRK[] = {
-    {"SLIDE", t_slide, v_slide, 0}, {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}, {"ECHO", t_echo, v_echo, 0},
-    {"PORTA", t_porta, v_porta, s_porta}, {"VIBRATO", t_vibr, v_vibr, 0}, {"TREMOLO", t_trem, v_trem, s_trem}, {"TREMOR", t_tremor, v_tremor, 0},
-    {"GATE", t_gate, v_gate, s_gate}, {"SWING", t_swing, v_swing, 0}, {"PAN", t_pan, v_pan, s_pan}};
+static void t_aglide(int32_t d) { if (sel == L_LEAD) { fxu[sel].aglide = clampi(fxu[sel].aglide + d, 0, 100); invalidate(); } }
+static void v_aglide(char *o) { if (sel != L_LEAD) s_cat(o, "--"); else s_pct(o, fxu[sel].aglide); }
+static void s_aglide(char *o) { if (sel == L_LEAD) s_cat(o, "BY STYLE"); }
+static const card_t ROW_TRK[] = {                               /* place and groove, echo, the pitch, the volume, the repeats */
+    {"PAN", t_pan, v_pan, s_pan}, {"SWING", t_swing, v_swing, 0}, {"ECHO", t_echo, v_echo, 0}, {"SLIDE", t_slide, v_slide, 0},
+    {"GLIDES", t_aglide, v_aglide, s_aglide}, {"PORTA", t_porta, v_porta, s_porta}, {"VIBRATO", t_vibr, v_vibr, 0},
+    {"TREMOLO", t_trem, v_trem, s_trem}, {"TREMOR", t_tremor, v_tremor, 0}, {"GATE", t_gate, v_gate, s_gate},
+    {"RETRIG", t_rtg, v_rtg, 0}, {"RATE", t_rate, v_rate, 0}};
 typedef struct { const char *name; int8_t lane; card_t c[4]; } srow_t;     /* lane: -1 the song, else that lane's */
 enum { SR_LIVE, SR_KEY, SR_ARC };
+static void t_set(int32_t d); static void v_set(char *o); static void s_set(char *o);
+static void t_setload(int32_t d); static void v_setload(char *o); static void t_setstore(int32_t d); static void v_setstore(char *o);
+static void t_setclear(int32_t d); static void v_setclear(char *o); static void s_setclear(char *o);
 static const srow_t ROW_SONG[] = {
     {"LIVE", -1, {{"STYLE", t_prof, v_prof, 0}, {"BLEND", t_blend, v_blend, s_blend}, {"ENERGY", t_energy, v_energy, 0}, {"SPACE", t_space, v_space, 0}}},
     {"KEY", -1, {{"KEY", t_key, v_key, 0}, {"SCALE", t_scale, v_scale, 0}, {"CHORDS", t_prog, v_prog, 0}, {"BARS/CH", t_bpc, v_bpc, 0}}},
     {"ARC", -1, {{"ARC", t_arc, v_arc, 0}, {"BUILD", t_build, v_build, s_phr}, {"PEAK", t_peak, v_peak, s_phr}, {"AUTODROP", t_auto, v_auto, 0}}},
+    {"SETS", -1, {{"SET", t_set, v_set, s_set}, {"LOAD", t_setload, v_setload, 0}, {"STORE", t_setstore, v_setstore, 0}, {"CLEAR", t_setclear, v_setclear, s_setclear}}},
 };
 /* EDIT's pages: NOTES, FX (the effect column), PART, BAR (its tools), RANGE (copy, paste, clear bars) */
 static void t_undo(int32_t d) { (void)d; if (pat_undo()) { toast("UNDONE"); cursor = clampi(cursor, 0, nav_steps(sel) - 1); } else toast("NOTHING TO UNDO"); area_dirty = 1; }
@@ -991,7 +999,7 @@ static void draw_frame(int force)
 /* ---- saving: settings (256 B) and patterns (their own sector), only while stopped (an erase stalls the sound) */
 typedef struct {
     uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy; uint8_t space;
-    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; int8_t porta, pan; uint8_t vibr, trem, gate, tremor, swing; } l[NLANE];
+    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; int8_t porta, pan; uint8_t vibr, trem, gate, tremor, swing, aglide, uon; } l[NLANE];
     uint8_t palette, screen, glow;
 } save_t;
 typedef char save_fits[sizeof(save_t) <= 256u ? 1 : -1];          /* settings_save takes at most 256 bytes */
@@ -1052,11 +1060,12 @@ static void parts_load(void)
 }
 typedef char parts_fit[64 + NLANE * MAXB * sizeof(ubar_t) <= LONGS_LEN ? 1 : -1];   /* the whole store always fits */
 typedef char ubar_size[sizeof(ubar_t) == 48u ? 1 : -1];          /* 48 bytes a bar, as the store's size assumes */
-static void do_save(void)
+static void state_get(save_t *P)                                /* everything into a save record */
 {
-    static save_t S;
-    int32_t l, rc;
-    S.ver = 10; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
+    save_t S;
+    int32_t l;
+    memset(&S, 0, sizeof S);
+    S.ver = 11; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
     for (l = 0; l < (int32_t)NLANE; l++) {
         S.l[l].prof = ln[l].prof; S.l[l].lock = ln[l].lock; S.l[l].dens = ln[l].dens; S.l[l].oct = ln[l].oct; S.l[l].filt = (int8_t)fxu[l].filt;
@@ -1065,21 +1074,29 @@ static void do_save(void)
         S.l[l].echo = (uint8_t)fxu[l].echo; S.l[l].level = (uint8_t)fxu[l].level; S.l[l].inst = (int8_t)fxu[l].inst; S.l[l].vary = (uint8_t)fxu[l].vary;
         S.l[l].mel = ln[l].mel; S.l[l].rhy = ln[l].rhy; S.l[l].pit = ln[l].pit; S.l[l].chg = ln[l].chg; S.l[l].mute = ln[l].mute; S.l[l].send = (uint8_t)fxu[l].send; S.l[l].midi = midi_chan[l];
         S.l[l].porta = (int8_t)fxu[l].porta; S.l[l].pan = (int8_t)fxu[l].pan; S.l[l].vibr = (uint8_t)fxu[l].vibr; S.l[l].trem = (uint8_t)fxu[l].trem;
-        S.l[l].gate = (uint8_t)fxu[l].gate; S.l[l].tremor = (uint8_t)fxu[l].tremor; S.l[l].swing = (uint8_t)fxu[l].swing;
+        S.l[l].gate = (uint8_t)fxu[l].gate; S.l[l].tremor = (uint8_t)fxu[l].tremor; S.l[l].swing = (uint8_t)fxu[l].swing; S.l[l].aglide = (uint8_t)fxu[l].aglide; S.l[l].uon = ln[l].up.on;
     }
+    *P = S;
+}
+static void do_save(void)
+{
+    static save_t S;
+    int32_t rc;
+    state_get(&S);
     rc = settings_save(&S, sizeof S);
     if (!rc) rc = parts_save();
     toast(rc ? "SAVE FAILED" : "SAVED");
 }
-static void do_load(void)
+/* a save record into everything; setup: the look and the MIDI channels too (the power-on record, not a set) */
+static void state_put(const save_t *P, int setup)
 {
-    static save_t S;
+    const save_t S = *P;
     int32_t l;
-    if (settings_load(&S, sizeof S) == 0 && S.ver == 10) {
-        palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0;
+    {
+        if (setup) { palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0; }
         energy = clampi(S.energy, -50, 50); space = clampi(S.space, 0, 100);
         set_key(S.key % 12u); scale_sel = S.scale < NSCALE ? S.scale : 0; prog_sel = S.prog <= NPROG ? S.prog : 0; bpc = clampi(S.bpc, 1, 4);
-        arc_on = S.arc != 0; build_ph = clampi(S.build, 2, 16); if (arc_on) arc_restart(0); peak_ph = clampi(S.peak, 1, 8); auto_drop = S.autod != 0; target = S.target % NPROF; set_bpm(S.bpm);
+        { int32_t was = arc_on; arc_on = S.arc != 0; build_ph = clampi(S.build, 2, 16); if (arc_on && (setup || !was)) arc_restart(seq_playing ? cur_bar() + 1 : 0); } peak_ph = clampi(S.peak, 1, 8); auto_drop = S.autod != 0; target = S.target % NPROF; set_bpm(S.bpm);
         for (l = 0; l < (int32_t)NLANE; l++) {
             ln[l].prof = (uint8_t)(S.l[l].prof % NPROF); ln[l].lock = S.l[l].lock != 0; ln[l].dens = (uint8_t)clampi(S.l[l].dens, 0, 100); ln[l].oct = (int8_t)clampi(S.l[l].oct, -1, 1);
             fxu[l].filt = clampi(S.l[l].filt, -100, 100); fxu[l].res = clampi(S.l[l].res, 0, 100); fxu[l].wob = clampi(S.l[l].wob, 0, 5); fxu[l].bright = clampi(S.l[l].bright, 0, 100);
@@ -1089,19 +1106,88 @@ static void do_load(void)
             ln[l].mel = (uint8_t)(S.l[l].mel % 100u); ln[l].rhy = (uint8_t)clampi(S.l[l].rhy, 0, 100); ln[l].pit = (uint8_t)clampi(S.l[l].pit, 0, 100);
             ln[l].chg = (uint8_t)clampi(S.l[l].chg, 0, 100); ln[l].mute = S.l[l].mute != 0; fxu[l].send = clampi(S.l[l].send, 0, 100);
             fxu[l].porta = clampi(S.l[l].porta, -100, 100); fxu[l].pan = clampi(S.l[l].pan, -100, 100); fxu[l].vibr = clampi(S.l[l].vibr, 0, 100);
-            fxu[l].trem = clampi(S.l[l].trem, 0, 100); fxu[l].gate = clampi(S.l[l].gate, 0, 100); fxu[l].tremor = clampi(S.l[l].tremor, 0, 3); fxu[l].swing = clampi(S.l[l].swing, 0, 100); midi_chan[l] = (uint8_t)(S.l[l].midi > 16u ? 16u : S.l[l].midi);
+            fxu[l].trem = clampi(S.l[l].trem, 0, 100); fxu[l].gate = clampi(S.l[l].gate, 0, 100); fxu[l].tremor = clampi(S.l[l].tremor, 0, 3); fxu[l].swing = clampi(S.l[l].swing, 0, 100); fxu[l].aglide = clampi(S.l[l].aglide, 0, 100); if (!setup) ln[l].up.on = S.l[l].uon != 0; if (setup) midi_chan[l] = (uint8_t)(S.l[l].midi > 16u ? 16u : S.l[l].midi);
             fxu[l].inst = clampi(S.l[l].inst, -1, l == L_SFX ? (int32_t)NSX - 1 : l == L_DRUMS ? (int32_t)NKIT - 1 : (int32_t)NPATCH - 1);
         }
     }
-    parts_load();
 }
+static int do_load(void)                                        /* 1: a saved set came back */
+{
+    static save_t S;
+    int got = 0;
+    if (settings_load(&S, sizeof S) == 0 && S.ver == 11) { got = 1; state_put(&S, 1); }
+    parts_load();
+    return got;
+}
+
+/* SETS (SONG): eight sets of everything but your parts (styles, knobs, mutes, key, tempo, effects, which lanes play
+ * your part), kept in their own flash sector and in RAM, so LOAD is at once, also while playing; STORE writes the
+ * sector (only while stopped: an erase stops the sound) */
+#define NSETS 8
+#define SETS_MAGIC 0x53544553u                  /* "SETS" */
+static save_t sets[NSETS];
+static uint32_t sets_used, sets_dirty;
+static int32_t set_idx, set_clear_turns;
+typedef char sets_fit[16 + NSETS * sizeof(save_t) <= 0x1000u ? 1 : -1];   /* all of them in the one sector */
+static void sets_load(void)
+{
+    uint32_t h[4], c = 0, i;
+    if (slots_read(0, h, sizeof h) || h[0] != SETS_MAGIC || h[1] != sizeof(save_t) || slots_read(16, sets, sizeof sets)) { sets_used = 0; return; }
+    for (i = 0; i < sizeof sets; i++) c = c * 31u + ((const uint8_t *)sets)[i];
+    sets_used = c == h[3] ? h[2] : 0;
+}
+static int sets_save(void)
+{
+    uint32_t h[4] = {SETS_MAGIC, sizeof(save_t), sets_used, 0}, i;
+    int rc;
+    for (i = 0; i < sizeof sets; i++) h[3] = h[3] * 31u + ((const uint8_t *)sets)[i];
+    if ((rc = slots_erase()) != 0 || (rc = slots_write(16, sets, sizeof sets)) != 0) return rc;
+    sets_dirty = 0;
+    return slots_write(0, h, sizeof h);                             /* the header last */
+}
+static void t_set(int32_t d) { set_idx = fmodp(set_idx + (d > 0 ? 1 : -1), NSETS); set_clear_turns = 0; }
+static void v_set(char *o) { s_int(o, set_idx + 1); }
+static void s_set(char *o) { s_cat(o, sets_used >> set_idx & 1u ? PSHORT[sets[set_idx].l[L_BASS].prof % NPROF] : "EMPTY"); }
+static void t_setload(int32_t d)
+{
+    char t[24], *o;
+    if (d <= 0) return;
+    if (!(sets_used >> set_idx & 1u) || sets[set_idx].ver != 11) { toast("THAT SET IS EMPTY"); return; }
+    state_put(&sets[set_idx], 0);
+    if (!seq_playing) form_arm(); else invalidate();
+    o = s_cat(t, "SET "); o = s_int(o, set_idx + 1); s_cat(o, " LOADED"); toast(t);
+    area_dirty = 1;
+}
+static void v_setload(char *o) { s_cat(o, "TURN"); }
+static void t_setstore(int32_t d)
+{
+    char t[32], *o;
+    if (d <= 0) return;
+    state_get(&sets[set_idx]); sets_used |= 1u << set_idx; sets_dirty = 1;
+    o = s_cat(t, "SET "); o = s_int(o, set_idx + 1); s_cat(o, seq_playing ? " KEPT: WRITES WHEN YOU STOP" : " STORED"); toast(t);
+}
+static void v_setstore(char *o) { s_cat(o, "TURN"); }
+static void t_setclear(int32_t d)
+{
+    char t[24], *o;
+    set_clear_turns = d > 0 ? set_clear_turns + 1 : 0;
+    if (set_clear_turns < 3) return;
+    set_clear_turns = 0;
+    sets_used &= ~(1u << set_idx); sets_dirty = 1;
+    o = s_cat(t, "SET "); o = s_int(o, set_idx + 1); s_cat(o, " EMPTIED"); toast(t);
+}
+static void v_setclear(char *o) { if (!set_clear_turns) s_cat(o, "TURN"); else { o = s_int(o, 3 - set_clear_turns); s_cat(o, " MORE"); } }
+static void s_setclear(char *o) { s_cat(o, "3 RIGHT"); }
 
 /* the drop, the moment DROP is let go: its one has passed, so the crash and the impact come now */
 static void drop_hit(void)
 {
+    harm_t H; tools_t T;
     live_push(L_DRUMS, DK_CRASH, 26, 1, (uint32_t)inst_eff(L_DRUMS));
     live_push(L_DRUMS, DK_KICK, 26, 1, (uint32_t)inst_eff(L_DRUMS));
     live_push(L_SFX, SX_IMPACT, 26, 1, 0);
+    harm_at(cur_bar(), &H); tools_make(&T, &H, LBASE[L_PAD] + key_off);
+    audition(L_PAD, (uint32_t)clampi(ct(&T, 0), 24, 96), NPATCH - 1u);   /* and the orchestra hit, on the chord's root */
 }
 static int is_black(int32_t k) { return (0x54Au >> ((53 + k) % 12)) & 1u; }
 static int32_t white_index(int32_t k) { int32_t i, w = 0; for (i = 0; i < k; i++) if (!is_black(i)) w++; return is_black(k) ? -1 : w; }
@@ -1419,13 +1505,14 @@ static void app_boot(void)
 {
     uint32_t t_splash;
     defaults();
-    do_load();
-    {                                                               /* every power-on a new song: MELODY at random */
+    {                                                               /* without a saved set a new song at every power-on: MELODY at random */
         rng_t r;
         uint32_t l;
+        int saved = do_load();
+        sets_load();
         r.a = sys_seed() | 1u;
-        for (l = 0; l < NLANE; l++) ln[l].mel = (uint8_t)((rnd(&r) >> 16) * 100u >> 16);
-        form_rng.a ^= r.a;                                          /* and the INTRO's order */
+        if (!saved) for (l = 0; l < NLANE; l++) ln[l].mel = (uint8_t)((rnd(&r) >> 16) * 100u >> 16);
+        form_rng.a ^= r.a;                                          /* the INTRO's order changes either way */
     }
     form_arm();                                                     /* the first INTRO, shown before PLAY */
     splash();
@@ -1451,6 +1538,7 @@ static void app_pass(void)
     bars_update();
     bars_update();
     if (save_pending && !seq_playing) { save_pending = 0; do_save(); }
+    if (sets_dirty && !seq_playing) { if (sets_save()) toast("SETS NOT WRITTEN"); }   /* STORE and CLEAR land when stopped */
     leds();
     if (fm1_ms - t_frame >= 33u || area_dirty) { t_frame = fm1_ms; draw_frame(area_dirty); }
 }

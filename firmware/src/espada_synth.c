@@ -55,7 +55,8 @@ typedef struct {
     uint8_t chaos;              /* 1: add the pad and the brown noise under the lead (CHAOS); 2: an ensemble, two
                                  * more detuned oscillators with the note (strings and brass as sections);
                                  * 3: no FM, seven detuned saws (SUPERSAW); 4: the orchestra hit, the note with
-                                 * its fifth, octave and tenth in one brassy stab (ORCH HIT) */
+                                 * its fifth, octave and tenth in one brassy stab (ORCH HIT, the last patch);
+                                 * 5: a choir's aah, saws through vowel formants (AH VOX) */
     uint8_t breath;             /* noise in the tone, following the note's level: bow, breath (0 = a clean FM tone) */
 } patch_t;
 static const patch_t PATCH[] = {
@@ -77,16 +78,18 @@ static const patch_t PATCH[] = {
     {"VIOLINS", 16,  680, 500, 400,  60, 1800,  230, 350, 1, 0,    0, 2, 80},   /* a section, singing: the symphony's lead */
     {"CELLOS",  16,  700, 450, 300,  90, 2700,  220, 300, 1, 0,    0, 2, 70},   /* cellos and basses, bowed */
     {"SUPERSAW", 16,   0,   0, 100,   6, 3000,  235, 380, 0, 0,    0, 3},   /* seven saws, wide and bright */
+    {"AH VOX",   16,    0,   0, 100, 280, 5500,  225, 650, 1, 0,    0, 5},   /* a choir's aah: two saws through the vowel's formants */
     {"ORCH HIT", 16, 1100, 260, 160,   1, 2300,    0, 220, 0, 0,  420, 4, 120},   /* one key, a whole orchestra: bright, a burst of noise, gone in half a second */
 };
 #define NPATCH (sizeof PATCH / sizeof PATCH[0])
 
-typedef struct { const char *name; uint16_t kh, kl, kd, sf, sd, hf, hd; } kit_t;   /* Hz and ms */
+typedef struct { const char *name; uint16_t kh, kl, kd, sf, sd, hf, hd; uint8_t sharp; } kit_t;   /* Hz and ms; sharp: a click, a crack, open hats */
 static const kit_t KITS[] = {
     {"STANDARD", 150, 45, 320, 1700, 700, 8000, 60},     /* snares with a body and a tail, as recorded ones */
     {"TRACKER",  220, 60, 180, 2300, 520, 6000, 90},
     {"ELECTRO",  120, 38, 600, 1200, 600, 10000, 35},
     {"DEEP",     140, 33, 750, 1500, 620, 7500, 70},     /* a kick that drops very low and rings long, a dry kit around it */
+    {"PUNCH",    260, 52, 240, 2600, 360, 9000, 45, 1},  /* sharp: the kick clicks, the snare cracks, the hats one pole bright */
 };
 #define NKIT (sizeof KITS / sizeof KITS[0])
 
@@ -227,7 +230,7 @@ static void synth_init(void)
     uint32_t i;
     for (i = 0; i < 1024u; i++) SIN[i] = (int16_t)sine_q15(i << 22);
     static const uint8_t SEND0[NLANE] = {35, 60, 3, 18, 100, 45};  /* REVERB: lead some, pad much, bass hardly, drums a little, sfx all, arp some */
-    for (i = 0; i < NLANE; i++) { fx[i].level = 80; fx[i].bright = 25; fx[i].rtg_rate = 1; fx[i].inst = -1; fx[i].res = 30; fx[i].send = SEND0[i]; }
+    for (i = 0; i < NLANE; i++) { fx[i].aglide = 100; fx[i].level = 80; fx[i].bright = 25; fx[i].rtg_rate = 1; fx[i].inst = -1; fx[i].res = 30; fx[i].send = SEND0[i]; }
     fx[L_SFX].level = 30;
     fx[L_LEAD].level = 50;                                        /* the lead: the ear hears its range most; 50 sits it in the mix */
     fx[L_ARP].level = 60;                                         /* the arp beside it */
@@ -294,7 +297,8 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
     v->breath = P->breath; v->s1 = 0;
     v->fx_porta = (int8_t)note_porta; v->fx_vib = (uint8_t)note_vib;
     if (P->chaos == 3u) for (i = 0; i < 6u; i++) { (void)noise(); v->ss[i] = noise_s; }   /* free-running: each note starts elsewhere */
-    if (P->chaos == 4u) { v->ss[0] = 0x20000000u; v->ss[1] = 0; }                      /* the hit's tenth; ss[1]: its noise burst's age */
+    if (P->chaos == 4u) { v->ss[0] = 0x20000000u; v->ss[1] = 0; }
+    if (P->chaos == 5u) { v->s2 = v->s3 = 0; v->pph1 = 0x55555555u; }                  /* the formant filters empty, the second voice elsewhere */                      /* the hit's tenth; ss[1]: its noise burst's age */
     if (midi) mo_push(0x90u | v->midi_ch, midi, 100);
 }
 
@@ -307,7 +311,7 @@ static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_ori
     v = alloc_voice(L_DRUMS);
     const kit_t *K = &KITS[kit < NKIT ? kit : 0];
     v->lane = L_DRUMS; v->stage = 1; v->ph = 0; v->ctr = 0; v->age = ++vage; v->s1 = v->s2 = v->s3 = 0;
-    v->gate = 0xFFFFFFFFu; v->midi = 0; v->chaos = 0; v->breath = 0;
+    v->gate = 0xFFFFFFFFu; v->midi = 0; v->chaos = 0; v->breath = K->sharp; v->tone_amp = 0;   /* breath: the kit's sharpness, for drums */
     switch (kind) {
     case DK_KICK: case DK_KETTLE: {
         uint32_t lo = kind == DK_KETTLE ? note_inc(38 + key_off) : HZ_INC(K->kl);
@@ -315,6 +319,7 @@ static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_ori
         v->inc_lo = lo; v->inc = kind == DK_KETTLE ? lo + (lo * 3u >> 2) : HZ_INC(K->kh);
         v->inc_k = (uint32_t)tau_k(kind == DK_KETTLE ? 20u : 30u);
         v->amp = (int32_t)(((kind == DK_KETTLE ? 10300u : 14000u) * lvl) >> 8);
+        if (K->sharp && kind == DK_KICK) v->tone_amp = v->amp / 2;
         v->dec_k = tau_k((kind == DK_KETTLE ? 900u : K->kd) * 10u / 69u);
         break; }
     case DK_SNARE:
@@ -578,6 +583,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
             } else {
                 v->amp = (v->amp * v->dec_k) >> 15;
                 if (v->kind == V_TOM) v->tone_amp = (v->tone_amp * 26000) >> 15;
+                if (v->kind == V_KICK) v->tone_amp = (v->tone_amp * 12000) >> 15;   /* the click: a few milliseconds */
                 if (v->kind == V_RIM) v->tone_amp = (v->tone_amp * 20000) >> 15;
                 if (v->kind == V_KICK || v->kind == V_KETTLE || v->kind == V_TOM)
                     v->inc = v->inc_lo + (uint32_t)(((uint64_t)(v->inc - v->inc_lo) * v->inc_k) >> 15);
@@ -604,6 +610,20 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                     v->vph += 545400u;
                     inc += (uint32_t)((((int32_t)(inc >> 16) * (SIN[v->vph >> 22] >> 4)) >> 11) * vd);
                 }
+            }
+            if (v->chaos == 5u) {                                       /* AH VOX: two saws a little apart, a breath, through the 'ah' formants */
+                int32_t x, hp;
+                v->ph += inc; v->pph1 += inc + (inc >> 7);              /* 13 cents apart: two voices */
+                x = (((int32_t)(v->ph >> 16) - 32768) + ((int32_t)(v->pph1 >> 16) - 32768)) >> 2;
+                x += noise() >> 4;
+                v->s1 += (3494 * v->s2) >> 15;                          /* F1 ~ 750 Hz */
+                hp = x - v->s1 - ((11000 * v->s2) >> 15);
+                v->s2 += (3494 * hp) >> 15;
+                v->s3 += (5591 * v->brown) >> 15;                       /* F2 ~ 1200 Hz */
+                hp = x - v->s3 - ((11000 * v->brown) >> 15);
+                v->brown += (5591 * hp) >> 15;
+                s = (((v->s2 + ((v->brown * 5) >> 3)) >> 1) * v->amp) >> 15;
+                break;
             }
             if (v->chaos == 3u) {                                       /* SUPERSAW: the note's saw and six around it */
                 static const int16_t DT[6] = {-2180, -1230, -420, 420, 1230, 2180};   /* Q16: -3.3 % .. +3.3 % */
@@ -657,7 +677,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
             break; }
         case V_KICK: case V_KETTLE:
             v->ph += v->inc;
-            s = (SIN[v->ph >> 22] * v->amp) >> 15;
+            s = (SIN[v->ph >> 22] * v->amp + noise() * v->tone_amp) >> 15;   /* + the click of a sharp kit */
             break;
         case V_TOM:                                                     /* a swept sine and a little stick noise */
             v->ph += v->inc;
@@ -686,7 +706,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                 int32_t tri = (int32_t)(v->tph >> 16) - 32768;
                 tri = (tri < 0 ? -tri : tri) * 2 - 32768;
                 v->s3 += ((v->s2 - v->s3) * 11000) >> 15;              /* the hiss off: ~3 kHz */
-                s = ((v->s3 * v->amp) >> 15) + ((tri * v->tone_amp) >> 15);
+                s = (((v->breath ? v->s2 : v->s3) * v->amp) >> 15) + ((tri * v->tone_amp) >> 15);   /* sharp: the crack left in */
             }
             break; }
         case V_HAT: case V_CRASH: case V_OHAT: {
@@ -694,7 +714,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
             v->s1 += ((x - v->s1) * (v->kind != V_CRASH ? 6000 : 9000)) >> 15;
             v->s2 += ((hp - v->s2) * (v->kind != V_CRASH ? 16000 : 11000)) >> 15;
             v->s3 += ((v->s2 - v->s3) * (v->kind != V_CRASH ? 16000 : 11000)) >> 15;   /* two poles */
-            s = (v->s3 * v->amp) >> 13;
+            s = ((v->breath && v->kind != V_CRASH ? v->s2 : v->s3) * v->amp) >> 13;   /* sharp: the hats one pole, brighter */
             break; }
         case V_WASH: {                                                  /* two-pole low-pass noise, swept */
             int32_t c = 1200 + (((int32_t)SIN[v->tph >> 22] + 32768) * 5000 >> 16), x = noise();

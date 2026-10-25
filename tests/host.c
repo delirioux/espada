@@ -98,6 +98,11 @@ static int host_longs_init;
 static void host_longs_erased(void) { if (!host_longs_init) { memset(host_longs, 0xFF, sizeof host_longs); host_longs_init = 1; } }
 static int longs_erase(uint32_t off) { host_longs_erased(); if ((off & 0xFFFu) || !FL_IN(off, 0x1000u, 0, LONGS_LEN)) return -8; memset(host_longs + off, 0xFF, 0x1000u); return 0; }
 static int longs_write(uint32_t off, const void *p, uint32_t n) { host_longs_erased(); if (!FL_IN(off, n, 0, LONGS_LEN)) return -8; memcpy(host_longs + off, p, n); return 0; }
+#define SLOTS_LEN 0x1000u
+static uint8_t host_slots[SLOTS_LEN];
+static int slots_erase(void) { memset(host_slots, 0xFF, sizeof host_slots); return 0; }
+static int slots_write(uint32_t off, const void *p, uint32_t n) { if (!FL_IN(off, n, 0, SLOTS_LEN)) return -8; memcpy(host_slots + off, p, n); return 0; }
+static int slots_read(uint32_t off, void *p, uint32_t n) { if (!FL_IN(off, n, 0, SLOTS_LEN)) return -8; memcpy(p, host_slots + off, n); return 0; }
 static int longs_read(uint32_t off, void *p, uint32_t n) { host_longs_erased(); if (!FL_IN(off, n, 0, LONGS_LEN)) return -8; memcpy(p, host_longs + off, n); return 0; }
 
 static void app_audio(int32_t *out, uint32_t n);

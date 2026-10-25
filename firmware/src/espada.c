@@ -49,6 +49,7 @@ typedef struct {                /* written by the main loop, read by the audio i
     volatile int32_t tremor;    /* 0 off, 1..3: the sound chopped on and off in 8ths, 16ths, 32nds (Ixy) */
     volatile int32_t swing;     /* 0..100: the off 16ths later, at 100 by a third of a step (EDx) */
     volatile int32_t pan;       /* -100..100: left .. right, equal power (8xx) */
+    volatile int32_t aglide;    /* 0..100: how much of the style's own glides the lane keeps (GLIDES; 100 = all) */
 } lanefx_t;
 static lanefx_t fx[NLANE];      /* what plays: your settings plus the phrase's character (the audio interrupt reads it) */
 static lanefx_t fxu[NLANE];     /* your settings (the encoders) */

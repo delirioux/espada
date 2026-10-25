@@ -130,7 +130,7 @@ static const prof_t PROF[] = {
      {S_MELODY, S_PCHORD, S_GALLOP, S_DSTEEL}, {10, 10, 0, 0, 0, 10}, 0, 140, 40, 0, 0, {AP_DOWN, 1, 1}},
     /* floating: sus chords resolving, two bars a chord, swelling strings, a breathy lead in long lines, no snare */
     {"DRIFT", AEO, {{0, Q_S4}, {0, Q_MIN}, {8, Q_MAJ}, {3, Q_MAJ}, {10, Q_S4}, {10, Q_MAJ}, {7, Q_S4}, {7, Q_MIN}},
-     {S_EPIC, S_LUSH, S_PEDAL, S_DDRIFT}, {8, 5, 3, 2, 0, 6}, 2, 96, 30, 70, 50, {AP_UPDOWN, 2, 2}},
+     {S_EPIC, S_LUSH, S_PEDAL, S_DDRIFT}, {8, 18, 3, 2, 0, 6}, 2, 96, 30, 70, 50, {AP_UPDOWN, 2, 2}},   /* the pad: AH VOX */
     /* funky: a major vamp with a diminished passing chord, a slapped syncopated bass, clav stabs, kick off the beat */
     {"FUNK", ION, {{0, Q_MAJ}, {0, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}, {6, Q_DIM}, {5, Q_MAJ}, {7, Q_S4}, {7, Q_MAJ}},
      {S_RIFF, S_CLAV, S_SLAP, S_DFUNK}, {11, 13, 1, 1, 0, 13}, 0, 112, 10, 0, 0, {AP_RANDOM, 1, 1}},
@@ -835,7 +835,8 @@ static void style_fx(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t p,
         }
     }
     if (l == L_PAD) {
-        int hit = (p == 0 && (b % 4 == 0 || A->drop))
+        int hit = A->drop                                           /* every style: the orchestra on the drop */
+               || (p == 0 && b % 4 == 0)
                || (p == 4 && (A->drop || (A->mode == A_OFF && b > 0 && b % 16 == 0)))
                || (p == 9 && (A->drop || (A->mode == A_OFF && b > 0 && b % 8 == 0)));
         if (hit) { ev_t *e = NOTE(G, 0, 2, ct(T, 0)); if (e) e->flags |= EV_ORCH; g_sort(G); }
@@ -1088,7 +1089,7 @@ static void play_shape(int32_t l, gen_t *G, rng_t *r, int32_t p)
         for (i = 0; i < G->n; i++) {
             ev_t *e = &G->ev[i];
             if (e->n != 1) { prev = -1; continue; }
-            if (prev >= 0 && e->note[0] != prev && (e->note[0] > prev ? e->note[0] - prev : prev - e->note[0]) <= 7 && chance(r, P->glide))
+            if (prev >= 0 && e->note[0] != prev && (e->note[0] > prev ? e->note[0] - prev : prev - e->note[0]) <= 7 && chance(r, P->glide * fxu[l].aglide / 100))   /* GLIDES scales them */
                 e->flags |= EV_GLIDE;
             prev = e->note[0];
         }
