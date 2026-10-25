@@ -119,7 +119,7 @@ typedef struct {
     uint32_t ss[6];                             /* SUPERSAW: the six detuned saws' phases */
     int32_t pamp, brown;                        /* the pad's level (Q15, slow), the brown noise */
     uint8_t wt;                                 /* what it costs (the voice budget) */
-    uint8_t key;                                /* the note it plays (0: an echo copy, a drum, a noise): the keys light it */
+    uint8_t key, arpk[3];                       /* the note it plays (0: an echo copy, a drum, a noise), an arpeggio's notes: the keys light them */
 } voice_t;
 #define NVOICE 33u
 static voice_t vc[NVOICE];
@@ -485,6 +485,7 @@ static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags,
             uint32_t a[3];
             for (i = 0; i < n && i < 3u; i++) a[i] = note_inc(note[i]);
             start_fm(lane, P, a[0], dur, l2, 0, a, n, original ? note[0] : 0);
+            for (i = 0; i < 3u; i++) last_voice->arpk[i] = (uint8_t)(original && i < n ? note[i] : 0);
             return;
         }
         for (i = 0; i < n && i < 3u; i++) {

@@ -205,11 +205,37 @@ static int32_t nav_steps(int32_t l) { return nav_bars(l) * 16; }
 /* the knobs show four lanes side by side, in the screen's order; the window follows the marked lane */
 static int32_t win;                                             /* the screen row of KNOB 1's lane: 0..NLANE-4 */
 static int32_t lane_row(int32_t l) { int32_t r = 0; while (r < (int32_t)NLANE - 1 && LROW[r] != l) r++; return r; }
+/* the keys follow the marked lane: their octave (OCT- / OCT+) moves to where this bar and the next play the most notes,
+ * when the lane is marked (force) and, as it plays, when most of its notes have left the keys' range */
+static void follow_oct(int32_t l, int force)
+{
+    int32_t in[5] = {0}, total = 0, o, best, b, cb = cur_bar();
+    if (HITS(l)) return;
+    for (b = cb; b <= cb + 1; b++) {
+        const bar_t *B = bar_get(b);
+        uint32_t i, j;
+        if (!B) continue;
+        for (i = 0; i < B->cnt[l]; i++)
+            for (j = 0; j < B->ev[l][i].n && j < 3u; j++) {
+                int32_t n = B->ev[l][i].note[j];
+                total++;
+                for (o = -2; o <= 2; o++) if (n >= 53 + 12 * o && n <= 79 + 12 * o) in[o + 2]++;
+            }
+    }
+    if (!total) return;
+    best = kb_oct;
+    for (o = -2; o <= 2; o++) {
+        int32_t d = o - kb_oct, db = best - kb_oct;
+        if (in[o + 2] > in[best + 2] || (in[o + 2] == in[best + 2] && (d < 0 ? -d : d) < (db < 0 ? -db : db))) best = o;
+    }
+    if (best != kb_oct && (force || in[kb_oct + 2] * 2 < total)) { kb_oct = best; area_dirty = 1; }
+}
 static void set_sel(int32_t l)
 {
     int32_t r;
     if (l == sel) return;
     sel = fmodp(l, NLANE);
+    follow_oct(sel, 1);
     r = lane_row(sel);
     if (r < win) win = r;
     if (r > win + 3) win = r - 3;
@@ -2028,7 +2054,7 @@ static uint32_t lane_keys(int32_t l)
         if (l == L_SFX) { int32_t w = (int32_t)v->kind - V_WASH; for (k = 0; k < 27; k++) if (white_index(k) == w) m |= 1u << k; continue; }
         if (!v->key || v->stage == 2u || v->gate < 1764u) continue;   /* sounding, not fading out; dark its last 40 ms, so a fast
                                                                      * run of notes (the arp) blinks note by note */
-        k = (int32_t)v->key - 53 - 12 * kb_oct;
+        k = (int32_t)(v->arp_n > 1u && v->arpk[v->arp_i % 3u] ? v->arpk[v->arp_i % 3u] : v->key) - 53 - 12 * kb_oct;   /* an arpeggio: the note it is on */
         while (k < 0) k += 12;
         while (k > 26) k -= 12;
         m |= 1u << k;
@@ -2119,8 +2145,10 @@ static void app_boot(void)
 static void app_pass(void)
 {
     uint8_t st, d1, d2;
+    static int32_t oct_bar = -1;
     platform_poll();
     input();
+    if (seq_playing && !edit_on && cur_bar() != oct_bar) { oct_bar = cur_bar(); follow_oct(sel, 0); }   /* the keys go where the lane plays */
     while (midi_get(&st, &d1, &d2)) {                           /* MIDI in: start / stop / continue */
         if (st == 0xFA) { if (!seq_playing) { form_reset(); start_stop(1); } }      /* MIDI start: everything at once */
         else if (st == 0xFB) { if (!seq_playing) start_stop(0); }

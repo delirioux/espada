@@ -109,7 +109,7 @@ Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on
 | REC | while playing, the marked lane alone at once. Tap = INTER (it plays alone for two bars, then the others come back one by one); hold = DROP (alone while held, everything back the moment you let go, with a crash and an impact). On EDIT: RECORD on or off (what you play goes into your part); SEL + REC: GRAB (what the lane plays now goes into this bar) |
 | ENV | fade the lane out over a bar; again: back in. SEL + ENV: LOCK (it keeps its style when you blend or launch). On EDIT: TIE |
 | LFO | a new idea for the lane, at once (MELODY moves on). On EDIT: GENERATE this bar: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
-| OCT- / OCT+ | the keys' octave; both together: back to 0. On EDIT: the octave you enter in |
+| OCT- / OCT+ | the keys' octave (it also follows the marked lane by itself); both together: back to 0. On EDIT: the octave you enter in |
 | SAVE | keep everything (settings and your parts); while playing it waits until you stop. SEL + SAVE: the audio interrupt's time in the header (also SETUP, AUDIO) |
 
 ## Demo
@@ -288,9 +288,11 @@ switch WASH, RISER, IMPACT, ZAP, CRACKLE, BITS, SURF and GALE at the cursor.
 - The keys play the marked lane, live, from F3 to G5 shifted by OCT- / OCT+: a note
   sounds as long as you hold it, with the lane's sound. On DRUMS the first nine white keys (F3 .. G4) play kick,
   snare, hat, kettle drum, crash, clap, open hat, tom and rim shot; on SFX the first eight its sounds. While it plays, the keys light up the notes the marked lane plays, as they sound (a note above or below the keys'
-  range lights in the octave that is there, so the arp, which plays above the keys, shows an octave or two down;
-  OCT- / OCT+ count; each note goes dark just before its end, so a fast run blinks note by note); on DRUMS and SFX
-  the white key of each hit. Stopped,
+  range lights in the octave that is there; each note goes dark just before its end, so a fast run blinks note by
+  note; a tracker arpeggio shows the note it is on); on DRUMS and SFX the white key of each hit. **The keys follow the
+  lane:** marking a lane moves the keys' octave (OCT- / OCT+) to where it plays most of its notes, and while it plays,
+  when most of a bar's notes have left the keys' range, the octave follows them. What you play is then in the lane's
+  own register too. Stopped,
   the keys of the tonic are lit. The keys you hold are always lit.
 - On PAD a key is a chord in key: the triad on that note in the song's scale (in C major: C, Dm, Em, F, G, Am, ...);
   SEL + a key the sus4. Your pad parts and recordings play the same chords.
