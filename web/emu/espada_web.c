@@ -86,7 +86,7 @@ static uint8_t nor[0x100000];
 static uint32_t web_flash_writes;
 #define WEB_SETTINGS 0xFC000u
 #define LONGS_AT 0x97000u                         /* the own parts: as on the FM-1 (the page keeps 0x97000..) */
-#define LONGS_LEN 0x19000u
+#define LONGS_LEN 0x25000u
 #define FL_IN(off, n, lo, hi) ((uint32_t)(off) >= (lo) && (uint32_t)(off) <= (hi) && (uint32_t)(n) <= (hi) - (uint32_t)(off))
 static int web_load(uint32_t at, uint32_t magic, void *p, uint32_t n)
 {

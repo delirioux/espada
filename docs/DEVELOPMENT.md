@@ -75,8 +75,8 @@ stand-in.
   and a close on the root. CHANGE sets how soon new material comes; MELODY picks the idea.
 - **50 % density is the style as written.** Lower thins it out, higher adds notes inside the chord and its
   scale. ENERGY moves every lane at once.
-- **Your own parts in their own flash.** Up to 512 bars a lane, 32 bytes a bar, held in RAM (the pool) and saved to
-  100 KiB at the start of Felucca's free store (0x97000), which Espada does not otherwise use. Every erase, write and
+- **Your own parts in their own flash.** Up to 512 bars a lane, 48 bytes a bar (with the effect column), held in RAM
+  (the pool; the undo copy in the main RAM) and saved to 148 KiB at the start of Felucca's free store (0x97000), which Espada does not otherwise use. Every erase, write and
   read is checked against that window, a compile-time check proves 6 x 512 bars fit it, the header goes last with a
   CRC (a cut save reads as none), and the linker fails the build if the pool overflows. MY STYLE is counting, not a
   network: per place in the phrase the 16ths and sounds used and the scale-step jumps, rebuilt when the part changes.

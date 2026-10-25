@@ -50,8 +50,11 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 
 | EDIT | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
-| the lane's steps | step in the bar (1..16) | the length a note goes in with | bar (1 .. your last + 1) | pattern (yours or the style's) |
-| EDIT 2 (PRESETS) | fill (the style LFO fills from) | copy (the lane SEQ copies from) | after your last bar: LOOP, PROFILE or MY STYLE | repeat: turn right, the bar before is copied here and the cursor moves on |
+| NOTES | step in the bar (1..16) | bar (1 .. your last + 1) | the length a note goes in with | undo: turn, one step back |
+| FX | step | bar | effect at the step: VOL, SLIDE, UP, DOWN, VIB, RETRIG, CUT, DELAY | its value, 0..15 |
+| PART | pattern (yours or the style's) | after your last bar: LOOP, PROFILE or MY STYLE | fill (the style LFO fills from) | copy (the lane SEQ copies from) |
+| BAR | repeat: the bar before copied here, on to the next | transpose: the bar by scale steps | shift: the bar round by 16ths | bars: right = an empty bar in here, left = this bar out |
+| RANGE | from bar | to bar | paste: those bars here | clear: three clicks right, those bars cleared |
 
 ## Setup
 
@@ -77,10 +80,10 @@ Every button does one thing, everywhere. ENV, LFO, REC, EDIT and the keys act on
 | Button | Does |
 | --- | --- |
 | HOME, FX, ARP, GLO | the groups PLAY, SOUND, TRACKER, SONG; pressed again: the next setting. From EDIT: back. Hold HOME: SETUP |
-| EDIT | the lane's own part, step by step, bar by bar (again: back). SEL + EDIT: clear this bar (the last bar goes) |
+| EDIT | the lane's own part, step by step, bar by bar (again: back); PRESETS through its five pages. SEL + EDIT: clear this bar (the last bar goes) |
 | PLAY | stopped: start from the top with an INTRO (SEL + PLAY: everything at once). Playing: the END (SEL + PLAY, or PLAY again during the END: stop now) |
 | SEQ | LAUNCH: every unlocked lane moves to the queued style at once, at the style's tempo. SEL + SEQ: launch and keep your tempo. On EDIT: COPY the whole part of the lane set on EDIT 2 into this one |
-| REC | while playing, the marked lane alone at once. Tap = INTER (it plays alone for two bars, then the others come back one by one); hold = DROP (alone while held, everything back the moment you let go, with a crash and an impact). On EDIT: GRAB (what the lane plays now goes into this bar); SEL + REC: clear the whole part |
+| REC | while playing, the marked lane alone at once. Tap = INTER (it plays alone for two bars, then the others come back one by one); hold = DROP (alone while held, everything back the moment you let go, with a crash and an impact). On EDIT: RECORD on or off (what you play goes into your part); SEL + REC: GRAB (what the lane plays now goes into this bar) |
 | ENV | fade the lane out over a bar; again: back in. SEL + ENV: LOCK (it keeps its style when you blend or launch). On EDIT: TIE |
 | LFO | a new idea for the lane, at once (MELODY moves on). On EDIT: GENERATE this bar: with FILL on OWN a variation of the one there (SEL + LFO: a fresh one), with FILL on a style a fresh one in that style |
 | OCT- / OCT+ | the keys' octave; both together: back to 0. On EDIT: the octave you enter in |
@@ -226,6 +229,8 @@ switch WASH, RISER, IMPACT, ZAP, CRACKLE, BITS, SURF and GALE at the cursor.
 - The keys play the marked lane, live, from F3 to G5 shifted by OCT- / OCT+: a note
   sounds as long as you hold it, with the lane's sound. On DRUMS the first nine white keys (F3 .. G4) play kick,
   snare, hat, kettle drum, crash, clap, open hat, tom and rim shot; on SFX the first eight its sounds. The keys of the tonic are lit, and the keys you hold.
+- On PAD a key is a chord in key: the triad on that note in the song's scale (in C major: C, Dm, Em, F, G, Am, ...);
+  SEL + a key the sus4. Your pad parts and recordings play the same chords.
 - They change no settings: the key of the music is SONG, KEY.
 - On EDIT the white keys are scale steps counted from the chord root: C4 is the root, D4 the next step, and
   so on (OCT- / OCT+ shift by a scale octave). A note goes in at the cursor with the set length, and the cursor moves
@@ -237,17 +242,33 @@ Your patterns follow the chords, as the generated parts do: they are written in 
 
 ## Your own parts
 
-Each lane can have a part of its own, as long as you write it: up to 512 bars. EDIT shows one bar at a time; BAR
-(KNOB 3) moves through your bars and one more, the new bar after the last (the grid says NEW BAR). Writing there makes
-the part a bar longer; you cannot go further, so a part never has holes at its end, and at 512 bars BAR says FULL and
-there is no new bar. SEL + EDIT clears the bar you are on (on the last bar it goes, and the part is a bar shorter),
-SEL + REC the whole part.
+Each lane can have a part of its own, as long as you write it: up to 512 bars. EDIT shows one bar at a time, with a
+band over it: the page (NOTES, FX, PART, BAR, RANGE; PRESETS steps through them) and a map of your bars, the one you
+are on white, the one playing marked cyan. BAR moves through your bars and one more, the new bar after the last (the
+grid says NEW BAR). Writing there makes the part a bar longer; you cannot go further, so a part never has holes at
+its end, and at 512 bars BAR says FULL and there is no new bar. SEL + EDIT clears the bar you are on (on the last bar
+it goes, and the part is a bar shorter); RANGE, CLEAR from bar 1 to the last clears the whole part.
 
-To build fast: REPEAT (EDIT 2, KNOB 4) copies the bar before into this one and moves on, a bar a click; LFO writes
-this bar from a style (FILL) or varies it; REC grabs what the lane plays; COPY takes a whole part from another lane.
+**Recording.** On EDIT, REC switches RECORD on (the band shows a red light). While Espada plays, the keys then play
+the lane as usual and what you play goes into your part at the bar playing, on the nearest 16th; a note you hold
+gets its length when you let go. Past your last bar the part grows by the bar right after it (so recording from the
+song's start writes bar after bar); further on it goes round your bars, so you can overdub a loop. What you record
+is heard from the next bar on. REC again stops it; UNDO takes a whole recording back.
 
-Your part plays from the song's first bar: bar 1 of yours with the song's bar 1, and so on. AFTER (EDIT 2, KNOB 3)
-says what comes after your last bar:
+**The effect column** (page FX), as a tracker row has it: each step can carry one effect with a value 0..15.
+**VOL** sets the note's volume (0 = a 16th, 15 = full), **SLIDE** glides into it from the note before, **UP** and
+**DOWN** make it rise or fall while it sounds, **VIB** gives it vibrato, **RETRIG** repeats it every value/6 of a
+step, **CUT** stops it after value/4 of a step, **DELAY** starts it value/16 of a step late. The grid shows the
+effect's letter under its step. The effects work on drums and sfx as well (volume, retrigger, delay).
+
+**The tools.** UNDO (NOTES) takes the last change back: a step, a fill, a paste, a recording. BAR: REPEAT copies the
+bar before into this one and moves on, a bar a click; TRANSPOSE moves the bar's notes by scale steps; SHIFT turns it
+round by 16ths; BARS puts an empty bar in here (right) or takes this one out (left). RANGE: FROM and TO pick bars,
+PASTE copies them here (over what is there, the part growing if it has to), CLEAR empties them. LFO writes this bar
+from a style (FILL) or varies it; SEL + REC grabs what the lane plays; COPY (SEQ) takes a whole part from another lane.
+
+Your part plays from the song's first bar: bar 1 of yours with the song's bar 1, and so on. AFTER (PART) says what
+comes after your last bar:
 
 - **LOOP**: your part again from its bar 1.
 - **PROFILE**: the lane's generated part.
@@ -258,8 +279,8 @@ says what comes after your last bar:
   most of your hits there and add the ones you often play. The more bars you write, the more it sounds like you.
 
 SAVE keeps all parts (in a part of the FM-1's flash Espada has to itself: every write is checked against it, and the
-whole 6 x 512 bars always fit). A save of long parts takes about a second; it waits until you stop, as always.
-Parts saved before long parts came in are not read: enter them again.
+whole 6 x 512 bars with their effects always fit). A save of long parts takes up to two seconds; it waits until you
+stop, as always. Parts saved before the effect column came in are not read: enter them again.
 
 ## MIDI
 

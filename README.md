@@ -35,7 +35,7 @@ the kind of setting, PRESETS steps through them.
 <td align="center"><img src="docs/screens/live.png" width="240" alt="SONG, LIVE"><br><b>LIVE</b>: the next of ten styles, blend, energy and space; SEQ launches it at once, with its tempo.</td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT, the drums"><br><b>EDIT</b>: the lane's own part, bar by bar, up to 512 bars, in scale steps from the chord root; the drums' nine hits by row. FILL a bar from any style, REPEAT the bar before, COPY another lane's part; after your last bar: LOOP, PROFILE or MY STYLE (new bars in your manner).</td>
+<td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT, the drums"><br><b>EDIT</b>: the lane's own part, bar by bar, up to 512 bars, in scale steps from the chord root; the drums' nine hits by row. RECORD live, an effect column per step, undo, bar and range tools, FILL a bar from any style, COPY another lane's part; after your last bar: LOOP, PROFILE or MY STYLE (new bars in your manner).</td>
 <td align="center"><img src="docs/screens/setup.png" width="240" alt="SETUP, LOOK"><br><b>SETUP</b> (hold HOME): the palette, the screen's level and the lights; the lanes' MIDI channels; back to defaults.</td>
 <td></td>
 </tr>
@@ -102,6 +102,9 @@ the kind of setting, PRESETS steps through them.
   counted from the chord root, so a melody follows the chords and stays in key. A part is as long as you write it, up
   to 512 bars a lane. FILL writes a bar in any of the ten styles, or a variation of yours, never the same one twice;
   REPEAT copies the bar before; COPY takes another lane's part (a lead line becomes a bass line in the same chords).
+  RECORD what you play, live, into the part; a tracker's effect column per step (volume, slide, porta up and down,
+  vibrato, retrigger, cut, delay); undo, transpose, shift, bars in and out, copy and paste a range of bars. On PAD a
+  key plays a chord in key.
   After your last bar the part loops, gives way to the generated one, or goes on in your style: MY STYLE learns the
   rhythms and jumps of your bars and writes new ones like them.
 - **Song.** Key, scale (major, minor, the church modes, harmonic and melodic minor, pentatonics, blues), a list of

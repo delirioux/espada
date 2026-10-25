@@ -99,6 +99,7 @@ typedef struct {
     int32_t amp, peak, sus, att, rel_k, dec_k;  /* Q15 levels, per-tick steps and factors (Q15) */
     int32_t idx, idx_end, idx_step;             /* FM index Q8 */
     uint32_t gate, age, ctr, arp_t;             /* samples until release, ticks alive */
+    int8_t fx_porta; uint8_t fx_vib;            /* the effect column's porta (-100..100) and vibrato (0..100) for this note */
     int32_t glide_k, vib;                       /* glide factor Q15 (0 = none), vibrato on */
     uint32_t vph, inc_lo, inc_k;                /* vibrato phase; drum sweep target and factor */
     uint32_t arp[3];
@@ -201,7 +202,7 @@ static volatile uint32_t isr_us_max, isr_us_last, isr_us_sum, isr_n;
 static uint32_t seq_step, seq_acc_q8, smp;      /* the step playing, samples into it (Q8), samples since boot */
 
 /* ---- retrigger repeats and echo copies: voice starts that wait for their sample time */
-typedef struct { uint32_t when, dur; uint8_t lane, n, flags, lvl, kind, orig; uint8_t note[3]; } pend_t;   /* orig: the note itself (swung), not a copy */
+typedef struct { uint32_t when, dur; uint8_t lane, n, flags, lvl, kind, orig; uint8_t note[3], fx; } pend_t;   /* orig: the note itself (swung or delayed), not a copy */
 #define NPEND 64u
 static pend_t pend[NPEND];
 static uint32_t npend;
@@ -252,6 +253,8 @@ static voice_t *alloc_voice(uint32_t lane)
     return &vc[pick];
 }
 
+/* the effect column's porta and vibrato for the notes fire() starts now (set around the call, 0 otherwise) */
+static int32_t note_porta, note_vib;
 /* start one FM voice: lvl Q8, dur in samples; from_inc: slide start (0 = none) */
 static voice_t *last_voice;                             /* the voice start_fm just started (the keys hold it) */
 static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur, uint32_t lvl, uint32_t from_inc,
@@ -286,6 +289,7 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
     v->midi = (uint8_t)midi; v->midi_ch = midi_chan[lane];
     v->chaos = P->chaos; v->pph1 = 0x40000000u; v->pph2 = 0; v->pamp = 0; v->brown = 0;
     v->breath = P->breath; v->s1 = 0;
+    v->fx_porta = (int8_t)note_porta; v->fx_vib = (uint8_t)note_vib;
     if (P->chaos == 3u) for (i = 0; i < 6u; i++) { (void)noise(); v->ss[i] = noise_s; }   /* free-running: each note starts elsewhere */
     if (midi) mo_push(0x90u | v->midi_ch, midi, 100);
 }
@@ -450,34 +454,49 @@ static void pend_add(uint32_t when, uint32_t lane, const ev_t *e, uint32_t dur, 
     if (npend >= NPEND) return;
     p = &pend[npend++];
     p->when = when; p->dur = dur; p->lane = (uint8_t)lane; p->n = e->n; p->flags = e->flags; p->lvl = (uint8_t)(lvl > 255u ? 255u : lvl);
-    p->kind = (uint8_t)kind; p->note[0] = e->note[0]; p->note[1] = e->note[1]; p->note[2] = e->note[2]; p->orig = 0;
+    p->kind = (uint8_t)kind; p->note[0] = e->note[0]; p->note[1] = e->note[1]; p->note[2] = e->note[2]; p->orig = 0; p->fx = e->fx;
 }
 
-/* an event at its step: the note now, its stutter repeats, its echo copies */
-static void trigger(uint32_t lane, const ev_t *e, uint32_t kind)
+static void note_fx(uint32_t f)                 /* the effect column's porta and vibrato, for the next fire() */
 {
+    uint32_t c = f >> 4, v = f & 15u;
+    note_porta = c == FX_UP ? (int32_t)v * 7 : c == FX_DOWN ? -(int32_t)v * 7 : 0;
+    note_vib = c == FX_VIB ? (int32_t)v * 7 : 0;
+}
+/* an event at its step: the note now, its stutter repeats, its echo copies; your effect column first */
+static void trigger(uint32_t lane, const ev_t *e0, uint32_t kind)
+{
+    ev_t ev = *e0, *e = &ev;
     uint32_t step = seq_step_len_q8 >> 8, total = lane == L_DRUMS ? step : e->len * step;
-    int32_t rt = fx[lane].retrig > 0 && (int32_t)(e->rv * 100u >> 8) < fx[lane].retrig;
-    uint32_t seg = rt ? step / (uint32_t)(fx[lane].rtg_rate < 1 ? 1 : fx[lane].rtg_rate) : total;
+    uint32_t fc = e->fx >> 4, fv = e->fx & 15u;
+    int32_t rt = (fx[lane].retrig > 0 && (int32_t)(e->rv * 100u >> 8) < fx[lane].retrig) || (fc == FX_RETRIG && fv);
+    uint32_t seg = fc == FX_RETRIG && fv ? step * fv / 6u : rt ? step / (uint32_t)(fx[lane].rtg_rate < 1 ? 1 : fx[lane].rtg_rate) : total;
+    if (fc == FX_SLIDE) e->flags |= EV_GLIDE;                      /* SLIDE: from the lane's last note */
+    if (seg < 64u) seg = 64u;
     uint32_t reps = rt ? total / (seg ? seg : 1u) : 1u, dur = rt ? seg * 7u / 10u : total * 95u / 100u, k, c;
     uint32_t late = (e->st & 1u) && fx[lane].swing > 0 ? step * (uint32_t)fx[lane].swing / 300u : 0u;   /* SWING: the off 16ths */
+    if (fc == FX_DELAY) late += step * fv / 16u;                    /* DELAY: later by 16ths of a step */
     if (reps > 16u) reps = 16u;
     if (!reps) reps = 1;
     if (fx[lane].gate > 0 && lane != L_DRUMS && lane != L_SFX) {                 /* GATE: cut short */
         dur = dur * (uint32_t)(100 - fx[lane].gate * 85 / 100) / 100u;
         if (dur < 441u) dur = 441u;
     }
+    if (fc == FX_CUT) { uint32_t cd = fv ? step * fv / 4u : step / 8u; if (cd < dur) dur = cd; }   /* CUT: after quarters of a step */
     uint32_t base = e->flags & EV_ACC2 ? 112u : e->flags & EV_ACC1 ? 176u : 256u;   /* the accent */
+    if (fc == FX_VOL) base = base * (fv + 1u) >> 4;                  /* VOL: 0..15 = 1/16 .. full */
     for (c = 0; c < 3u; c++) {                                       /* the note, then two echo copies */
         uint32_t lvl = c == 0 ? base : c == 1 ? (uint32_t)fx[lane].echo * 141u / 100u * base >> 8
                                               : (uint32_t)(fx[lane].echo * fx[lane].echo) * 77u / 10000u * base >> 8;
         uint32_t at = smp + late + c * 3u * step;
         if (c && fx[lane].echo <= 0) break;
         if (!lvl) continue;
+        note_fx(e->fx);
         for (k = 0; k < reps; k++) {
             if (c == 0 && k == 0 && !late) fire(lane, e->note, e->n, e->flags, dur, lvl, kind, 1);
             else { pend_add(at + k * seg, lane, e, dur, lvl, kind); if (c == 0 && k == 0 && npend) pend[npend - 1].orig = 1; }
         }
+        note_porta = note_vib = 0;
     }
 }
 
@@ -513,8 +532,8 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                     int32_t d = (int32_t)(v->target - v->inc);
                     v->inc += (uint32_t)(int32_t)(((int64_t)d * v->glide_k) >> 15);
                 }
-                if (fx[v->lane].porta) {                                    /* PORTA: up or down, up to an octave a second */
-                    int32_t pt = fx[v->lane].porta;
+                if (fx[v->lane].porta || v->fx_porta) {                     /* PORTA (and the effect column's): up or down, up to an octave a second */
+                    int32_t pt = fx[v->lane].porta + v->fx_porta;
                     v->inc += (uint32_t)(int32_t)(((int64_t)v->inc * pt * 21) >> 22);
                     v->target += (uint32_t)(int32_t)(((int64_t)v->target * pt * 21) >> 22);
                     if (v->inc < HZ_INC(20)) v->inc = v->target = HZ_INC(20);
@@ -576,7 +595,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
         case V_FM: {
             uint32_t inc = v->inc, off;
             {                                                           /* vibrato: the patch's after 0.35 s (0.7 %), VIBRATO's from the start, 5.6 Hz */
-                int32_t vd = (v->vib && v->ctr > 15435u ? 512 : 0) + fx[v->lane].vibr * 20;
+                int32_t vd = (v->vib && v->ctr > 15435u ? 512 : 0) + (fx[v->lane].vibr + v->fx_vib) * 20;
                 if (vd) {
                     v->vph += 545400u;
                     inc += (uint32_t)((((int32_t)(inc >> 16) * (SIN[v->vph >> 22] >> 4)) >> 11) * vd);
@@ -803,20 +822,22 @@ static void all_off(void)
 
 /* the keys, played live: the main loop queues key down / up, the interrupt starts and releases (only it touches
  * the voices). A melodic note sounds until its key comes up; drums and sfx are hits. */
-typedef struct { uint8_t lane, note, key, on, inst; } live_t;
+typedef struct { uint8_t lane, note, key, on, inst, n2, n3; } live_t;   /* n2, n3: a chord's other notes (0 = none) */
 static volatile live_t live_q[16];
 static volatile uint32_t live_w, live_r;
-static voice_t *live_v[27];
-static uint32_t live_age[27];
-static void live_push(uint32_t lane, uint32_t note, uint32_t key, uint32_t on, uint32_t inst)
+static voice_t *live_v[27][3];
+static uint32_t live_age[27][3];
+static void live_push3(uint32_t lane, uint32_t note, uint32_t n2, uint32_t n3, uint32_t key, uint32_t on, uint32_t inst)
 {
     live_t *e;
     if (live_w - live_r >= 16u) return;
     e = (live_t *)&live_q[live_w % 16u];
     e->lane = (uint8_t)lane; e->note = (uint8_t)note; e->key = (uint8_t)key; e->on = (uint8_t)on; e->inst = (uint8_t)inst;
+    e->n2 = (uint8_t)n2; e->n3 = (uint8_t)n3;
     RING_PUBLISH();
     live_w++;
 }
+static void live_push(uint32_t lane, uint32_t note, uint32_t key, uint32_t on, uint32_t inst) { live_push3(lane, note, 0, 0, key, on, inst); }
 static void live_run(void)
 {
     while (live_r != live_w) {
@@ -826,13 +847,23 @@ static void live_run(void)
             if (e->lane == L_DRUMS) start_drum(e->note, 230, e->inst, 0);
             else if (e->lane == L_SFX) start_sfx(e->note, (uint32_t)(62 + key_off), 44100, 230);
             else {
-                start_fm(e->lane, &PATCH[e->inst < NPATCH ? e->inst : 0], note_inc(e->note), 0xFFFFFFF0u, 230, 0, 0, 0, e->note);
-                live_v[k] = last_voice; live_age[k] = last_voice->age;
+                const uint8_t nn[3] = {e->note, e->n2, e->n3};
+                uint32_t j, lv = e->n2 ? 160u : 230u;              /* a chord: quieter per voice */
+                for (j = 0; j < 3u; j++) {
+                    live_v[k][j] = 0;
+                    if (!nn[j]) continue;
+                    start_fm(e->lane, &PATCH[e->inst < NPATCH ? e->inst : 0], note_inc(nn[j]), 0xFFFFFFF0u, lv, 0, 0, 0, nn[j]);
+                    live_v[k][j] = last_voice; live_age[k][j] = last_voice->age;
+                }
             }
             lane_hit_ms[e->lane] = fm1_ms;
-        } else if (live_v[k] && live_v[k]->age == live_age[k] && live_v[k]->kind == V_FM && live_v[k]->stage != 2u) {
-            live_v[k]->gate = 1;                                    /* released on the next control tick */
-            live_v[k] = 0;
+        } else {
+            uint32_t j;
+            for (j = 0; j < 3u; j++)
+                if (live_v[k][j] && live_v[k][j]->age == live_age[k][j] && live_v[k][j]->kind == V_FM && live_v[k][j]->stage != 2u) {
+                    live_v[k][j]->gate = 1;                         /* released on the next control tick */
+                    live_v[k][j] = 0;
+                }
         }
         live_r++;
     }
@@ -878,7 +909,9 @@ static void app_audio(int32_t *out, uint32_t n)
         }
         for (p = 0; p < npend;) {                                           /* fire what is due */
             if ((int32_t)(pend[p].when - smp) <= 0) {
+                note_fx(pend[p].fx);
                 fire(pend[p].lane, pend[p].note, pend[p].n, pend[p].flags, pend[p].dur, pend[p].lvl, pend[p].kind, pend[p].orig);
+                note_porta = note_vib = 0;
                 pend[p] = pend[--npend];
             } else p++;
         }

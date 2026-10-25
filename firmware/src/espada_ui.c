@@ -395,6 +395,7 @@ static void t_rep(int32_t d)
     int32_t b = cursor >> 4;
     if (d <= 0) return;
     if (b < 1) { toast("REPEAT: FROM BAR 2 ON"); return; }
+    undo_save(sel, -1);
     if (!pat_repeat(sel, b)) { toast("FULL"); return; }
     if (b + 1 < nav_bars(sel)) cursor = (b + 1) * 16 + (cursor & 15);
     area_dirty = 1;
@@ -424,10 +425,98 @@ static const srow_t ROW_SONG[] = {
     {"KEY", -1, {{"KEY", t_key, v_key, 0}, {"SCALE", t_scale, v_scale, 0}, {"CHORDS", t_prog, v_prog, 0}, {"BARS/CH", t_bpc, v_bpc, 0}}},
     {"ARC", -1, {{"ARC", t_arc, v_arc, 0}, {"BUILD", t_build, v_build, s_phr}, {"PEAK", t_peak, v_peak, s_phr}, {"AUTODROP", t_auto, v_auto, 0}}},
 };
-static const card_t ROW_EDIT[2][4] = {
-    {{"STEP", t_step, v_step, s_step}, {"LENGTH", t_len, v_len, 0}, {"BAR", t_bar, v_bar, s_bar}, {"PATTERN", t_use, v_use, 0}},
-    {{"FILL", t_fill, v_fill, s_fill}, {"COPY", t_csrc, v_csrc, s_csrc}, {"AFTER", t_after, v_after, s_after}, {"REPEAT", t_rep, v_rep, s_rep}}};
-static int32_t edit_row;
+/* EDIT's pages: NOTES, FX (the effect column), PART, BAR (its tools), RANGE (copy, paste, clear bars) */
+static void t_undo(int32_t d) { (void)d; if (pat_undo()) { toast("UNDONE"); cursor = clampi(cursor, 0, nav_steps(sel) - 1); } else toast("NOTHING TO UNDO"); area_dirty = 1; }
+static void v_undo(char *o) { s_cat(o, undo_l >= 0 ? "TURN" : "NONE"); }
+static void s_undo(char *o) { if (undo_l >= 0) s_cat(o, LNAME[undo_l]); }
+static const char *const FXN[NFX] = {"--", "VOL", "SLIDE", "UP", "DOWN", "VIB", "RETRIG", "CUT", "DELAY"};
+static void t_fxc(int32_t d)
+{
+    uint8_t *f = &ubar[sel][cursor >> 4].fx[cursor & 15];
+    int32_t c = fmodp((*f >> 4) + (d > 0 ? 1 : -1), NFX), v = *f & 15;
+    undo_save(sel, 1 << 20 | cursor);
+    if (c && !(*f >> 4)) v = c == FX_VOL ? 12 : c == FX_CUT ? 2 : c == FX_RETRIG ? 3 : c == FX_DELAY ? 4 : 8;   /* a sensible start */
+    *f = (uint8_t)(c << 4 | v);
+    if (c) pat_touched(sel, cursor >> 4); else { ln[sel].up.ver++; invalidate_now(); }
+}
+static void v_fxc(char *o) { s_cat(o, FXN[(ubar[sel][cursor >> 4].fx[cursor & 15] >> 4) % NFX]); }
+static void s_fxc(char *o) { o = s_cat(o, "STEP "); s_int(o, (cursor & 15) + 1); }
+static void t_fxv(int32_t d)
+{
+    uint8_t *f = &ubar[sel][cursor >> 4].fx[cursor & 15];
+    if (!(*f >> 4)) return;
+    undo_save(sel, 2 << 20 | cursor);
+    *f = (uint8_t)((*f & 0xF0u) | (uint32_t)clampi((*f & 15) + d, 0, 15));
+    ln[sel].up.ver++; invalidate_now();
+}
+static void v_fxv(char *o) { uint8_t f = ubar[sel][cursor >> 4].fx[cursor & 15]; if (!(f >> 4)) s_cat(o, "--"); else s_int(o, f & 15); }
+static void s_fxv(char *o)
+{
+    uint8_t f = ubar[sel][cursor >> 4].fx[cursor & 15];
+    uint32_t c = f >> 4, v = f & 15u;
+    if (c == FX_VOL) { o = s_int(o, (int32_t)((v + 1u) * 100u / 16u)); s_cat(o, "%"); }
+    else if (c == FX_UP || c == FX_DOWN || c == FX_VIB) s_cat(o, v < 6 ? "GENTLE" : v < 11 ? "MEDIUM" : "STRONG");
+    else if (c == FX_RETRIG) { o = s_cat(o, "EVERY "); o = s_int(o, (int32_t)v); s_cat(o, "/6"); }
+    else if (c == FX_CUT) { o = s_cat(o, "AFTER "); o = s_int(o, (int32_t)v); s_cat(o, "/4"); }
+    else if (c == FX_DELAY) { o = s_int(o, (int32_t)v); s_cat(o, "/16 LATE"); }
+}
+static void t_trans(int32_t d) { if (HITS(sel) || (cursor >> 4) >= ln[sel].up.bars) return; undo_save(sel, 3 << 20 | (cursor >> 4)); pat_transpose(sel, cursor >> 4, d > 0 ? 1 : -1); }
+static void v_trans(char *o) { s_cat(o, HITS(sel) ? "--" : "TURN"); }
+static void s_trans(char *o) { if (!HITS(sel)) s_cat(o, "SCALE STEPS"); }
+static void t_shift(int32_t d) { if ((cursor >> 4) >= ln[sel].up.bars) return; undo_save(sel, 4 << 20 | (cursor >> 4)); pat_shift(sel, cursor >> 4, d > 0 ? 1 : -1); }
+static void v_shift(char *o) { s_cat(o, "TURN"); }
+static void s_shift(char *o) { s_cat(o, "BY 16THS"); }
+static void t_insdel(int32_t d)
+{
+    int32_t b = cursor >> 4;
+    undo_save(sel, -1);
+    if (d > 0) { if (!pat_insert(sel, b)) toast("FULL"); else toast("A BAR IN"); }
+    else if (pat_delete(sel, b)) { toast("A BAR OUT"); cursor = clampi(cursor, 0, nav_steps(sel) - 1); }
+    area_dirty = 1;
+}
+static void v_insdel(char *o) { s_cat(o, "TURN"); }
+static void s_insdel(char *o) { s_cat(o, "R: IN L: OUT"); }
+static int32_t range_from, range_to, clear_turns;
+static void t_from(int32_t d) { range_from = clampi(range_from + d, 0, ln[sel].up.bars - 1); if (range_to < range_from) range_to = range_from; }
+static void v_from(char *o) { s_int(o, clampi(range_from, 0, ln[sel].up.bars - 1) + 1); }
+static void t_to(int32_t d) { range_to = clampi(range_to + d, 0, ln[sel].up.bars - 1); if (range_from > range_to) range_from = range_to; }
+static void v_to(char *o) { s_int(o, clampi(range_to, 0, ln[sel].up.bars - 1) + 1); }
+static void s_range(char *o) { o = s_cat(o, "OF "); s_int(o, ln[sel].up.bars); }
+static void t_paste(int32_t d)
+{
+    int32_t f = clampi(range_from, 0, ln[sel].up.bars - 1), t = clampi(range_to, f, ln[sel].up.bars - 1), n;
+    char m[32], *o;
+    if (d <= 0) return;
+    undo_save(sel, -1);
+    n = pat_paste(sel, f, t, cursor >> 4);
+    if (!n) { toast("NOT HERE"); return; }
+    o = s_int(m, n); o = s_cat(o, n == 1 ? " BAR AT " : " BARS AT "); s_int(o, (cursor >> 4) + 1); toast(m);
+    area_dirty = 1;
+}
+static void v_paste(char *o) { s_cat(o, "TURN"); }
+static void s_paste(char *o) { o = s_cat(o, "AT BAR "); s_int(o, (cursor >> 4) + 1); }
+static void t_clear(int32_t d)                                  /* three clicks to the right: the range cleared */
+{
+    int32_t f = clampi(range_from, 0, ln[sel].up.bars - 1), t = clampi(range_to, f, ln[sel].up.bars - 1);
+    clear_turns = d > 0 ? clear_turns + 1 : 0;
+    if (clear_turns < 3) return;
+    clear_turns = 0;
+    undo_save(sel, -1);
+    pat_clear_range(sel, f, t);
+    cursor = clampi(cursor, 0, nav_steps(sel) - 1);
+    toast(f == 0 && t >= ln[sel].up.bars - 1 ? "PART CLEARED" : "BARS CLEARED");
+    area_dirty = 1;
+}
+static void v_clear(char *o) { if (!clear_turns) s_cat(o, "TURN"); else { o = s_int(o, 3 - clear_turns); s_cat(o, " MORE"); } }
+static void s_clear(char *o) { s_cat(o, "3 RIGHT"); }
+static const card_t ROW_EDIT[5][4] = {
+    {{"STEP", t_step, v_step, s_step}, {"BAR", t_bar, v_bar, s_bar}, {"LENGTH", t_len, v_len, 0}, {"UNDO", t_undo, v_undo, s_undo}},
+    {{"STEP", t_step, v_step, s_step}, {"BAR", t_bar, v_bar, s_bar}, {"EFFECT", t_fxc, v_fxc, s_fxc}, {"VALUE", t_fxv, v_fxv, s_fxv}},
+    {{"PATTERN", t_use, v_use, 0}, {"AFTER", t_after, v_after, s_after}, {"FILL", t_fill, v_fill, s_fill}, {"COPY", t_csrc, v_csrc, s_csrc}},
+    {{"REPEAT", t_rep, v_rep, s_rep}, {"TRANSPOSE", t_trans, v_trans, s_trans}, {"SHIFT", t_shift, v_shift, s_shift}, {"BARS", t_insdel, v_insdel, s_insdel}},
+    {{"FROM", t_from, v_from, s_range}, {"TO", t_to, v_to, s_range}, {"PASTE", t_paste, v_paste, s_paste}, {"CLEAR", t_clear, v_clear, s_clear}}};
+static const char *const EDIT_PAGE[5] = {"NOTES", "FX", "PART", "BAR", "RANGE"};
+static int32_t edit_row, rec_on;                               /* the EDIT page; RECORD (REC on EDIT) */
 /* SETUP (hold HOME): the look, the MIDI channels, the defaults */
 static int32_t setup_on, setup_row, reset_turns;
 static void defaults(void);
@@ -650,7 +739,23 @@ static void draw_edit_area(void)
 {
     const upat_t *U = &ln[sel].up;
     const ubar_t *P = &ubar[sel][cursor >> 4];
-    int32_t n = 16, x0 = 16, cwq = (220 << 8) / n, top = pan_y + 1, h = pan_h - 2, hits = HITS(sel), cs = cursor & 15, pb;
+    int32_t n = 16, x0 = 16, cwq = (220 << 8) / n, top = pan_y + 14, h = pan_h - 26, hits = HITS(sel), cs = cursor & 15, pb;
+    {                                                               /* the band: the page, and a map of the part's bars */
+        int32_t i2, cb = cursor >> 4, first = cb - 22, mx = 96, pbar = cur_bar();
+        text7(2, pan_y + 3, EDIT_PAGE[edit_row % 5], LCOL[sel]);
+        for (i2 = 0; i2 < 5; i2++) fill(54 + i2 * 6, pan_y + 5, 4, 4, i2 == edit_row ? LCOL[sel] : RGBC(0x2d4040));
+        if (rec_on) { fill(86, pan_y + 2, 9, 9, (fm1_ms / 300u) % 2u ? RGBC(0xff3030) : RGBC(0x801818)); }
+        if (first < 0) first = 0;
+        for (i2 = 0; i2 < 46; i2++) {
+            int32_t b = first + i2, x = mx + i2 * 3;
+            uint16_t c;
+            if (b > U->bars || b >= MAXB) break;
+            c = b == U->bars ? RGBC(0x1b2928) : ubar_empty(sel, b) ? RGBC(0x2d4040) : cscale(LCOL[sel], 150);
+            if (b == cb) c = C_WHITE;
+            fill(x, pan_y + 3, 2, 7, c);
+            if (seq_playing && b == (pbar < U->bars ? pbar : U->after == AF_LOOP ? pbar % (U->bars ? U->bars : 1) : -1)) fill(x, pan_y + 11, 2, 2, C_CYAN);
+        }
+    }
     int32_t rows = sel == L_DRUMS ? NDK : sel == L_SFX ? NSX : 18, rh = h / rows, i, s;
     uint16_t col = LCOL[sel];
 #define CX(s) (x0 + (((s) * cwq) >> 8))
@@ -670,6 +775,13 @@ static void draw_edit_area(void)
             i = 14 - P->n.k[s] - 3;
             if (i >= 0 && i < rows) fill(CX(s) + 1, top + i * rh + 2, CX(s + (P->n.len[s] > n - s ? n - s : P->n.len[s])) - CX(s) - 2, rh - 4, col);
         }
+    }
+    for (s = 0; s < n; s++) {                                       /* the effect column, under the grid */
+        uint8_t f = P->fx[s];
+        char t[2] = {0, 0};
+        if (!(f >> 4)) continue;
+        t[0] = FXN[(f >> 4) % NFX][0];
+        text7(CX(s) + 2, top + h + 2, t, s == cs ? C_WHITE : cscale(col, 200));
     }
     if ((cursor >> 4) >= U->bars) { fill(46, top + h / 2 - 9, 160, 18, C_BG); textc(126, top + h / 2 - 5, "NEW BAR: WRITE TO ADD", C_MUTE, 1); }
     pb = cur_bar();                                                 /* the bar playing, if it is this one of yours */
@@ -934,6 +1046,7 @@ static void parts_load(void)
     }
 }
 typedef char parts_fit[64 + NLANE * MAXB * sizeof(ubar_t) <= LONGS_LEN ? 1 : -1];   /* the whole store always fits */
+typedef char ubar_size[sizeof(ubar_t) == 48u ? 1 : -1];          /* 48 bytes a bar, as the store's size assumes */
 static void do_save(void)
 {
     static save_t S;
@@ -1023,18 +1136,15 @@ static void clear_bar_ui(void)                                  /* EDIT held: th
     char t[24], *o;
     int32_t b = cursor >> 4, last = b == ln[sel].up.bars - 1 && b > 0;
     if (b >= ln[sel].up.bars) return;
+    undo_save(sel, -1);
     pat_clear_bar(sel, b);
     o = s_cat(t, "BAR "); o = s_int(o, b + 1); s_cat(o, last ? " REMOVED" : " CLEARED"); toast(t);
     cursor = clampi(cursor, 0, nav_steps(sel) - 1);
 }
-static void clear_part_ui(void)                                 /* REC held: the whole part */
-{
-    pat_clear_all(sel);
-    cursor = 0; toast("PART CLEARED");
-}
 static void edit_key(int32_t k, int32_t sel_held_now)
 {
     int32_t n = nav_steps(sel), wi = white_index(k), l = sel;
+    undo_save(l, 5 << 20 | cursor);
     if (HITS(sel)) {
         int32_t nk = sel == L_DRUMS ? NDK : NSX;
         if (wi >= 0 && wi < nk) {
@@ -1071,18 +1181,62 @@ static void edit_key(int32_t k, int32_t sel_held_now)
 
 /* ---- the keys play the lane (the white bar beside it), F3..G5 plus OCT- / OCT+; drums and sfx: their sounds on the
  * white keys. On EDIT they enter steps. */
-static void keys_play(uint32_t pressed, uint32_t released)
+/* RECORD (REC on EDIT, while playing): what you play goes into your part at the bar playing, on the nearest 16th; a
+ * held note gets its length when you let go. Past the part's end it grows by the bar right after it, further on it
+ * goes round the part's bars. Changes land from the next bar (this one has played them already) */
+static int32_t rec_at[27] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+static int32_t rec_q0[27];
+static int32_t rec_q(void) { return cur_step() + (vis_frac >= 32768u ? 1 : 0); }
+static void rec_press(int32_t l, int32_t key, int32_t note_or_kind)
 {
-    int32_t k, l = sel;
+    upat_t *U = &ln[l].up;
+    int32_t q = rec_q(), sb = q >> 4, st = q & 15, pb, at;
+    pb = sb < U->bars ? sb : sb == U->bars && sb < MAXB ? sb : sb % (U->bars ? U->bars : 1);
+    at = pb * 16 + st;
+    if (HITS(l)) UKIND(l, at) |= (uint16_t)(1u << note_or_kind);
+    else {
+        harm_t H; tools_t T;
+        harm_at(sb, &H); tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
+        UK(l, at) = (int8_t)note_to_k(&T, note_or_kind); ULEN(l, at) = 1;
+        rec_at[key] = at; rec_q0[key] = q;
+    }
+    if (pb >= U->bars) U->bars = (uint16_t)(pb + 1);
+    U->on = 1; U->ver++;
+    invalidate_from(cur_bar() + 1);
+}
+static void rec_release(int32_t l, int32_t key)
+{
+    int32_t at = rec_at[key], len;
+    if (at < 0 || HITS(l)) return;
+    len = clampi(rec_q() - rec_q0[key], 1, 16);
+    ULEN(l, at) = (uint8_t)len;
+    ln[l].up.ver++;
+    invalidate_from(cur_bar() + 1);
+    rec_at[key] = -1;
+}
+/* the keys play the marked lane; on PAD a key is a chord in key: the triad on that note (SEL: the sus4) */
+static void keys_play(uint32_t pressed, uint32_t released, int sel_held_now)
+{
+    int32_t k, l = sel, rec = edit_on && rec_on && seq_playing;
     for (k = 0; k < 27; k++) {
-        if (released >> k & 1u) { live_push((uint32_t)l, 0, (uint32_t)k, 0, 0); keys_down &= ~(1u << k); }
+        if (released >> k & 1u) { live_push((uint32_t)l, 0, (uint32_t)k, 0, 0); keys_down &= ~(1u << k); if (rec) rec_release(l, k); }
         if (!(pressed >> k & 1u)) continue;
         keys_down |= 1u << k;
         if (HITS(l)) {
             int32_t wi = white_index(k);
             if (wi < 0 || wi >= (l == L_DRUMS ? NDK : NSX)) continue;
             live_push((uint32_t)l, (uint32_t)wi, (uint32_t)k, 1, (uint32_t)inst_eff(l));
-        } else live_push((uint32_t)l, (uint32_t)clampi(53 + k + 12 * kb_oct, 0, 119), (uint32_t)k, 1, (uint32_t)inst_eff(l));
+            if (rec) rec_press(l, k, wi);
+        } else {
+            int32_t note = clampi(53 + k + 12 * kb_oct, 0, 119);
+            if (l == L_PAD) {
+                int32_t c3[3];
+                key_chord(cur_bar(), note, sel_held_now, c3);
+                live_push3((uint32_t)l, (uint32_t)clampi(c3[0], 1, 119), (uint32_t)clampi(c3[1], 1, 119), (uint32_t)clampi(c3[2], 1, 119),
+                           (uint32_t)k, 1, (uint32_t)inst_eff(l));
+            } else live_push((uint32_t)l, (uint32_t)note, (uint32_t)k, 1, (uint32_t)inst_eff(l));
+            if (rec) rec_press(l, k, note);
+        }
     }
 }
 static void input(void)
@@ -1099,7 +1253,7 @@ static void input(void)
         if (e == ENC_PRESETS) {                                         /* the setting in the group */
             if (setup_on) { setup_row = fmodp(setup_row + (d > 0 ? 1 : -1), NROWS_OF(ROW_SETUP)); reset_turns = 0; }
             else if (!edit_on) rowi[grp] = fmodp(rowi[grp] + (d > 0 ? 1 : -1), nrows(grp));
-            else edit_row = !edit_row;                                  /* EDIT: the steps, or FILL and COPY */
+            else { edit_row = fmodp(edit_row + (d > 0 ? 1 : -1), 5); clear_turns = 0; }   /* EDIT: its five pages */
             area_dirty = 1; continue;
         }
         {
@@ -1133,7 +1287,7 @@ static void input(void)
             char t[40], *o;
             if (copy_src == sel) toast("COPY: PICK ANOTHER LANE (EDIT 2)");
             else if (pat_empty(copy_src)) { o = s_cat(t, LNAME[copy_src]); s_cat(o, " HAS NO PART: FILL IT FIRST"); toast(t); }
-            else { pat_copy(copy_src, sel); o = s_cat(t, LNAME[copy_src]); o = s_cat(o, " COPIED TO "); s_cat(o, LNAME[sel]); toast(t); }
+            else { undo_save(sel, -1); pat_copy(copy_src, sel); o = s_cat(t, LNAME[copy_src]); o = s_cat(o, " COPIED TO "); s_cat(o, LNAME[sel]); toast(t); }
         } else {                                                    /* LAUNCH: the queued style, at once */
             char t[40], *o;
             launch_tempo = !held;
@@ -1144,8 +1298,8 @@ static void input(void)
     }
     if (b & (1u << BTN_REC)) {
         if (edit_on) {
-            if (held) clear_part_ui();
-            else { char t[24], *o; pat_grab(sel, cursor >> 4); o = s_cat(t, "GRABBED INTO BAR "); s_int(o, (cursor >> 4) + 1); toast(t); }
+            if (held) { char t[24], *o; undo_save(sel, -1); pat_grab(sel, cursor >> 4); o = s_cat(t, "GRABBED INTO BAR "); s_int(o, (cursor >> 4) + 1); toast(t); }
+            else { rec_on = !rec_on; if (rec_on) undo_save(sel, -1); toast(rec_on ? (seq_playing ? "RECORDING" : "RECORDING: PRESS PLAY") : "RECORDED"); area_dirty = 1; }
         }
         else if (!seq_playing) toast("DROP: PRESS PLAY FIRST");
         else { drop_press(sel); { char t[40], *o = s_cat(t, LNAME[sel]); s_cat(o, " ALONE"); toast(t); } }
@@ -1163,7 +1317,9 @@ static void input(void)
             ln[sel].mel = (uint8_t)fmodp(ln[sel].mel + 1 + (int32_t)(fm1_ms % 13u), 100); invalidate();
             o = s_cat(t, LNAME[sel]); o = s_cat(o, ": MELODY "); s_int(o, ln[sel].mel); toast(t);
         } else {
-            int32_t n = pat_generate(sel, held, cursor >> 4);
+            int32_t n;
+            undo_save(sel, -1);
+            n = pat_generate(sel, held, cursor >> 4);
             char t[40], *o;
             if (n) {
                 o = s_cat(t, LNAME[sel]);
@@ -1187,9 +1343,9 @@ static void input(void)
         else if (seq_playing) { save_pending = 1; toast("SAVES WHEN YOU STOP"); }
         else do_save();
     }
-    if (edit_on) {
+    if (edit_on && !(rec_on && seq_playing)) {
         for (k = 0; k < 27; k++) if (keys >> k & 1u) { edit_key(k, held); area_dirty = 1; }
-    } else keys_play(keys, keys_was & ~now);
+    } else { keys_play(keys, keys_was & ~now, held); if (edit_on) area_dirty = 1; }
     keys_was = now;
 }
 

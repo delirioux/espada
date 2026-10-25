@@ -169,10 +169,10 @@ static void chord_of(int32_t s, int32_t deg, int32_t *root, int8_t *tones)
 
 /* ---- lanes and mixing */
 #define EMPTY (-128)
-/* your own parts: per lane up to MAXB bars, as long as you have written them. A bar is 32 bytes: a scale step and a
- * length per 16th (lead, pad, bass), or a bit per drum or sfx sound (drums, sfx) */
+/* your own parts: per lane up to MAXB bars, as long as you have written them. A bar is 48 bytes: a scale step and a
+ * length per 16th (lead, pad, bass, arp), or a bit per drum or sfx sound (drums, sfx); and an effect per 16th */
 #define MAXB 512
-typedef union { struct { int8_t k[16]; uint8_t len[16]; } n; uint16_t kinds[16]; } ubar_t;
+typedef struct { union { struct { int8_t k[16]; uint8_t len[16]; } n; uint16_t kinds[16]; }; uint8_t fx[16]; } ubar_t;   /* + the effect column */
 static ubar_t ubar[NLANE][MAXB] __attribute__((section(".pool")));
 typedef struct { uint16_t bars, ver; uint8_t on, after; } upat_t;   /* bars: its length; ver: one more at every change */
 enum { AF_LOOP, AF_GEN, AF_STYLE, NAF };                          /* after your last bar: loop, the generated part, more like yours */
@@ -217,6 +217,20 @@ static void harm_at(int32_t b, harm_t *H)
         const int8_t *c = P->prog[prof_chord(P, b)];
         harm_make(H, P->scale, 7, c[0], QUAL[(int)c[1]], QUAL_N[(int)c[1]]);
     }
+}
+
+/* the chord in key on a note (the pad's keys): the note taken into the song's scale, then the scale's notes two and
+ * four above it (sus: three and four); out: three MIDI notes */
+static void key_chord(int32_t b, int32_t note, int sus, int32_t *o)
+{
+    const int8_t *sc; int32_t n, i, best = 0, pc, oct;
+    if (prog_sel > 0 && scale_sel > 0) { sc = SCALES[scale_sel].pcs; n = SCALES[scale_sel].n; }
+    else { sc = PROF[eff_prof(L_BASS, b)].scale; n = 7; }
+    pc = fmodp(note - 2 - key_off, 12); oct = note - pc;           /* key_off counts from D: the tonic is 2 + key_off; oct: the note's octave on it */
+    for (i = 0; i < n; i++) if (sc[i] <= pc) best = i;              /* the scale note at or under it */
+    o[0] = oct + sc[best];
+    o[1] = oct + sc[(best + (sus ? 3 : 2)) % n] + ((best + (sus ? 3 : 2)) >= n ? 12 : 0);
+    o[2] = oct + sc[(best + 4) % n] + (best + 4 >= n ? 12 : 0);
 }
 
 /* ---- the arc: energy (Q8, 256 = full) over bars */
@@ -339,7 +353,7 @@ static ev_t *g_add(gen_t *G, int32_t st, int32_t len, int32_t n, int32_t a, int3
     ev_t *e;
     if (G->n >= MAXEV || st < 0 || st > 15) return 0;
     e = &G->ev[G->n++];
-    e->st = (uint8_t)st; e->len = (uint8_t)(len < 1 ? 1 : len > 16 ? 16 : len); e->n = (uint8_t)n; e->flags = (uint8_t)flags; e->rv = 0;
+    e->st = (uint8_t)st; e->len = (uint8_t)(len < 1 ? 1 : len > 16 ? 16 : len); e->n = (uint8_t)n; e->flags = (uint8_t)flags; e->rv = 0; e->fx = 0;
     e->note[0] = (uint8_t)(a < 0 ? 0 : a > 127 ? 127 : a); e->note[1] = (uint8_t)(b < 0 ? 0 : b > 127 ? 127 : b); e->note[2] = (uint8_t)(c < 0 ? 0 : c > 127 ? 127 : c);
     return e;
 }
@@ -858,16 +872,17 @@ static int user_bar(int32_t l, gen_t *G, const tools_t *T, int32_t b)
     else if (U->after == AF_LOOP) P = &ubar[l][b % n];
     else { style_bar(l, b, &tmp); P = &tmp; }
     for (s = 0; s < 16; s++) {
-        if (l == L_DRUMS) { for (k = 0; k < NDK; k++) if (P->kinds[s] >> k & 1u) DRUM(G, s, k); continue; }
-        if (l == L_SFX) {
+        uint32_t n0 = G->n, i;
+        if (l == L_DRUMS) { for (k = 0; k < NDK; k++) if (P->kinds[s] >> k & 1u) DRUM(G, s, k); }
+        else if (l == L_SFX) {
             for (k = 0; k < NSX; k++) if (P->kinds[s] >> k & 1u)
                 SFX(G, s, SX_LONG(k) ? 16 - s : 1, k, ct(T, 0));
-            continue;
+        } else if (P->n.k[s] != EMPTY) {
+            k = P->n.k[s];
+            if (l == L_PAD) { int32_t c3[3]; key_chord(b, stp(T, k), 0, c3); g_add(G, s, P->n.len[s] > 16 - s ? 16 - s : P->n.len[s], 3, c3[0], c3[1], c3[2], 0); }   /* the chord in key on it */
+            else NOTE(G, s, P->n.len[s] > 16 - s ? 16 - s : P->n.len[s], stp(T, k));
         }
-        if (P->n.k[s] == EMPTY) continue;
-        k = P->n.k[s];
-        if (l == L_PAD) g_add(G, s, P->n.len[s] > 16 - s ? 16 - s : P->n.len[s], 3, stp(T, k), stp(T, k + 2), stp(T, k + 4), 0);
-        else NOTE(G, s, P->n.len[s] > 16 - s ? 16 - s : P->n.len[s], stp(T, k));
+        for (i = n0; i < G->n; i++) G->ev[i].fx = P->fx[s];          /* the step's effect goes with what it plays */
     }
     return 1;
 }
@@ -1105,7 +1120,7 @@ static int bars_update(void)                    /* one bar per call at most: 1 =
 static void ubar_clear(int32_t l, int32_t b)
 {
     int32_t s;
-    for (s = 0; s < 16; s++) { if (HITS(l)) ubar[l][b].kinds[s] = 0; else { ubar[l][b].n.k[s] = EMPTY; ubar[l][b].n.len[s] = 1; } }
+    for (s = 0; s < 16; s++) { if (HITS(l)) ubar[l][b].kinds[s] = 0; else { ubar[l][b].n.k[s] = EMPTY; ubar[l][b].n.len[s] = 1; } ubar[l][b].fx[s] = 0; }
 }
 static int ubar_empty(int32_t l, int32_t b)
 {
@@ -1378,4 +1393,89 @@ static void pat_clear_all(int32_t l)
     for (b = 0; b < MAXB; b++) ubar_clear(l, b);
     ln[l].up.bars = 1; ln[l].up.ver++;
     invalidate_now();
+}
+/* UNDO: one step back. Before every change the lane's part (its used bars) is kept; a run of the same change at the
+ * same place (turning a knob on one step) keeps only its start */
+static ubar_t undo_b[MAXB];                                     /* in RAM, not the pool: the pool holds the parts */
+static upat_t undo_up;
+static int32_t undo_l = -1, undo_key = -1;
+static uint32_t undo_ms;
+static void undo_save(int32_t l, int32_t key)
+{
+    int32_t b;
+    if (key >= 0 && key == undo_key && undo_l == l && fm1_ms - undo_ms < 3000u) { undo_ms = fm1_ms; return; }
+    undo_l = l; undo_key = key; undo_ms = fm1_ms; undo_up = ln[l].up;
+    for (b = 0; b < ln[l].up.bars; b++) undo_b[b] = ubar[l][b];
+}
+static int pat_undo(void)
+{
+    int32_t l = undo_l, b;
+    if (l < 0) return 0;
+    for (b = 0; b < MAXB; b++) { if (b < undo_up.bars) ubar[l][b] = undo_b[b]; else if (b < ln[l].up.bars + 1) ubar_clear(l, b); }
+    ln[l].up = undo_up; ln[l].up.ver++;
+    undo_l = -1; undo_key = -1;
+    invalidate_now();
+    return 1;
+}
+/* the BAR tools: transpose by scale steps, shift by 16ths (round the bar), a bar in or out */
+static void pat_transpose(int32_t l, int32_t b, int32_t d)
+{
+    int32_t s;
+    if (HITS(l)) return;
+    for (s = 0; s < 16; s++) if (ubar[l][b].n.k[s] != EMPTY) { int32_t k = ubar[l][b].n.k[s] + d; ubar[l][b].n.k[s] = (int8_t)(k < -21 ? -21 : k > 28 ? 28 : k); }
+    ln[l].up.ver++; invalidate_now();
+}
+static void pat_shift(int32_t l, int32_t b, int32_t d)
+{
+    ubar_t t = ubar[l][b];
+    int32_t s;
+    for (s = 0; s < 16; s++) {
+        int32_t f = fmodp(s - d, 16);
+        if (HITS(l)) ubar[l][b].kinds[s] = t.kinds[f]; else { ubar[l][b].n.k[s] = t.n.k[f]; ubar[l][b].n.len[s] = t.n.len[f]; }
+        ubar[l][b].fx[s] = t.fx[f];
+    }
+    ln[l].up.ver++; invalidate_now();
+}
+static int pat_insert(int32_t l, int32_t b)                     /* an empty bar at b, the rest one later */
+{
+    upat_t *U = &ln[l].up;
+    int32_t i;
+    if (U->bars >= MAXB || b > U->bars) return 0;
+    for (i = U->bars; i > b; i--) ubar[l][i] = ubar[l][i - 1];
+    ubar_clear(l, b);
+    U->bars++; U->on = 1; U->ver++; invalidate_now();
+    return 1;
+}
+static int pat_delete(int32_t l, int32_t b)                     /* bar b out, the rest one earlier */
+{
+    upat_t *U = &ln[l].up;
+    int32_t i;
+    if (b >= U->bars) return 0;
+    if (U->bars == 1) { ubar_clear(l, 0); U->ver++; invalidate_now(); return 1; }
+    for (i = b; i < U->bars - 1; i++) ubar[l][i] = ubar[l][i + 1];
+    ubar_clear(l, U->bars - 1);
+    U->bars--; U->ver++; invalidate_now();
+    return 1;
+}
+/* RANGE: bars from..to (as written, 0-based) pasted at bar at (over what is there; past the end the part grows) */
+static int32_t pat_paste(int32_t l, int32_t from, int32_t to, int32_t at)
+{
+    upat_t *U = &ln[l].up;
+    int32_t n = to - from + 1, i;
+    if (from < 0 || to < from || to >= U->bars || at > U->bars) return 0;
+    if (at + n > MAXB) n = MAXB - at;
+    if (n <= 0) return 0;
+    if (at > from) { for (i = n - 1; i >= 0; i--) ubar[l][at + i] = ubar[l][from + i]; }   /* overlapping: copy from the far end */
+    else for (i = 0; i < n; i++) ubar[l][at + i] = ubar[l][from + i];
+    if (at + n > U->bars) U->bars = (uint16_t)(at + n);
+    U->on = 1; U->ver++; invalidate_now();
+    return n;
+}
+static void pat_clear_range(int32_t l, int32_t from, int32_t to)
+{
+    upat_t *U = &ln[l].up;
+    int32_t i;
+    for (i = from; i <= to && i < U->bars; i++) ubar_clear(l, i);
+    if (to >= U->bars - 1) U->bars = (uint16_t)(from > 0 ? from : 1);   /* cleared to the end: the part ends before it */
+    U->ver++; invalidate_now();
 }

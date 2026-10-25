@@ -57,6 +57,7 @@ static lanefx_t fxu[NLANE];     /* your settings (the encoders) */
 typedef struct {
     uint8_t st, len, n, flags;  /* step 0..15, length in steps, notes in it, bit 0 = arpeggio */
     uint8_t rv;                 /* fixed random value 0..255 (decides which notes stutter) */
+    uint8_t fx;                 /* your effect column: code (FX_x) in the high 4 bits, value 0..15 in the low */
     uint8_t note[3];            /* MIDI notes; drums: note[0] = drum kind; sfx: note[0] = kind, note[1] = pitch */
 } ev_t;
 #define EV_ARP 1u
@@ -65,6 +66,8 @@ typedef struct {
 #define EV_GLIDE 8u             /* the note glides in from the lane's last one (a tracker's tone portamento) */
 #define EV_SWELL 16u            /* the note swells in over most of its length (volume slide up) */
 #define EV_FADE 32u             /* the note fades out over its length (volume slide down) */
+/* the effect column of your own parts, as a tracker row has it: a code and a value 0..15 */
+enum { FX_NONE, FX_VOL, FX_SLIDE, FX_UP, FX_DOWN, FX_VIB, FX_RETRIG, FX_CUT, FX_DELAY, NFX };
 #define MAXEV 80u
 typedef struct {
     int32_t num;                /* the bar this buffer holds (-1 = none) */

@@ -91,7 +91,7 @@ static int midi_get(uint8_t *st, uint8_t *d1, uint8_t *d2)
 }
 static uint32_t host_midi_out;
 static void midi_send(uint32_t st, uint32_t d1, uint32_t d2) { (void)st; (void)d1; (void)d2; host_midi_out++; }
-#define LONGS_LEN 0x19000u                         /* the own parts' store, in memory (it starts erased) */
+#define LONGS_LEN 0x25000u                         /* the own parts' store, in memory (it starts erased) */
 #define FL_IN(off, n, lo, hi) ((uint32_t)(off) >= (lo) && (uint32_t)(off) <= (hi) && (uint32_t)(n) <= (hi) - (uint32_t)(off))
 static uint8_t host_longs[LONGS_LEN];
 static int host_longs_init;
