@@ -3,9 +3,10 @@
 # JieLi AC79 SDK (Apache-2.0) come from JieLi's own servers. Every push builds the package (the run's artifact
 # "makohai-firmware") and runs the host mode (artifact "makohai-host": screens as PNG, the sound as WAV).
 # A tag vX.Y builds the release package (version X.Y, identity FM-1_47625642) and attaches it to a GitHub release.
-# A push to main also publishes the site on GitHub Pages: the web installer with that package
-# (web/makohai_make_site.py) and Makohai in the browser (web/emu). The site needs Settings > Pages > Source:
-# GitHub Actions.
+# A push to main, and a tag vX.Y, publish the site on GitHub Pages: the web installer with that package
+# (web/makohai_make_site.py) and Makohai in the browser (web/emu); a tag's run publishes the release's own package,
+# so the page shows its version. The site needs Settings > Pages > Source: GitHub Actions, and for the tags,
+# Settings > Environments > github-pages > Deployment branches and tags: a rule for tags v*.
 name: Firmware
 
 on:
@@ -92,28 +93,33 @@ jobs:
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/makohai-*.fwsc --title "Makohai ${GITHUB_REF_NAME#v}" --notes-file docs/RELEASE.md
+        run: |                             # a re-run replaces the package instead of failing on the release that is there
+          gh release create "$GITHUB_REF_NAME" dist/makohai-*.fwsc --title "Makohai ${GITHUB_REF_NAME#v}" --notes-file docs/RELEASE.md ||
+            gh release upload "$GITHUB_REF_NAME" dist/makohai-*.fwsc --clobber
 
       - name: Makohai in the browser (WebAssembly, on Felucca's page)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         continue-on-error: true            # (the site goes out without it)
         run: |
           command -v wasm-ld >/dev/null || sudo apt-get install -y -q lld
           sh web/emu/makohai_build.sh "$(git describe --tags --always)"
           node web/emu/makohai_emu_test.mjs build/makohai_emu/makohai.wasm
 
-      - name: Site (the web installer with this package)
-        if: github.ref == 'refs/heads/main'
-        run: python3 web/makohai_make_site.py build/makohai.fwsc "$(git describe --tags --always)" _site
+      - name: Site (the web installer with this package; a release's own, so the page shows its version)
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        run: python3 web/makohai_make_site.py "$(ls build/makohai*.fwsc | head -1)" "$(git describe --tags --always)" _site
 
       - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
           path: _site
 
-  pages:
-    if: github.ref == 'refs/heads/main'
+  pages:                                    # a push to main and a release's tag both publish; one after the other, the last wins
+    if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
     needs: build
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     permissions:
       pages: write
