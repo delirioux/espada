@@ -1,3 +1,7 @@
+Since 1.1:
+
+- Two new pictures: MORPH (a wireframe that turns, wanders and melts from shape to shape) and BOBS (shadebobs).
+
 Makohai 1.1: stereo that moves, pictures in demo style, keys that show what plays, and no more cracks.
 
 Sound

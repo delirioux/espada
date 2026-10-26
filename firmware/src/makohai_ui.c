@@ -589,6 +589,9 @@ static int32_t star_x[48], star_y[48], star_z[48], vis_hit;
 static uint16_t vpal[64], wpal[64], fpal[64];       /* three ramps, already painted (the palette, the screen level) */
 static uint8_t tq_ang[TQ][TQ] __attribute__((section(".pool"))), tq_dep[TQ][TQ] __attribute__((section(".pool")));
 static uint8_t flame[FIRE_H][FIRE_W] __attribute__((section(".pool")));
+#define BOB_N 80                                    /* SHADEBOBS: the field they paint, BOB_N x BOB_N */
+static uint8_t bobf[BOB_N][BOB_N] __attribute__((section(".pool")));
+static uint16_t hpal[64];                           /* a ramp all round the colours, for the bobs */
 static int8_t dot_sph[96][3], dot_tor[96][3];
 static int32_t vis_ready, logo_dark;
 static int32_t vx0, vy0, vw, vh, vps = 1;           /* the view */
@@ -653,6 +656,7 @@ static void vis_prep(void)
     for (k = 0; k < 64; k++) {
         vpal[k] = vramp(k, 0x020818u, 0x1aa0c8u, 0xf0fbffu); wpal[k] = vramp(k, 0x14062au, 0xc03a8cu, 0xffd27au);
         fpal[k] = k < 32 ? vramp(k, 0x000000u, 0x200000u, 0xd02800u) : vramp(k, 0x000000u, 0xd02800u, 0xfff0a0u);
+        hpal[k] = vramp(k < 32 ? k * 2 : (63 - k) * 2, 0x1a0a40u, 0xff3d8bu, 0xffe08au);   /* there and back: the wrap is seamless */
     }
     for (i = 0; i < 256u; i++) { sl[i] = scope_l[(w + i) & 255u]; sr[i] = scope_r[(w + i) & 255u]; }   /* oldest first */
     for (i = 1; i < 144u; i++) if (sl[i - 1] + sr[i - 1] < 0 && sl[i] + sr[i] >= 0) { trig = (int32_t)i; break; }   /* a rising zero: it stands still */
@@ -698,6 +702,14 @@ static void vis_prep(void)
             s = (s >> 2) - 2;
             flame[y][x] = (uint8_t)(s < 0 ? 0 : s);
         }
+    if (vis_t % 300u == 0u) memset(bobf, 0, sizeof bobf);                     /* every ten seconds a clean sheet */
+    for (k = 0; k < 5; k++) {                                                 /* the shadebobs: each adds to what is under it */
+        int32_t cx = BOB_N / 2 + vsin(vis_t * (uint32_t)(3 + k) + (uint32_t)k * 170u) * (BOB_N / 2 - 8) / 32768;
+        int32_t cy = BOB_N / 2 + vcos(vis_t * (uint32_t)(5 + 2 * k) + (uint32_t)k * 300u) * (BOB_N / 2 - 8) / 32768, dx, dy;
+        for (dy = -6; dy <= 6; dy++)
+            for (dx = -6; dx <= 6; dx++)
+                if (dx * dx + dy * dy <= 36) { uint8_t *b = &bobf[cy + dy][cx + dx]; *b = (uint8_t)(*b + (vis_hit ? 6 : 3)); }   /* it wraps round: the bands */
+    }
 }
 
 /* where a picture may draw: its view, the screen, the strip, and the cut's side */
@@ -914,11 +926,70 @@ static uint16_t px_logo(int32_t u, int32_t v, int32_t W, int32_t H)           /*
     return SW(paint(LOGO_PAL[i]));
 }
 static void pic_logo(void) { render_px(px_logo); }
+static uint16_t px_bobs(int32_t u, int32_t v, int32_t W, int32_t H) { return hpal[bobf[v * BOB_N / H][u * BOB_N / W] >> 2]; }
+static void pic_bobs(void) { render_px(px_bobs); }
+static void vlin(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c, int32_t thick)   /* a line, through vpix */
+{
+    int32_t dx = x1 > x0 ? x1 - x0 : x0 - x1, dy = y1 > y0 ? y0 - y1 : y1 - y0, sx2 = x0 < x1 ? 1 : -1, sy2 = y0 < y1 ? 1 : -1, e = dx + dy, n = 0;
+    for (;;) {
+        vpix(x0, y0, c); if (thick) { vpix(x0 + 1, y0, c); vpix(x0, y0 + 1, c); }
+        if ((x0 == x1 && y0 == y1) || ++n > 600) break;
+        { int32_t e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx2; } if (e2 <= dx) { e += dx; y0 += sy2; } }
+    }
+}
+/* MORPH: a wireframe that turns and wanders over the screen, changing shape every two seconds: a cube with its faces'
+ * diagonals, a star, an octahedron, a twisted cube, a ball, a pyramid. All shapes share 14 points (8 corners, 6 face
+ * middles) and 36 edges, so each melts into the next */
+static void pic_morph(void)
+{
+    static const int8_t C[8][3] = {{-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1}, {-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1}};
+    static const int8_t M[6][3] = {{0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}};
+    static const uint8_t E12[12][2] = {{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
+    static const uint8_t F[6][4] = {{0, 1, 2, 3}, {5, 4, 7, 6}, {4, 0, 3, 7}, {1, 5, 6, 2}, {4, 5, 1, 0}, {3, 2, 6, 7}};
+    int32_t P[14][3], S[2][14][3], sh, i, k, f, e, t = (int32_t)(vis_t % 60u), w, sz = vsize() * 256 / 54;
+    int32_t cx = vx0 + vw / 2 + vsin(vis_t * 3u) * (vw / 5) / 32768, cy = vy0 + vh / 2 + vsin(vis_t * 4u + 200u) * (vh / 5) / 32768;
+    uint32_t ph = vis_t / 60u;
+    for (sh = 0; sh < 2; sh++) {                                              /* this shape and the next, Q8, radius 256 */
+        uint32_t which = (ph + (uint32_t)sh) % 6u;
+        for (i = 0; i < 14; i++) {
+            int32_t x = i < 8 ? C[i][0] * 256 : M[i - 8][0] * 256, y = i < 8 ? C[i][1] * 256 : M[i - 8][1] * 256, z = i < 8 ? C[i][2] * 256 : M[i - 8][2] * 256;
+            switch (which) {
+            case 1: if (i >= 8) { x *= 2; y *= 2; z *= 2; } break;                                   /* a star */
+            case 2: if (i < 8) { x = x * 3 / 10; y = y * 3 / 10; z = z * 3 / 10; } else { x = x * 3 / 2; y = y * 3 / 2; z = z * 3 / 2; } break;   /* an octahedron */
+            case 3: if (y > 0) { int32_t a = x, b = z; x = (a * 181 - b * 181) >> 8; z = (a * 181 + b * 181) >> 8; } break;   /* twisted */
+            case 4: { int32_t d = isqrt(x * x + y * y + z * z); if (d) { x = x * 300 / d; y = y * 300 / d; z = z * 300 / d; } } break;   /* a ball */
+            case 5: if (y < 0) { x = x / 8; z = z / 8; y = -300; } break;                         /* a pyramid */
+            default: break;                                                                       /* the cube */
+            }
+            S[sh][i][0] = x; S[sh][i][1] = y; S[sh][i][2] = z;
+        }
+    }
+    w = t < 40 ? 0 : (t - 40) * 256 / 20;                                     /* hold, then melt into the next */
+    w = w * w * (768 - 2 * w) >> 16;                                          /* eased */
+    for (i = 0; i < 14; i++) {
+        int32_t p[3], d;
+        for (k = 0; k < 3; k++) p[k] = (S[0][i][k] * (256 - w) + S[1][i][k] * w) >> 8;
+        for (k = 0; k < 3; k++) p[k] = p[k] * sz / 256 * (vis_hit ? 15 : 13) / 256;   /* a tile: radius 13 px */
+        rot3(p, vis_t * 6u, vis_t * 4u + 100u);
+        { int32_t t2 = (p[0] * vcos(vis_t * 2u) - p[1] * vsin(vis_t * 2u)) >> 15; p[1] = (p[0] * vsin(vis_t * 2u) + p[1] * vcos(vis_t * 2u)) >> 15; p[0] = t2; }   /* and about z */
+        d = 256 * (sz * 60 / 256) / (sz * 60 / 256 + p[2]);
+        P[i][0] = cx + (p[0] * d >> 8); P[i][1] = cy + (p[1] * d >> 8); P[i][2] = p[2];
+    }
+    for (e = 0; e < 12; e++) {                                                /* far edges dim, near ones bright */
+        const int32_t *a = P[E12[e][0]], *b = P[E12[e][1]];
+        vlin(a[0], a[1], b[0], b[1], vpal[(a[2] + b[2]) > 0 ? 34 : 63], vw > 100);
+    }
+    for (f = 0; f < 6; f++)
+        for (e = 0; e < 4; e++) {
+            const int32_t *a = P[8 + f], *b = P[F[f][e]];
+            vlin(a[0], a[1], b[0], b[1], wpal[(a[2] + b[2]) > 0 ? 30 : 56], vw > 100);
+        }
+}
 
-#define NPIC 10
-static const char *const PICN[NPIC] = {"CRYSTAL", "TUNNEL", "DOTS", "PLASMA", "TWIRL", "STARS", "FIRE", "LOGO", "SCOPE", "SPECTRUM"};
-static void (*const PICF[NPIC])(void) = {pic_crystal, pic_tunnel, pic_dots, pic_plasma, pic_twirl, pic_stars, pic_fire, pic_logo, pic_scope, pic_spectrum};
-static const uint8_t PIC_CHUNKY[NPIC] = {0, 1, 0, 1, 1, 0, 1, 1, 0, 0};   /* per pixel: drawn in 2 x 2 full screen */
+#define NPIC 12
+static const char *const PICN[NPIC] = {"CRYSTAL", "TUNNEL", "DOTS", "PLASMA", "TWIRL", "STARS", "FIRE", "LOGO", "SCOPE", "SPECTRUM", "MORPH", "BOBS"};
+static void (*const PICF[NPIC])(void) = {pic_crystal, pic_tunnel, pic_dots, pic_plasma, pic_twirl, pic_stars, pic_fire, pic_logo, pic_scope, pic_spectrum, pic_morph, pic_bobs};
+static const uint8_t PIC_CHUNKY[NPIC] = {0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1};   /* per pixel: drawn in 2 x 2 full screen */
 static int32_t pick[3] = {0, 1, 2};
 
 /* on SETUP's knobs: the view is the knob's tile */
