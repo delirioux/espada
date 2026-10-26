@@ -1,7 +1,10 @@
-Since 1.1:
+Makohai 1.2: three new pictures, on RESET's knobs, in BACK and in DEMO.
 
-- Three new pictures: MORPH (a wireframe that turns, wanders and melts from shape to shape), BOBS (shadebobs) and
-  STATUE (a marble bust with 3D chrome text running round its outline: MAKE FIRMWARE NOT WAR).
+- MORPH: a wireframe that turns, wanders over the screen and melts from shape to shape (cube, star, octahedron,
+  twisted cube, ball, pyramid).
+- BOBS: shadebobs, glowing blobs that add up where they cross, in bands of colour.
+- STATUE: a marble bust of a young Greek god before a copper sky, 3D chrome text running round its outline:
+  MAKE FIRMWARE NOT WAR.
 
 Makohai 1.1: stereo that moves, pictures in demo style, keys that show what plays, and no more cracks.
 

@@ -18,7 +18,7 @@ SETUP's BACK puts one behind the whole screen, cycling every few bars if you lik
 
 <p align="center"><img src="docs/screens/main.png" width="320" alt="Makohai's screen: the VOLUME setting, all six lanes of notes scrolling past a fixed play line, and the four knobs' values for lead, pad, bass and drums"></p>
 
-> **Status: 1.1.** It runs on the FM-1. A voice budget keeps the sound in time however much plays (SETUP, VOICES);
+> **Status: 1.2.** It runs on the FM-1. A voice budget keeps the sound in time however much plays (SETUP, VOICES);
 > if the sound ever turns to crackles, SETUP's AUDIO and VOICES rows show what the FM-1 was doing.
 > Install it over the official firmware and keep the USB rescue in mind (below).
 
@@ -139,7 +139,7 @@ build, and brings back the official V15), the [FM-1 Firmware Hub](https://fm1.de
 line (once: `pip3 install mido python-rtmidi`):
 
 ```
-python3 tools/fm1_install.py makohai-1.1.fwsc
+python3 tools/fm1_install.py makohai-1.2.fwsc
 ```
 
 Install over M-VAVE's official firmware. If anything goes wrong: hold **OCT-** while switching on for the USB rescue,
@@ -156,7 +156,7 @@ tools/get_toolchain.sh
 git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
     https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK
 ./build.sh                         # -> build/makohai.fwsc
-./build.sh --release 1.1           # -> build/makohai-1.1.fwsc, identity FM-1_47625642
+./build.sh --release 1.2           # -> build/makohai-1.2.fwsc, identity FM-1_47625642
 ```
 
 GitHub Actions builds the package on every push (the run's artifact `makohai-firmware`).
