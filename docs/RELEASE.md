@@ -1,3 +1,7 @@
+Since 1.2:
+
+- SYMPHONY's lead plays CHAOS.
+
 Makohai 1.2: three new pictures, on RESET's knobs, in BACK and in DEMO.
 
 - MORPH: a wireframe that turns, wanders over the screen and melts from shape to shape (cube, star, octahedron,

@@ -121,7 +121,7 @@ static const prof_t PROF[] = {
      {S_MELODY, S_ARP, S_OCTAVE, S_DOLD}, {8, 9, 0, 1, 0, 9}, 0, 125, 10, 0, 35, {AP_UP, 1, 2}},
     /* the orchestra: minor, two bars a chord, a dominant before the return */
     {"SYMPHONY", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {5, Q_MIN}, {8, Q_MAJ}, {7, Q_MAJ}, {0, Q_MIN}},
-     {S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH}, {15, 5, 16, 0, 0, 2}, 2, 110, 5, 55, 0, {AP_UP, 2, 2}},
+     {S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH}, {14, 5, 16, 0, 0, 2},   /* the lead on CHAOS */ 2, 110, 5, 55, 0, {AP_UP, 2, 2}},
     /* sunny: mixolydian, I and bVII, a sus4 into the turn; off-beat chords, a deep bass with rests, congas */
     {"TROPIC", MXL, {{0, Q_MAJ}, {0, Q_S4}, {10, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}, {10, Q_MAJ}, {5, Q_MAJ}, {7, Q_S4}},
      {S_MELODY, S_SKANK, S_ROOTS, S_DTROPIC}, {8, 13, 3, 1, 0, 13}, 0, 110, 15, 0, 25, {AP_ALBERTI, 2, 1}},

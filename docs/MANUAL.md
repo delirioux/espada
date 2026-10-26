@@ -220,7 +220,7 @@ lane faded out, a save waiting, the keys' octave off 0.
 | HYPERSPACE | 130 | techno minor: power chords, a chopped pad, chord stabs, straight drums, a clap every other bar |
 | FUSION | 125 | melodic major with a chromatic turn: a riff through every chord, a pedal bass, lush chords, the hat opening into the one |
 | OLDSKOOL | 125 | the 4-channel sound: arpeggio chords, an octave bass, a busy lead with an echo |
-| SYMPHONY | 110 | the orchestra: two bars a chord, swelling strings, a violin line, cellos, timpani |
+| SYMPHONY | 110 | the orchestra: two bars a chord, swelling strings, a lead on CHAOS, cellos, timpani |
 | TROPIC | 110 | sunny mixolydian: chords on the off-beat, a deep bass with rests, rim shots, congas, a flute |
 | STEEL | 140 | heavy: power chords, a galloping bass, double kick, tom fills, a saw lead that glides |
 | DRIFT | 96 | floating: sus chords resolving, two bars a chord, swells, a breathy lead with a long echo, no snare, a soft rim |
@@ -242,7 +242,7 @@ lane faded out, a save waiting, the keys' octave off 0.
   it comes on top of your settings: your knobs show yours, the lanes play both.
 - **SYMPHONY** is the orchestra: two bars a chord in minor with a major dominant before the
   return; strings in open voicing (root, fifth, tenth) with a suspension resolving on each new chord and the inner
-  voice moving on the last bar; a legato violin line in long arcs; cellos and basses holding the root and walking
+  voice moving on the last bar; a legato line in long arcs, on CHAOS; cellos and basses holding the root and walking
   down into the next chord; timpani on the one with a roll into each phrase, a bass drum every other bar, a cymbal
   on the phrase and a cymbal swell (sfx) before it; a march snare when the energy is up.
 - **A lane's style** (PLAY) sets that lane alone; the queued style (SONG, LIVE) is the one blend and launch move to.
