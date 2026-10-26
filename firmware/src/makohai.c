@@ -20,6 +20,7 @@ static void makohai_host_stats(void);
 #endif
 #include "platform.c"
 #include "makohai_logo.h"
+#include "makohai_statue.h"
 
 /* ---- shared between the main loop and the audio interrupt (one writer each) */
 #define NLANE 6u

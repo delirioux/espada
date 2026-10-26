@@ -1,6 +1,7 @@
 Since 1.1:
 
-- Two new pictures: MORPH (a wireframe that turns, wanders and melts from shape to shape) and BOBS (shadebobs).
+- Three new pictures: MORPH (a wireframe that turns, wanders and melts from shape to shape), BOBS (shadebobs) and
+  STATUE (a marble bust with a chrome scroller: MAKE FIRMWARE NOT WAR).
 
 Makohai 1.1: stereo that moves, pictures in demo style, keys that show what plays, and no more cracks.
 

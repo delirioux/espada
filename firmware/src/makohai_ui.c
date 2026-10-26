@@ -592,6 +592,7 @@ static uint8_t flame[FIRE_H][FIRE_W] __attribute__((section(".pool")));
 #define BOB_N 80                                    /* SHADEBOBS: the field they paint, BOB_N x BOB_N */
 static uint8_t bobf[BOB_N][BOB_N] __attribute__((section(".pool")));
 static uint16_t hpal[64];                           /* a ramp all round the colours, for the bobs */
+static uint16_t spal[16], mpal[SCROLL_H];           /* STATUE: the marble, the scroller's chrome by row */
 static int8_t dot_sph[96][3], dot_tor[96][3];
 static int32_t vis_ready, logo_dark;
 static int32_t vx0, vy0, vw, vh, vps = 1;           /* the view */
@@ -657,6 +658,9 @@ static void vis_prep(void)
         vpal[k] = vramp(k, 0x020818u, 0x1aa0c8u, 0xf0fbffu); wpal[k] = vramp(k, 0x14062au, 0xc03a8cu, 0xffd27au);
         fpal[k] = k < 32 ? vramp(k, 0x000000u, 0x200000u, 0xd02800u) : vramp(k, 0x000000u, 0xd02800u, 0xfff0a0u);
         hpal[k] = vramp(k < 32 ? k * 2 : (63 - k) * 2, 0x1a0a40u, 0xff3d8bu, 0xffe08au);   /* there and back: the wrap is seamless */
+        if (k < 16) spal[k] = vramp(k * 63 / 15, 0x14110cu, 0x8f887au, 0xfff8eau);   /* warm marble */
+        if (k < SCROLL_H) mpal[k] = k < SCROLL_H / 2 ? vramp(k * 63 / (SCROLL_H / 2 - 1), 0x2a4a80u, 0x9fc4ffu, 0xffffffu)   /* chrome: a sky above */
+                                                      : vramp((k - SCROLL_H / 2) * 63 / (SCROLL_H / 2 - 1), 0x3a2410u, 0xb07a30u, 0xfff0b0u);   /* the ground below */
     }
     for (i = 0; i < 256u; i++) { sl[i] = scope_l[(w + i) & 255u]; sr[i] = scope_r[(w + i) & 255u]; }   /* oldest first */
     for (i = 1; i < 144u; i++) if (sl[i - 1] + sr[i - 1] < 0 && sl[i] + sr[i] >= 0) { trig = (int32_t)i; break; }   /* a rising zero: it stands still */
@@ -926,6 +930,33 @@ static uint16_t px_logo(int32_t u, int32_t v, int32_t W, int32_t H)           /*
     return SW(paint(LOGO_PAL[i]));
 }
 static void pic_logo(void) { render_px(px_logo); }
+/* STATUE: a marble bust (drawn by tools/draw_statue.py) in front of a slow copper sky, a chrome scroller waving past */
+static uint16_t px_statue(int32_t u, int32_t v, int32_t W, int32_t H)
+{
+    int32_t s = W < H ? W : H, lx = (u - (W - s) / 2) * 120 / s, ly = (v - (H - s) / 2) * 120 / s, k, t;
+    if (lx >= 0 && lx < 120 && ly >= 0 && ly < 120) {
+        int32_t b = STATUE_PX[(ly * 120 + lx) >> 1], i = lx & 1 ? b & 15 : b >> 4;
+        if (i) return spal[i];
+    }
+    k = (v * 40 / H + (int32_t)(vis_t / 3u)) & 63; t = k < 32 ? k : 63 - k;
+    return wpal[t * 3 / 4];
+}
+static void scroller(void)
+{
+    int32_t q = vw > 100 ? 2 : 1, base = vy0 + vh - SCROLL_H * q - vh / 10, pass, x, r, stride = (SCROLL_W + 7) / 8;
+    uint32_t off = vis_t * 2u;
+    uint16_t black = SW(paint(C_BG));
+    for (pass = 0; pass < 2; pass++)                                          /* the shadow first, then the chrome */
+        for (x = vx0; x < vx0 + vw; x += q) {
+            int32_t col = (int32_t)((off + (uint32_t)((x - vx0) / q)) % SCROLL_W), wav = vsin((uint32_t)x * 5u + vis_t * 14u) * (vh / 14) / 32768;
+            for (r = 0; r < SCROLL_H; r++)
+                if (SCROLL_BITS[r * stride + col / 8] & (0x80 >> (col & 7))) {
+                    if (pass) vfill(x, base + wav + r * q, q, q, mpal[r]);
+                    else vfill(x + q, base + wav + (r + 1) * q, q, q, black);
+                }
+        }
+}
+static void pic_statue(void) { render_px(px_statue); scroller(); }
 static uint16_t px_bobs(int32_t u, int32_t v, int32_t W, int32_t H) { return hpal[bobf[v * BOB_N / H][u * BOB_N / W] >> 2]; }
 static void pic_bobs(void) { render_px(px_bobs); }
 static void vlin(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c, int32_t thick)   /* a line, through vpix */
@@ -986,10 +1017,10 @@ static void pic_morph(void)
         }
 }
 
-#define NPIC 12
-static const char *const PICN[NPIC] = {"CRYSTAL", "TUNNEL", "DOTS", "PLASMA", "TWIRL", "STARS", "FIRE", "LOGO", "SCOPE", "SPECTRUM", "MORPH", "BOBS"};
-static void (*const PICF[NPIC])(void) = {pic_crystal, pic_tunnel, pic_dots, pic_plasma, pic_twirl, pic_stars, pic_fire, pic_logo, pic_scope, pic_spectrum, pic_morph, pic_bobs};
-static const uint8_t PIC_CHUNKY[NPIC] = {0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1};   /* per pixel: drawn in 2 x 2 full screen */
+#define NPIC 13
+static const char *const PICN[NPIC] = {"CRYSTAL", "TUNNEL", "DOTS", "PLASMA", "TWIRL", "STARS", "FIRE", "LOGO", "SCOPE", "SPECTRUM", "MORPH", "BOBS", "STATUE"};
+static void (*const PICF[NPIC])(void) = {pic_crystal, pic_tunnel, pic_dots, pic_plasma, pic_twirl, pic_stars, pic_fire, pic_logo, pic_scope, pic_spectrum, pic_morph, pic_bobs, pic_statue};
+static const uint8_t PIC_CHUNKY[NPIC] = {0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1};   /* per pixel: drawn in 2 x 2 full screen */
 static int32_t pick[3] = {0, 1, 2};
 
 /* on SETUP's knobs: the view is the knob's tile */
