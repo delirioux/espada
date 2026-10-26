@@ -941,20 +941,25 @@ static uint16_t px_statue(int32_t u, int32_t v, int32_t W, int32_t H)
     k = (v * 40 / H + (int32_t)(vis_t / 3u)) & 63; t = k < 32 ? k : 63 - k;
     return wpal[t * 3 / 4];
 }
+/* the text runs round the bust's outline (STATUE_PATH), in 3D: three layers of depth under a chrome face */
 static void scroller(void)
 {
-    int32_t q = vw > 100 ? 2 : 1, base = vy0 + vh - SCROLL_H * q - vh / 10, pass, x, r, stride = (SCROLL_W + 7) / 8;
+    int32_t sz = vw < vh ? vw : vh, cx = vx0 + vw / 2, cy = vy0 + vh / 2, q = sz > 100 ? 2 : 1, stride = (SCROLL_W + 7) / 8, layer, i, r;
     uint32_t off = vis_t * 2u;
-    uint16_t black = SW(paint(C_BG));
-    for (pass = 0; pass < 2; pass++)                                          /* the shadow first, then the chrome */
-        for (x = vx0; x < vx0 + vw; x += q) {
-            int32_t col = (int32_t)((off + (uint32_t)((x - vx0) / q)) % SCROLL_W), wav = vsin((uint32_t)x * 5u + vis_t * 14u) * (vh / 14) / 32768;
+    static const uint32_t DEEP[3] = {0x0a0612u, 0x241430u, 0x46305au};
+    for (layer = 3; layer >= 0; layer--) {                                    /* the far layers first, the face last */
+        uint16_t deep = layer ? vramp(63, DEEP[3 - layer], DEEP[3 - layer], DEEP[3 - layer]) : 0;
+        for (i = 0; i < PATH_N; i++) {
+            int32_t col = (int32_t)((off + (uint32_t)i) % SCROLL_W), px = STATUE_PATH[2 * i], py = STATUE_PATH[2 * i + 1], d = isqrt(px * px + py * py);
+            if (!d) continue;
             for (r = 0; r < SCROLL_H; r++)
                 if (SCROLL_BITS[r * stride + col / 8] & (0x80 >> (col & 7))) {
-                    if (pass) vfill(x, base + wav + r * q, q, q, mpal[r]);
-                    else vfill(x + q, base + wav + (r + 1) * q, q, q, black);
+                    int32_t up = (SCROLL_H - 1 - r) * 8 / 10;                 /* the row's height above the path, outward */
+                    int32_t x = cx + (px * 256 + px * 256 * up / d) * sz / (120 * 256) + layer * q, y = cy + (py * 256 + py * 256 * up / d) * sz / (120 * 256) + layer * q;
+                    vfill(x, y, q + 1, q + 1, layer ? deep : mpal[r]);   /* a little over: no gaps on the curves */
                 }
         }
+    }
 }
 static void pic_statue(void) { render_px(px_statue); scroller(); }
 static uint16_t px_bobs(int32_t u, int32_t v, int32_t W, int32_t H) { return hpal[bobf[v * BOB_N / H][u * BOB_N / W] >> 2]; }

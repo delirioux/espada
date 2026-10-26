@@ -82,8 +82,8 @@ tempo), **DOTS** (a ball of dots that becomes a ring and back), **PLASMA**, **TW
 zooming), **STARS**, **FIRE**, **LOGO** (the logo with raster bars behind it), **SCOPE**, **SPECTRUM**, **MORPH** (a
 wireframe that turns and wanders over the screen, melting from a cube into a star, an octahedron, a twisted cube, a
 ball and a pyramid), **BOBS** (shadebobs: glowing blobs that add up where they cross, in bands of colour) and
-**STATUE** (a marble bust of a young Greek god before a slow copper sky, a chrome scroller waving past: MAKE FIRMWARE
-NOT WAR). Which pictures RESET
+**STATUE** (a marble bust of a young Greek god before a slow copper sky, with 3D chrome text running round its
+outline: MAKE FIRMWARE NOT WAR). Which pictures RESET
 shows is not saved. **BACK** puts one of them behind the whole screen, on every page (PLAY, SOUND, TRACKER, SONG, EDIT, SETUP), dimmed
 so everything stays clear; the lanes' bands glow over it. With CYCLE it moves on to the next picture every 4, 8 or 16
 bars, on the bar line, with a cut (blinds, a raster wipe, a dissolve, an iris or a push). SAVE keeps BACK and CYCLE

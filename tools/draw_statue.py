@@ -4,6 +4,7 @@
 ray-marched from signed distance functions, and the scroller's text. Writes firmware/gen/makohai_statue.h:
   STATUE_PX   120 x 120, 4 bits a pixel (0: not the statue, 1..15: marble from dark to light)
   SCROLL_BITS the text, 1 bit a pixel, SCROLL_H rows of SCROLL_W
+  STATUE_PATH the bust's outline, a little out: PATH_N points (x, y from the middle), a pixel apart
 Needs numpy and Pillow; takes about a minute."""
 from pathlib import Path
 import numpy as np
@@ -166,6 +167,29 @@ def main():
                 if x < w and bits[r, x]:
                     v |= 0x80 >> k
             sb.append(v)
+    # the path the text runs along: the bust's outline, a little out, smoothed, a point every pixel
+    m = a[..., 3] > 127
+    ang = np.linspace(0, 2 * np.pi, 720, endpoint=False)
+    rad = np.zeros(len(ang))
+    for i, t in enumerate(ang):
+        far = 0
+        for d in np.arange(0, 60, 0.5):
+            x, y = int(60 + d * np.cos(t)), int(60 + d * np.sin(t))
+            if 0 <= x < 120 and 0 <= y < 120 and m[y, x]:
+                far = d
+        rad[i] = min(far + 9, 58)
+    k = np.ones(31) / 31
+    rad = np.convolve(np.concatenate([rad[-15:], rad, rad[:15]]), k, mode="valid")
+    px_, py_ = 60 + rad * np.cos(ang), 60 + rad * np.sin(ang)
+    seg = np.hypot(np.diff(np.append(px_, px_[0])), np.diff(np.append(py_, py_[0])))
+    cum = np.concatenate([[0], np.cumsum(seg)])
+    n = int(cum[-1])
+    xs = np.interp(np.arange(n), cum, np.append(px_, px_[0]))
+    ys = np.interp(np.arange(n), cum, np.append(py_, py_[0]))
+    path = []
+    for x, y in zip(xs, ys):
+        path += [int(round(x)) - 60 & 255, int(round(y)) - 60 & 255]
+
     def rows(data, n):
         return ",\n    ".join(", ".join(f"0x{b:02X}" for b in data[i:i + n]) for i in range(0, len(data), n))
     out = ROOT / "firmware" / "gen" / "makohai_statue.h"
@@ -174,7 +198,9 @@ def main():
                    " * scroller's text (1 bit a pixel) */\n"
                    f"#define SCROLL_W {w}\n#define SCROLL_H {SCROLL_H}\n"
                    "static const uint8_t STATUE_PX[120 * 120 / 2] = {\n    " + rows(packed, 24) + "\n};\n"
-                   f"static const uint8_t SCROLL_BITS[{len(sb)}] = {{\n    " + rows(sb, 24) + "\n};\n")
+                   f"static const uint8_t SCROLL_BITS[{len(sb)}] = {{\n    " + rows(sb, 24) + "\n};\n"
+                   f"#define PATH_N {n}\n"
+                   f"static const int8_t STATUE_PATH[PATH_N * 2] = {{\n    " + rows(path, 24).replace("0x", "(int8_t)0x") + "\n};\n")
     small.save(ROOT / "build" / "statue-check.png") if (ROOT / "build").exists() else None
     print("->", out, f"(statue {len(packed)} B, text {w} x {SCROLL_H}, {len(sb)} B)")
 
