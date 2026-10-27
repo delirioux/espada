@@ -2018,20 +2018,20 @@ static void rec_release(int32_t l, int32_t key)
 }
 /* the keys play the marked lane; on PAD a key is a chord in key: the triad on that note (SEL: the sus4) */
 /* EDIT opens where the music is: on your part's bar that plays now; and while the lane plays the style (your part is
- * off), that bar shows what the style plays there, to change from. Only a bar that is empty, or that EDIT filled
- * itself before and you have not touched, is filled; it stays off until you change a step */
+ * off), your bars 1-4 show what the style plays from this bar on (the bars made so far), to change from. Only a part
+ * that is empty, or that EDIT filled itself before and you have not touched, is filled; it stays off until you change
+ * a step, and then all of it plays */
 static void edit_enter(void)
 {
-    int32_t l = sel, cb = cur_bar(), b;
+    int32_t l = sel, cb = cur_bar(), b, n = 0;
     upat_t *U = &ln[l].up;
-    b = U->on ? (cb < U->bars ? cb : -1) : 0;
-    if (b < 0) return;
-    if (!U->on && (ubar_empty(l, b) || auto_bar[l] == b + 1)) {
-        pat_grab(l, b);
-        U->on = 0; U->ver++; invalidate_now();                      /* shown, not played: the style goes on */
-        auto_bar[l] = b + 1;
+    if (U->on) { if (cb < U->bars) cursor = cb * 16; return; }
+    if (pat_empty(l) || auto_bar[l]) {
+        for (b = 0; b < 4 && b < MAXB; b++) if (pat_grab_at(l, b, cb + b)) n = b + 1; else break;
+        if (n) { U->bars = (uint16_t)n; U->on = 0; U->ver++; invalidate_now(); }   /* shown, not played: the style goes on */
+        auto_bar[l] = n;
     }
-    cursor = b * 16;
+    cursor = 0;
 }
 static void keys_play(uint32_t pressed, uint32_t released, int sel_held_now)
 {

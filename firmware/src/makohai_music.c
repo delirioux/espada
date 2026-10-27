@@ -1315,7 +1315,7 @@ static void fx_apply(void)
 static uint32_t seen[NLANE][64], nseen[NLANE];
 static rng_t ui_rng = {0x1234567u};
 /* a bar was written: past the end it lengthens the part (only the bar right after it can be reached) */
-static int32_t auto_bar[NLANE];                                 /* a bar EDIT filled by itself from what played (+1; 0 = none) */
+static int32_t auto_bar[NLANE];                                 /* the bars EDIT filled by itself from what plays (0 = none) */
 static void pat_touched(int32_t l, int32_t b)
 {
     upat_t *U = &ln[l].up;
@@ -1442,12 +1442,12 @@ static void pat_copy(int32_t from, int32_t to)
     ln[to].up.bars = (uint16_t)n;
     pat_touched(to, 0);
 }
-static void pat_grab(int32_t l, int32_t b)                      /* what the lane plays in this song bar goes into bar b */
+static int pat_grab_at(int32_t l, int32_t b, int32_t cb)        /* what the lane plays in song bar cb goes into bar b */
 {
-    int32_t cb = cur_bar(), i;
+    int32_t i;
     const bar_t *B = bar_get(cb);
     harm_t H; tools_t T;
-    if (!B) return;
+    if (!B) return 0;
     harm_at(cb, &H);
     tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
     ubar_clear(l, b);
@@ -1457,7 +1457,9 @@ static void pat_grab(int32_t l, int32_t b)                      /* what the lane
         else { ubar[l][b].n.k[e->st] = (int8_t)note_to_k(&T, e->note[0]); ubar[l][b].n.len[e->st] = e->len; }
     }
     pat_touched(l, b);
+    return 1;
 }
+static void pat_grab(int32_t l, int32_t b) { (void)pat_grab_at(l, b, cur_bar()); }
 /* clearing: one bar (the last one goes, so the part gets shorter), or the whole part */
 static void pat_clear_bar(int32_t l, int32_t b)
 {

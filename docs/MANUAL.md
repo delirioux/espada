@@ -312,9 +312,9 @@ Your patterns follow the chords, as the generated parts do: they are written in 
 ## Your own parts
 
 Each lane can have a part of its own, as long as you write it: up to 512 bars. EDIT opens where the music is: with your
-part playing, on the bar that plays now; while the lane plays the style, on your first bar, filled with what the style
-plays there (only if that bar is empty, or was filled this way and not touched since), so you start from what you
-hear. It sounds once you change a step. EDIT shows one bar at a time, with a
+part playing, on the bar that plays now; while the lane plays the style, on your first bar, with bars 1 to 4 filled
+with what the style plays from the bar playing on (only if your part is empty, or was filled this way and not touched
+since), so you start from what you hear. It sounds once you change a step, all four bars. EDIT shows one bar at a time, with a
 band over it: the page (NOTES, FX, PART, BAR, RANGE; PRESETS steps through them) and a map of your bars, the one you
 are on white, the one playing marked cyan. BAR moves through your bars and one more, the new bar after the last (the
 grid says NEW BAR). Writing there makes the part a bar longer; you cannot go further, so a part never has holes at
