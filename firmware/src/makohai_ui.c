@@ -182,7 +182,7 @@ static const char *const NN[12] = {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "A
 static const char *const WOBN[6] = {"OFF", "1/1", "1/2", "1/4", "1/8", "1/16"};
 static const char *const DKN[NDK] = {"K", "S", "H", "T", "C", "X", "O", "M", "R"};   /* EDIT rows: kick, snare, hat, timpani, crash, clap, open hat, tom, rim */
 static const char *const PSHORT[] = {"EPIC", "HYPER", "FUSION", "OLDSKOOL", "SYMPHONY", "TROPIC", "STEEL", "DRIFT", "FUNK", "RAVE",
-                                     "DUB", "TRIBAL", "FABLE", "PC FM", "BOOGIE", "ZEN", "FACTORY"};
+                                     "DUB", "TRIBAL", "FABLE", "PC FM", "BOOGIE", "ZEN", "FACTORY", "AMIGA"};
 typedef char pshort_count[sizeof PSHORT / sizeof PSHORT[0] == NPROF ? 1 : -1];
 static const char *const SSHORT[13] = {"AUTO", "MAJOR", "MINOR", "DORIAN", "PHRYGIAN", "LYDIAN", "MIXOLYD", "LOCRIAN",
                                        "HARM MIN", "MEL MIN", "MAJ PENT", "MIN PENT", "BLUES"};

@@ -4,7 +4,7 @@
  *   harmony     a chord per bar: from the profile (explicit chords, borrowed ones allowed), or from the SONG
  *               page (key, scale, a suggested progression). Lines move through a "local scale": the scale
  *               with any note a semitone off a chord tone swapped for that chord tone, so nothing rubs.
- *   styles      seventeen profiles: a progression, a generator and an instrument per lane, a tempo, and a way of
+ *   styles      eighteen profiles: a progression, a generator and an instrument per lane, a tempo, and a way of
  *               playing (how many lead notes glide in, how many long chords swell or fade, the lead's echo)
  *   mixing      a queued profile; BLEND moves lanes to it bottom-up (drums, bass, pad, lead); LAUNCH moves
  *               every unlocked lane on the next phrase; the bass lane's profile carries the harmony
@@ -95,7 +95,7 @@ enum { S_DRIVE, S_PEDAL, S_OCTAVE,                       /* bass */
        S_DTROPIC, S_DSTEEL, S_DDRIFT, S_DFUNK, S_DRAVE,  /* drums */
        S_DUBBASS, S_OOMPAH, S_WALK, S_DRONE,             /* bass: DUB, FABLE, BOOGIE, ZEN */
        S_PIZZ, S_BOOGIE,                                 /* pad: FABLE, BOOGIE */
-       S_DDUB, S_DTRIBAL, S_DFABLE, S_DBOOGIE, S_DZEN, S_DFACTORY };   /* drums */
+       S_DDUB, S_DTRIBAL, S_DFABLE, S_DBOOGIE, S_DZEN, S_DFACTORY, S_DAMIGA };   /* drums */
 static const int8_t AEO[7] = {0, 2, 3, 5, 7, 8, 10}, ION[7] = {0, 2, 4, 5, 7, 9, 11}, DOR[7] = {0, 2, 3, 5, 7, 9, 10},
                     MXL[7] = {0, 2, 4, 5, 7, 9, 10}, PHG[7] = {0, 1, 3, 5, 7, 8, 10},
                     MPENT[7] = {0, 3, 5, 7, 10, 10, 10}, YO[7] = {0, 2, 5, 7, 9, 9, 9};   /* pentatonics: five notes, the last again */
@@ -112,7 +112,7 @@ typedef struct {
     uint8_t arp[3];             /* the arp lane: its pattern (AP_x), 16ths a note, octaves */
 } prof_t;
 enum { AP_UP, AP_DOWN, AP_UPDOWN, AP_ALBERTI, AP_BROKEN, AP_RANDOM, NAP };
-/* seventeen styles of 90s tracker music, from a study of their modules: chords (sus chords everywhere), drum grids,
+/* eighteen styles of 90s tracker music, from a study of their modules: chords (sus chords everywhere), drum grids,
  * tempos, and how the notes are played (glides, swells, an echo channel) */
 static const prof_t PROF[] = {
     {"EPIC", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}},
@@ -164,6 +164,10 @@ static const prof_t PROF[] = {
     /* the factory: fast and half-time, phrygian power chords, metal clanks, a growling bass, distorted strings */
     {"FACTORY", PHG, {{0, Q_5}, {1, Q_5}, {0, Q_5}, {0, Q_5}, {0, Q_5}, {6, Q_5}, {3, Q_5}, {1, Q_5}},
      {S_RIFF, S_STRINGS, S_ACID, S_DFACTORY}, {28, 5, 21, 5, 0, 28}, 0, 185, 25, 0, 15, {AP_RANDOM, 1, 2}},
+    /* the Amiga demo track: minor, a breakbeat with ghost snares, a saw lead that glides and sings, string stabs,
+     * an octave saw bass, a fast chip arpeggio, an echo */
+    {"AMIGA", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {3, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {8, Q_MAJ}, {5, Q_MIN}, {7, Q_MAJ}},
+     {S_MELODY, S_STAB, S_OCTAVE, S_DAMIGA}, {27, 59, 21, 1, 0, 63}, 0, 135, 30, 0, 30, {AP_UP, 1, 2}},
 };
 #define NPROF (int32_t)(sizeof PROF / sizeof PROF[0])
 /* each style's other sounds that fit, per lane: LEAD, PAD, BASS, the kits, ARP; the first is the style's own. With
@@ -186,6 +190,7 @@ static const uint8_t POOL[][5][4] = {
     /* BOOGIE */     {{36, 35, 11, 29}, {66, 12, 13, 53}, {1, 23, 22, 0}, {4, 0, 1, 4}, {12, 13, 40, 44}},
     /* ZEN */        {{67, 8, 32, 38}, {18, 58, 57, 56}, {3, 16, 26, 3}, {3, 0, 3, 2}, {48, 41, 47, 50}},
     /* FACTORY */    {{28, 10, 27, 29}, {5, 61, 62, 15}, {21, 25, 24, 20}, {5, 4, 2, 5}, {28, 64, 10, 11}},
+    /* AMIGA */      {{27, 28, 30, 10}, {59, 5, 61, 56}, {21, 0, 24, 20}, {1, 4, 0, 1}, {63, 64, 9, 42}},
 };
 typedef char pool_count[sizeof POOL / sizeof POOL[0] == sizeof PROF / sizeof PROF[0] ? 1 : -1];
 /* how each style plays the lanes, on top of your settings (as VARY): swing, tremolo, trance gate (tremor), gate,
@@ -210,6 +215,8 @@ static const sstyle_t SSTYLE[] = {
     /* BOOGIE */     {{0, 0, 0, 0, 0, 0}, {20, -10, 0, 0, 0, -20}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 30, 0, 0, 0, 0}},
     /* ZEN */        {{0, 0, 0, 0, 0, 0}, {-10, 0, 0, 0, 0, 30}, {0, 20, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 30, 20}},
     /* FACTORY */    {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, -30}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 20, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {20, 25, 0, 0, 0, 15}},
+    /* AMIGA: the four channels hard left and right, as Paula played them; the stabs short */
+    /* AMIGA */      {{0, 0, 0, 10, 0, 0}, {-30, 30, 30, -30, 0, 30}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 30, 0, 0, 0, 0}, {0, 20, 0, 0, 0, 0}},
 };
 typedef char sstyle_count[sizeof SSTYLE / sizeof SSTYLE[0] == sizeof PROF / sizeof PROF[0] ? 1 : -1];
 
@@ -788,6 +795,18 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
         if (b % 4 == 3) for (s = 12; s < 16; s++) DRUM(G, s, DK_SNARE);
         if (b % 8 == 0) DRUM(G, 0, DK_CRASH);
         break; }
+    case S_DAMIGA: {            /* a breakbeat: kick on the one and the and of three, snare on two and four with ghosts,
+                                 * 8th hats with a 16th push, the open hat into the phrase, a crash on it */
+        static const int8_t K[16] = {100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 90, 0, 0, 0, 30, 0}, GH[16] = {0, 0, 0, 0, 0, 0, 0, 45, 0, 30, 0, 0, 0, 0, 40, 0},
+                            H[16] = {90, 0, 90, 0, 90, 0, 90, 40, 90, 0, 90, 0, 90, 0, 90, 40};
+        rng_t m = {hash3(b / 2, 71, p)};
+        hits(G, r, DK_KICK, K);
+        if (chance(&m, 40)) { ev_t *e = DRUM(G, 6, DK_KICK); if (e) e->flags = EV_ACC1; }   /* the break's second kick, a bar in two */
+        DRUM(G, 4, DK_SNARE); DRUM(G, 12, DK_SNARE);
+        for (s = 0; s < 16; s++) if (GH[s] && chance(r, GH[s])) { ev_t *e = DRUM(G, s, DK_SNARE); if (e) e->flags = EV_ACC2; }
+        for (s = 0; s < 16; s++) if (H[s] && chance(r, H[s])) { ev_t *e = DRUM(G, s, b % 4 == 3 && s == 14 ? DK_OHAT : DK_HAT); if (e && s % 2) e->flags = EV_ACC2; }
+        if (b % 8 == 0) DRUM(G, 0, DK_CRASH);
+        break; }
     case S_DTROPIC: {           /* the one and the three, rim shots on two and four with a push, congas, shaker 8ths */
         static const int8_t K[16] = {100, 0, 30, 20, 0, 0, 30, 0, 90, 0, 40, 0, 0, 0, 25, 0}, SN[16] = {0, 0, 0, 0, 90, 0, 0, 45, 0, 35, 0, 0, 90, 0, 25, 30},
                             H[16] = {50, 0, 85, 0, 50, 0, 85, 0, 50, 0, 85, 0, 50, 0, 85, 0}, TT[16] = {0, 0, 0, 45, 0, 0, 55, 0, 0, 0, 0, 45, 0, 0, 55, 0};
@@ -933,6 +952,11 @@ static void gen_sfx(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, 
             if (chance(r, x)) SFX(G, 0, 16, SX_SURF, root);
             if (b % 4 == 0 && !drop && chance(r, x * 50 / 100)) SFX(G, 0, 16, SX_WASH, root);
             break;
+        case 17:                                                    /* AMIGA: a zap into the phrase, bits at the top */
+            if (b % 4 == 3 && chance(r, x * 70 / 100)) SFX(G, 12, 1, SX_ZAP, root + 24);
+            if (b % 8 == 0 && !drop && chance(r, x * 60 / 100)) SFX(G, 0, 16, SX_WASH, root);
+            if (e > 200) for (i = 0; i < 4; i++) if (chance(r, x * 20 / 100)) SFX(G, OFF[i] + 1, 1, SX_BITS, root);
+            break;
         case 16:                                                    /* FACTORY: machines: bits, a hammer on the phrase, screams */
             for (s = 1; s < 16; s += 2) if (chance(r, x * 25 / 100)) SFX(G, s, 1, SX_BITS, root);
             if (b % 4 == 0 && !drop && chance(r, x * 70 / 100)) SFX(G, 0, 2, SX_IMPACT, root);
@@ -1047,6 +1071,11 @@ static void style_fx(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t p,
             break;
         case 15:                                                    /* ZEN: the flute bends into its notes, a slow vibrato */
             if (l == L_LEAD) { if (chance(r, 35)) e->fx = FX_SLIDE << 4; else if (e->len >= 4) e->fx = FX_VIB << 4 | 3; }
+            break;
+        case 17:                                                    /* AMIGA: the lead sings and slides, the stabs short, a dive off the phrase */
+            if (l == L_LEAD) { if (end && i == last) e->fx = FX_DOWN << 4 | 8; else if (e->len >= 3 && chance(r, 50)) e->fx = FX_VIB << 4 | 6; else if (chance(r, 20)) e->fx = FX_SLIDE << 4; }
+            else if (l == L_PAD) e->fx = FX_CUT << 4 | 2;
+            else if (l == L_DRUMS && end && e->st >= 12 && e->note[0] == DK_SNARE) e->fx = FX_RETRIG << 4 | 2;
             break;
         case 16:                                                    /* FACTORY: the lead dives off the phrase, the bass chopped, snare rolls */
             if (l == L_LEAD && end && i == last) e->fx = FX_DOWN << 4 | 14;

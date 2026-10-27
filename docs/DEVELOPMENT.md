@@ -4,9 +4,9 @@ How Makohai is made and where it is going: the agreements, how changes reach Git
 and why, how to build and test it, the open risks and what comes next. What Makohai is and how to play it is in
 the [README](../README.md) and the [manual](MANUAL.md); the chip's rules are in [RULES.md](RULES.md).
 
-Status: 27 October 2026. Version 1.2 runs on the FM-1. Its first overload (SYMPHONY with echo everywhere, 109 % of
+Status: 27 October 2026. Version 1.3 runs on the FM-1 (1.2 tested for hours; 1.3's MIDI awaits real gear). Its first overload (SYMPHONY with echo everywhere, 109 % of
 the audio time) is closed by the voice budget; it has run for hours on the hardware without a crack. Six lanes,
-seventeen styles played as in a tracker, long lead arcs, the one-screen interface, the browser version and the web
+eighteen styles played as in a tracker, long lead arcs, the one-screen interface, the browser version and the web
 installer are in.
 
 ## Agreements
@@ -43,7 +43,7 @@ stand-in.
 | --- | --- |
 | `firmware/src/makohai.c` | the app's shared state (lanes, effects, the clock), includes the parts below |
 | `firmware/src/makohai_synth.c` | the audio interrupt: FM voices (patches with ensembles), drums, sfx voices, the stereo buses and the room, lane effects, the step clock, all MIDI out (notes, bends, expression, the clock) |
-| `firmware/src/makohai_music.c` | harmony, scales and progressions, the seventeen styles, their generators, the lead's long arcs, density, the arc, your own patterns, the bar cache, mute fades |
+| `firmware/src/makohai_music.c` | harmony, scales and progressions, the eighteen styles, their generators, the lead's long arcs, density, the arc, your own patterns, the bar cache, mute fades |
 | `firmware/src/makohai_ui.c` | the screen (header, title, lanes, knobs), the groups and their settings, the panel, the LEDs, saving |
 | `firmware/src/platform.c` | Dinghy's wiring of the FM-1 platform |
 | `tests/host.c` | host mode: the platform as a stand-in; runs a script of buttons, encoders and keys over time, writes screens and a WAV |

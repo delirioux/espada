@@ -1,7 +1,8 @@
-Since 1.2:
+Makohai 1.3: eight new styles, 48 new sounds, MIDI both ways.
 
-- Seven new styles: DUB (105, the one drop), TRIBAL (125), FABLE (150), PC FM (125), BOOGIE (125, the shuffle),
-  ZEN (60) and FACTORY (185, industrial), each with its drums, bass, pad, lead, arp, sfx and effects. Seventeen in all.
+- Eight new styles: DUB (105, the one drop), TRIBAL (125), FABLE (150), PC FM (125), BOOGIE (125, the shuffle),
+  ZEN (60), FACTORY (185, industrial) and AMIGA (135, the demo track's breakbeat), each with its drums, bass, pad,
+  lead, arp, sfx and effects. Eighteen in all.
 - HONKYTNK and SHAKU patches, the METAL kit.
 - SAVE keeps VOICES LIMIT and RESET's three pictures (settings record 16; older ones load with 80 and the first three).
 - MIDI: notes with velocity, the lanes' settings as controllers (volume, pan, vibrato, portamento, cutoff,

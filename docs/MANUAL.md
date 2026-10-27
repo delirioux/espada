@@ -238,7 +238,7 @@ lane faded out, a save waiting, the keys' octave off 0.
   - **END** (PLAY while playing): lead (with the arp), sfx and pad fade out one by one, a bar apart, then bass or drums; the one
     left (chosen at random) plays alone two bars and fades last. Then Makohai stops. The title says INTRO, INTER or
     END while one is running.
-- **The seventeen styles.** Each is a chord progression, a part for each lane, an instrument for each, a tempo, and a way
+- **The eighteen styles.** Each is a chord progression, a part for each lane, an instrument for each, a tempo, and a way
   of playing. Change the mood with STYLE (SONG, LIVE) and SEQ. Without a saved set Makohai starts with OLDSKOOL.
 
 | Style | Tempo | What it is |
@@ -260,6 +260,7 @@ lane faded out, a save waiting, the keys' octave off 0.
 | BOOGIE | 125 | the shuffle: a walking bass, honky-tonk piano on the off-beats, a hard snare, a sax riff |
 | ZEN | 60 | slow, a five-note scale over fifths: a bamboo flute that bends, a held drone, a choir, one big drum, water |
 | FACTORY | 185 | industrial, half-time: phrygian power chords, metal clanks, a growling bass, distorted strings, machine noise |
+| AMIGA | 135 | the Amiga demo track: a breakbeat with ghost snares, a saw lead that glides and sings, string stabs, an octave saw bass, a fast chip arpeggio, the channels hard left and right |
 
 - **How a style plays.** As a tracker musician plays the notes by hand: some lead notes glide in from the last one
   (STEEL most, DRIFT and FUSION often), long chords swell in or fade out (DRIFT and SYMPHONY most), and the lead
@@ -276,7 +277,9 @@ lane faded out, a save waiting, the keys' octave off 0.
   cuts the skank short and echoes it and the rim shots, and its melodica wavers; TRIBAL's flute sings and slides;
   FABLE keeps its pizzicato short and its flute staccato now and then; PC FM gives the long lead notes vibrato; BOOGIE
   slides the sax in and keeps the piano short; ZEN bends the flute into its notes; FACTORY drives lead, strings and
-  arp, dives the lead off the phrase, chops the bass, rolls the snare and hits the orchestra every 8 bars. All of
+  arp, dives the lead off the phrase, chops the bass, rolls the snare and hits the orchestra every 8 bars; AMIGA
+  gives the lead vibrato and slides and dives it off the phrase, keeps the stabs short, retriggers a snare fill and
+  pans the four channels hard left and right as the Amiga did. All of
   it comes on top of your settings: your knobs show yours, the lanes play both.
 - **SYMPHONY** is the orchestra: two bars a chord in minor with a major dominant before the
   return; strings in open voicing (root, fifth, tenth) with a suspension resolving on each new chord and the inner
@@ -300,7 +303,7 @@ going up, FUSION bells in broken thirds, OLDSKOOL the chip arpeggio, SYMPHONY a 
 an Alberti figure on electric piano, STEEL a saw running down, DRIFT slow bells, FUNK a random electric piano, RAVE
 a supersaw going up, DUB an electric piano up and down in 8ths, TRIBAL a marimba in broken thirds, FABLE the
 xylophone up and down in 16ths, PC FM a thin FM pulse going up, BOOGIE an Alberti figure on piano, ZEN a slow koto
-in broken thirds, FACTORY random 16ths on a hard-sync lead.
+in broken thirds, FACTORY random 16ths on a hard-sync lead, AMIGA a chip pulse going up in 16ths.
 
 Its settings are on the knobs as every lane's (ALGORITHM to ARP, and the window shows it). **MELODY** steps to the next pattern: UP, DOWN, UP-DOWN, ALBERTI (low, high, middle,
 high), BROKEN (in thirds) and RANDOM. **RHYTHM** makes it faster or slower (16ths, 8ths, quarters), **PITCH** wider or
@@ -322,7 +325,7 @@ between it plays what fits the style: washes and surf for FUSION and DRIFT, surf
 gale for EPIC, a cymbal swell and a far wind for SYMPHONY, zaps, gusts and bits for HYPERSPACE, crackle and bits for
 OLDSKOOL, crackle for FUNK and BOOGIE, impacts and a storm for STEEL, zaps and a gust into every phrase for RAVE, a
 siren into the phrase for DUB, a river and wind for TRIBAL, sparkles for FABLE, a zap and bits for PC FM, water for
-ZEN, machines (bits, a hammer, screams) for FACTORY, more as the
+ZEN, machines (bits, a hammer, screams) for FACTORY, a zap into the phrase and bits for AMIGA, more as the
 energy and the density rise. With the arc off: a gale every 8th bar, an impact after it. The RISER is never chosen
 on AUTO; turn it on yourself.
 Turn **SOUND** (PLAY, the SFX knob) to one of the eight to hear only that one, in its own pattern. SOUND and TRACKER
