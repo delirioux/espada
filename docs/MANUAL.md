@@ -219,7 +219,7 @@ lane faded out, a save waiting, the keys' octave off 0.
 | EPIC | 125 | orchestral minor: long lead lines over strings, a driving bass, timpani, a tom fill every other phrase |
 | HYPERSPACE | 130 | techno minor: power chords, a chopped pad, chord stabs, straight drums, a clap every other bar |
 | FUSION | 125 | melodic major with a chromatic turn: a riff through every chord, a pedal bass, lush chords, the hat opening into the one |
-| OLDSKOOL | 125 | the 4-channel sound: arpeggio chords, an octave bass, a busy lead with an echo |
+| OLDSKOOL | 125 | the 4-channel sound: chords with a chip arpeggio into each phrase, an octave bass, a busy lead with an echo |
 | SYMPHONY | 110 | the orchestra: two bars a chord, swelling strings, a lead on CHAOS, cellos, timpani |
 | TROPIC | 110 | sunny mixolydian: chords on the off-beat, a deep bass with rests, rim shots, congas, a flute |
 | STEEL | 140 | heavy: power chords, a galloping bass, double kick, tom fills, a saw lead that glides |

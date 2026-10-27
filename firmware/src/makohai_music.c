@@ -531,8 +531,10 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
         g_add(G, 0, 8, 3, ct(T, 0), ct(T, 1), ct(T, 2), 0);
         g_add(G, 8, 8, 3, ct(T, 1), ct(T, 2), ct(T, 3), 0);
         break;
-    case S_ARP:
-        g_add(G, 0, 16, 3, ct(T, 0), ct(T, 1), ct(T, 2), EV_ARP);
+    case S_ARP:                 /* mostly the chord, struck on the one and the three; the chip arpeggio on the phrase's
+                                 * last bar and now and then */
+        if (b % 4 == 3 || chance(r, 20)) g_add(G, 0, 16, 3, ct(T, 0), ct(T, 1), ct(T, 2), EV_ARP);
+        else { g_add(G, 0, 8, 3, ct(T, 0), ct(T, 1), ct(T, 2), 0); g_add(G, 8, 8, 3, ct(T, 0), ct(T, 1), ct(T, 2), 0); }
         break;
     case S_SYMLEAD:             /* the symphony's lead: long arcs, legato */
         lead_long(G, T, b, p, 1);

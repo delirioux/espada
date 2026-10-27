@@ -1,6 +1,7 @@
 Since 1.2:
 
 - SYMPHONY's lead plays CHAOS.
+- OLDSKOOL's pad plays chords, struck on the one and the three; the chip arpeggio comes on a phrase's last bar and now and then.
 - EDIT opens on what plays: an empty part gets four bars of what the style plays from the bar playing on.
 - STYLE (SONG, LIVE) while stopped also starts a new song: MELODY at random on every lane.
 
