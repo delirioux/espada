@@ -176,6 +176,7 @@ static int32_t cursor, entry_len = 1, entry_oct;
 static char toast_s[48];
 static uint32_t toast_until;
 static int32_t save_pending, gen_count[NLANE];
+static int ms_before(uint32_t t) { return (int32_t)(t - fm1_ms) > 0; }   /* not yet at t: right across the clock's wrap (49 days) */
 static void toast(const char *s) { uint32_t i; for (i = 0; i < 47u && s[i]; i++) toast_s[i] = s[i]; toast_s[i] = 0; toast_until = fm1_ms + 1600u; }
 static const char *const NN[12] = {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
 static const char *const WOBN[6] = {"OFF", "1/1", "1/2", "1/4", "1/8", "1/16"};
@@ -887,7 +888,7 @@ static uint16_t px_tunnel(int32_t u, int32_t v, int32_t W, int32_t H)
     a = tq_ang[ay][ax]; z = tq_dep[ay][ax];
     if (dx < 0) a = 128 - a;
     if (dy < 0) a = 256 - a;
-    tex = ((a + (int32_t)vis_t) ^ (z + (int32_t)(vis_t * (uint32_t)(2 + seq_bpm / 40)))) & 32;
+    tex = (int32_t)(((uint32_t)a + vis_t) ^ ((uint32_t)z + vis_t * (uint32_t)(2 + seq_bpm / 40))) & 32;   /* unsigned: the frame count wraps cleanly */
     lit = z > 200 ? 0 : 63 - z / 4;
     return vpal[tex ? lit : lit / 3];
 }
@@ -917,7 +918,7 @@ static uint16_t px_twirl(int32_t u, int32_t v, int32_t W, int32_t H)          /*
 {
     int32_t zm = 200 + (vsin(vis_t * 5u) >> 8) + (vis_hit ? 60 : 0), cs = vcos(vis_t * 4u) * zm >> 15, sn = vsin(vis_t * 4u) * zm >> 15;
     int32_t x = (u - W / 2) * 54 / W, y = (v - H / 2) * 54 / W;
-    int32_t tu = (x * cs - y * sn + (int32_t)vis_t * 300) >> 8, tv = (x * sn + y * cs) >> 8, c = ((tu ^ tv) & 8) ? 16 + ((tu + tv) & 15) * 3 : 4;
+    int32_t tu = (x * cs - y * sn + (int32_t)(vis_t * 300u % 65536u)) >> 8, tv = (x * sn + y * cs) >> 8, c = ((tu ^ tv) & 8) ? 16 + ((tu + tv) & 15) * 3 : 4;
     return vpal[c > 63 ? 63 : c];
 }
 static void pic_twirl(void) { render_px(px_twirl); }
@@ -937,7 +938,7 @@ static uint16_t px_logo(int32_t u, int32_t v, int32_t W, int32_t H)           /*
     if (ly < 0 || ly > 239) return vpal[0];
     b = LOGO_PX[(ly * 240 + lx) >> 1]; i = lx & 1 ? b & 15 : b >> 4;
     if (logo_dark >> i & 1) {
-        int32_t ph = (ly * 2 + (int32_t)vis_t * 3) & 63, k = ph < 32 ? ph : 63 - ph;
+        int32_t ph = (int32_t)(((uint32_t)ly * 2u + vis_t * 3u) & 63u), k = ph < 32 ? ph : 63 - ph;
         return wpal[k * 2 * (vis_hit ? 5 : 3) / 5];
     }
     return SW(paint(LOGO_PAL[i]));
@@ -1184,8 +1185,8 @@ static void draw_demo(void)
                 cvp[i] = SW((uint16_t)(r << 11 | g << 5 | b));
             }
         }
-        if (y == 0 && ((demo_msg && fm1_ms < demo_msg_until) || fm1_ms < toast_until)) {   /* a word on what changed, top left */
-            const char *m = fm1_ms < toast_until ? toast_s : demo_msg;
+        if (y == 0 && ((demo_msg && ms_before(demo_msg_until)) || ms_before(toast_until))) {   /* a word on what changed, top left */
+            const char *m = ms_before(toast_until) ? toast_s : demo_msg;
             k = tw7(m);
             fill(0, 0, k + 6, 13, C_BG);
             text7(3, 3, m, C_CREAM);
@@ -1569,7 +1570,7 @@ static void draw_title(int force)
     char st[24];
     const char *name = row_name();
     uint16_t sc = status(st);
-    int32_t n = setup_on ? NROWS_OF(ROW_SETUP) : nrows(grp), i, toast_on = fm1_ms < toast_until;
+    int32_t n = setup_on ? NROWS_OF(ROW_SETUP) : nrows(grp), i, toast_on = ms_before(toast_until);
     uint32_t h = 2166136261u;
     for (i = 0; st[i]; i++) h = (h ^ (uint8_t)st[i]) * 16777619u;
     for (i = 0; toast_on && toast_s[i]; i++) h = (h ^ (uint8_t)toast_s[i]) * 16777619u;

@@ -3,6 +3,8 @@ Since 1.2:
 - Seven new styles: DUB (105, the one drop), TRIBAL (125), FABLE (150), PC FM (125), BOOGIE (125, the shuffle),
   ZEN (60) and FACTORY (185, industrial), each with its drums, bass, pad, lead, arp, sfx and effects. Seventeen in all.
 - HONKYTNK and SHAKU patches, the METAL kit.
+- Long runs: a message no longer stays on screen after the millisecond clock wraps (49 days); voice stealing
+  and the pictures stay right past their counters' wraps.
 - SYMPHONY's lead plays CHAOS.
 - OLDSKOOL's pad plays chords, struck on the one and the three; the chip arpeggio comes on a phrase's last bar and now and then.
 - EDIT opens on what plays: an empty part gets four bars of what the style plays from the bar playing on.

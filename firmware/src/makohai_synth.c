@@ -408,7 +408,7 @@ static voice_t *alloc_voice(uint32_t lane, uint32_t wt)
         /* a free voice, else the quietest one in its release, else the oldest */
         uint32_t score = vc[v].kind == V_OFF ? 0u
                        : vc[v].stage == 2u || (vc[v].kind != V_FM && vc[v].kind < V_WASH) ? 1u + (uint32_t)vc[v].amp
-                       : 0x40000000u + (vc[v].age & 0x3FFFFFFFu);
+                       : 0x7FFFFFFFu - ((vage - vc[v].age) & 0x3FFFFFFFu);
         if (score < best) { best = score; pick = v; }
     }
     if (vc[pick].kind != V_OFF && vc[pick].midi) mo_push(0x80u | vc[pick].midi_ch, vc[pick].midi, 0);
@@ -419,7 +419,7 @@ static voice_t *alloc_voice(uint32_t lane, uint32_t wt)
         for (v = 0; v < NVOICE; v++) {
             uint32_t score;
             if (vc[v].kind == V_OFF) continue;
-            score = vc[v].stage == 2u || (vc[v].kind != V_FM && vc[v].kind < V_WASH) ? 1u + (uint32_t)vc[v].amp : 0x40000000u + (vc[v].age & 0x3FFFFFFFu);
+            score = vc[v].stage == 2u || (vc[v].kind != V_FM && vc[v].kind < V_WASH) ? 1u + (uint32_t)vc[v].amp : 0x7FFFFFFFu - ((vage - vc[v].age) & 0x3FFFFFFFu);
             if (score < vb) { vb = score; victim = v; }
         }
         if (victim == NVOICE) break;

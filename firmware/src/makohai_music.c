@@ -352,7 +352,7 @@ static arc_t arc_at(int32_t b)
     if (s.from > b) { a.mode = A_BUILD; a.e = 0; return a; }
     for (k = 0; k < 64 && next_implicit(&s, &nx) && nx.from <= b; k++) s = nx;
     a.mode = s.mode; a.lane = s.lane; a.until = s.until;
-    if (s.mode == A_BUILD) { a.e = s.e0 + (b - s.from) * 256 / (build_ph * 4); if (a.e > 230) a.e = 230; }
+    if (s.mode == A_BUILD) { int32_t d = b - s.from > 4096 ? 4096 : b - s.from; a.e = s.e0 + d * 256 / (build_ph * 4); if (a.e > 230) a.e = 230; }   /* d capped: no overflow in a build that never drops */
     else if (s.mode == A_BREAK) a.e = s.e0;
     else if (s.mode == A_PEAK) { a.e = 256; a.drop = b == s.from; }
     else { a.e = 256 - (b - s.from + 1) * 56; if (a.e < 31) a.e = 31; }
