@@ -1,10 +1,13 @@
 Since 1.2:
 
+- Seven new styles: DUB (105, the one drop), TRIBAL (125), FABLE (150), PC FM (125), BOOGIE (125, the shuffle),
+  ZEN (60) and FACTORY (185, industrial), each with its drums, bass, pad, lead, arp, sfx and effects. Seventeen in all.
+- HONKYTNK and SHAKU patches, the METAL kit.
 - SYMPHONY's lead plays CHAOS.
 - OLDSKOOL's pad plays chords, struck on the one and the three; the chip arpeggio comes on a phrase's last bar and now and then.
 - EDIT opens on what plays: an empty part gets four bars of what the style plays from the bar playing on.
 - STYLE (SONG, LIVE) while stopped also starts a new song: MELODY at random on every lane.
-- 46 new patches (66 in all), in families: basses, leads, struck and plucked, organs, pads, chips.
+- 46 new patches (68 in all with HONKYTNK and SHAKU), in families: basses, leads, struck and plucked, organs, pads, chips.
 - Waveforms for the FM operators: the PC sound card's, a square, a saw, and sixteen 8-bit single cycles drawn at
   power-on.
 - MUTATE (SOUND): each song plays the lanes' sounds its own way, and the styles pick from four fitting sounds per

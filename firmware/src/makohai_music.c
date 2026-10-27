@@ -4,7 +4,7 @@
  *   harmony     a chord per bar: from the profile (explicit chords, borrowed ones allowed), or from the SONG
  *               page (key, scale, a suggested progression). Lines move through a "local scale": the scale
  *               with any note a semitone off a chord tone swapped for that chord tone, so nothing rubs.
- *   styles      ten profiles: a progression, a generator and an instrument per lane, a tempo, and a way of
+ *   styles      seventeen profiles: a progression, a generator and an instrument per lane, a tempo, and a way of
  *               playing (how many lead notes glide in, how many long chords swell or fade, the lead's echo)
  *   mixing      a queued profile; BLEND moves lanes to it bottom-up (drums, bass, pad, lead); LAUNCH moves
  *               every unlocked lane on the next phrase; the bass lane's profile carries the harmony
@@ -92,9 +92,13 @@ enum { S_DRIVE, S_PEDAL, S_OCTAVE,                       /* bass */
        S_SYMLEAD, S_ORCH, S_CELLO, S_DORCH,              /* the symphony: lead, strings, cellos, percussion */
        S_ROOTS, S_GALLOP, S_SLAP, S_ACID,                /* bass: TROPIC, STEEL, FUNK, RAVE */
        S_SKANK, S_PCHORD, S_CLAV,                         /* pad: TROPIC, STEEL, FUNK */
-       S_DTROPIC, S_DSTEEL, S_DDRIFT, S_DFUNK, S_DRAVE }; /* drums */
+       S_DTROPIC, S_DSTEEL, S_DDRIFT, S_DFUNK, S_DRAVE,  /* drums */
+       S_DUBBASS, S_OOMPAH, S_WALK, S_DRONE,             /* bass: DUB, FABLE, BOOGIE, ZEN */
+       S_PIZZ, S_BOOGIE,                                 /* pad: FABLE, BOOGIE */
+       S_DDUB, S_DTRIBAL, S_DFABLE, S_DBOOGIE, S_DZEN, S_DFACTORY };   /* drums */
 static const int8_t AEO[7] = {0, 2, 3, 5, 7, 8, 10}, ION[7] = {0, 2, 4, 5, 7, 9, 11}, DOR[7] = {0, 2, 3, 5, 7, 9, 10},
-                    MXL[7] = {0, 2, 4, 5, 7, 9, 10};
+                    MXL[7] = {0, 2, 4, 5, 7, 9, 10}, PHG[7] = {0, 1, 3, 5, 7, 8, 10},
+                    MPENT[7] = {0, 3, 5, 7, 10, 10, 10}, YO[7] = {0, 2, 5, 7, 9, 9, 9};   /* pentatonics: five notes, the last again */
 typedef struct {
     const char *name;
     const int8_t *scale;
@@ -108,7 +112,7 @@ typedef struct {
     uint8_t arp[3];             /* the arp lane: its pattern (AP_x), 16ths a note, octaves */
 } prof_t;
 enum { AP_UP, AP_DOWN, AP_UPDOWN, AP_ALBERTI, AP_BROKEN, AP_RANDOM, NAP };
-/* ten styles of 90s tracker music, from a study of their modules: chords (sus chords everywhere), drum grids,
+/* seventeen styles of 90s tracker music, from a study of their modules: chords (sus chords everywhere), drum grids,
  * tempos, and how the notes are played (glides, swells, an echo channel) */
 static const prof_t PROF[] = {
     {"EPIC", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}},
@@ -137,6 +141,29 @@ static const prof_t PROF[] = {
     /* the rave: four on the floor, an acid bass that slides, organ stabs, brass chord hits */
     {"RAVE", AEO, {{0, Q_MIN}, {0, Q_MIN}, {8, Q_MAJ}, {8, Q_MAJ}, {3, Q_MAJ}, {3, Q_MAJ}, {10, Q_MAJ}, {7, Q_S4}},
      {S_STAB, S_SUS, S_ACID, S_DRAVE}, {4, 7, 0, 3, 0, 17}, 0, 138, 20, 0, 35, {AP_UP, 1, 2}},
+    /* dub: minor, two bars a chord, the one drop, an organ skank off the beat, a round bass with rests, a melodica
+     * in a long echo */
+    {"DUB", AEO, {{0, Q_MIN}, {0, Q_MIN}, {5, Q_MIN}, {5, Q_MIN}, {0, Q_MIN}, {10, Q_MAJ}, {5, Q_MIN}, {7, Q_MIN}},
+     {S_EPIC, S_SKANK, S_DUBBASS, S_DDUB}, {55, 7, 3, 3, 0, 13}, 2, 105, 10, 0, 60, {AP_UPDOWN, 2, 1}},
+    /* tribal: minor pentatonic over open fifths, toms and big drums, a breathy flute, brass held for the climax */
+    {"TRIBAL", MPENT, {{0, Q_5}, {0, Q_5}, {10, Q_5}, {0, Q_5}, {5, Q_5}, {3, Q_5}, {10, Q_5}, {0, Q_5}},
+     {S_MELODY, S_STRINGS, S_PEDAL, S_DTRIBAL}, {8, 4, 3, 0, 0, 39}, 2, 125, 15, 30, 20, {AP_BROKEN, 2, 1}},
+    /* a fable: major and quick, pizzicato chords, an oom-pah clarinet bass, a flute, the xylophone, a triangle */
+    {"FABLE", ION, {{0, Q_MAJ}, {7, Q_MAJ}, {9, Q_MIN}, {5, Q_MAJ}, {0, Q_MAJ}, {5, Q_MAJ}, {7, Q_MAJ}, {0, Q_MAJ}},
+     {S_MELODY, S_PIZZ, S_OOMPAH, S_DFABLE}, {8, 2, 34, 0, 0, 39}, 0, 150, 0, 0, 0, {AP_UPDOWN, 1, 2}},
+    /* the PC sound card: minor with its dominant, thin two-operator tones, a fat FM bass, a plain beat */
+    {"PC FM", AEO, {{0, Q_MIN}, {8, Q_MAJ}, {3, Q_MAJ}, {10, Q_MAJ}, {0, Q_MIN}, {5, Q_MIN}, {7, Q_MAJ}, {0, Q_MIN}},
+     {S_MELODY, S_LUSH, S_DRIVE, S_DOLD}, {30, 31, 20, 1, 0, 31}, 0, 125, 10, 0, 20, {AP_UP, 1, 2}},
+    /* boogie: the shuffle, a walking bass, honky-tonk piano on the off-beats, a hard snare, a sax riff */
+    {"BOOGIE", MXL, {{0, Q_MAJ}, {0, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}, {7, Q_MAJ}, {5, Q_MAJ}, {0, Q_MAJ}, {7, Q_MAJ}},
+     {S_RIFF, S_BOOGIE, S_WALK, S_DBOOGIE}, {36, 66, 1, 4, 0, 12}, 0, 125, 15, 0, 0, {AP_ALBERTI, 2, 1}},
+    /* zen: slow, a five-note scale over fifths and sus chords, a bamboo flute bending, a held drone, a choir, one
+     * big drum */
+    {"ZEN", YO, {{0, Q_5}, {0, Q_S4}, {7, Q_S4}, {0, Q_5}, {5, Q_5}, {2, Q_S4}, {7, Q_5}, {0, Q_S4}},
+     {S_EPIC, S_STRINGS, S_DRONE, S_DZEN}, {67, 18, 3, 3, 0, 48}, 2, 60, 35, 60, 45, {AP_BROKEN, 4, 2}},
+    /* the factory: fast and half-time, phrygian power chords, metal clanks, a growling bass, distorted strings */
+    {"FACTORY", PHG, {{0, Q_5}, {1, Q_5}, {0, Q_5}, {0, Q_5}, {0, Q_5}, {6, Q_5}, {3, Q_5}, {1, Q_5}},
+     {S_RIFF, S_STRINGS, S_ACID, S_DFACTORY}, {28, 5, 21, 5, 0, 28}, 0, 185, 25, 0, 15, {AP_RANDOM, 1, 2}},
 };
 #define NPROF (int32_t)(sizeof PROF / sizeof PROF[0])
 /* each style's other sounds that fit, per lane: LEAD, PAD, BASS, the kits, ARP; the first is the style's own. With
@@ -152,11 +179,18 @@ static const uint8_t POOL[][5][4] = {
     /* DRIFT */      {{8, 38, 32, 34}, {18, 57, 58, 60}, {3, 26, 23, 25}, {2, 3, 0, 2}, {6, 42, 50, 41}},
     /* FUNK */       {{11, 36, 35, 29}, {13, 44, 54, 46}, {1, 25, 22, 26}, {1, 4, 0, 1}, {13, 44, 40, 45}},
     /* RAVE */       {{4, 62, 28, 27}, {7, 53, 54, 61}, {0, 20, 21, 25}, {3, 2, 4, 3}, {17, 17, 63, 28}},
+    /* DUB */        {{55, 33, 30, 32}, {7, 53, 44, 13}, {3, 26, 0, 23}, {3, 1, 0, 3}, {13, 40, 41, 44}},
+    /* TRIBAL */     {{8, 32, 30, 49}, {4, 62, 5, 18}, {3, 26, 23, 0}, {0, 3, 1, 0}, {39, 41, 49, 40}},
+    /* FABLE */      {{8, 34, 33, 32}, {2, 47, 43, 42}, {34, 2, 22, 23}, {0, 1, 0, 4}, {39, 51, 42, 41}},
+    /* PC FM */      {{30, 31, 29, 9}, {31, 53, 54, 7}, {20, 0, 25, 24}, {1, 0, 1, 2}, {31, 30, 63, 64}},
+    /* BOOGIE */     {{36, 35, 11, 29}, {66, 12, 13, 53}, {1, 23, 22, 0}, {4, 0, 1, 4}, {12, 13, 40, 44}},
+    /* ZEN */        {{67, 8, 32, 38}, {18, 58, 57, 56}, {3, 16, 26, 3}, {3, 0, 3, 2}, {48, 41, 47, 50}},
+    /* FACTORY */    {{28, 10, 27, 29}, {5, 61, 62, 15}, {21, 25, 24, 20}, {5, 4, 2, 5}, {28, 64, 10, 11}},
 };
 typedef char pool_count[sizeof POOL / sizeof POOL[0] == sizeof PROF / sizeof PROF[0] ? 1 : -1];
-/* how each style plays the lanes, on top of your settings (as VARY): swing, tremolo, trance gate (tremor), gate and
- * stereo per lane, in LEAD PAD BASS DRUMS SFX ARP order. The notes' own effects are in style_fx */
-typedef struct { int8_t swing[NLANE], pan[NLANE]; uint8_t trem[NLANE], tremor[NLANE], gate[NLANE]; } sstyle_t;
+/* how each style plays the lanes, on top of your settings (as VARY): swing, tremolo, trance gate (tremor), gate,
+ * stereo, echo and drive per lane, in LEAD PAD BASS DRUMS SFX ARP order. The notes' own effects are in style_fx */
+typedef struct { int8_t swing[NLANE], pan[NLANE]; uint8_t trem[NLANE], tremor[NLANE], gate[NLANE], echo[NLANE], drive[NLANE]; } sstyle_t;
 static const sstyle_t SSTYLE[] = {
     /* EPIC */       {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
     /* HYPERSPACE */ {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 30}},
@@ -168,6 +202,14 @@ static const sstyle_t SSTYLE[] = {
     /* DRIFT */      {{0, 0, 0, 0, 0, 0}, {25, 0, 0, 0, 0, -25}, {0, 30, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
     /* FUNK */       {{0, 0, 0, 35, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 40, 30, 0, 0, 0}},
     /* RAVE */       {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 2, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},
+    /* DUB: the skank short and echoed, the rim shots too */
+    /* DUB */        {{0, 0, 0, 25, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 40, 0, 0, 0, 0}, {0, 45, 0, 30, 40, 30}},
+    /* TRIBAL */     {{0, 0, 0, 15, 0, 0}, {-15, 0, 0, 0, 0, 25}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {20, 0, 0, 0, 0, 10}},
+    /* FABLE */      {{0, 0, 0, 0, 0, 0}, {10, 0, 0, 0, 0, -20}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 50, 30, 0, 0, 20}},
+    /* PC FM */      {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 20}},
+    /* BOOGIE */     {{0, 0, 0, 0, 0, 0}, {20, -10, 0, 0, 0, -20}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 30, 0, 0, 0, 0}},
+    /* ZEN */        {{0, 0, 0, 0, 0, 0}, {-10, 0, 0, 0, 0, 30}, {0, 20, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 30, 20}},
+    /* FACTORY */    {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, -30}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 20, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {20, 25, 0, 0, 0, 15}},
 };
 typedef char sstyle_count[sizeof SSTYLE / sizeof SSTYLE[0] == sizeof PROF / sizeof PROF[0] ? 1 : -1];
 
@@ -265,7 +307,7 @@ static void key_chord(int32_t b, int32_t note, int sus, int32_t *o)
 {
     const int8_t *sc; int32_t n, i, best = 0, pc, oct;
     if (prog_sel > 0 && scale_sel > 0) { sc = SCALES[scale_sel].pcs; n = SCALES[scale_sel].n; }
-    else { sc = PROF[eff_prof(L_BASS, b)].scale; n = 7; }
+    else { sc = PROF[eff_prof(L_BASS, b)].scale; for (n = 1; n < 7 && sc[n] > sc[n - 1]; n++) ; }   /* a pentatonic: its five */
     pc = fmodp(note - 2 - key_off, 12); oct = note - pc;           /* key_off counts from D: the tonic is 2 + key_off; oct: the note's octave on it */
     for (i = 0; i < n; i++) if (sc[i] <= pc) best = i;              /* the scale note at or under it */
     o[0] = oct + sc[best];
@@ -646,6 +688,106 @@ static void generate(int32_t style, gen_t *G, rng_t *r, const tools_t *T, int32_
         const int8_t *cp = CP[(rnd(&m) >> 16) * 3u >> 16];
         for (i = 0; i < 7 && cp[i] >= 0; i++) g_add(G, cp[i], 1, 3, ct(T, 1), ct(T, 2), ct(T, 3), i % 2 ? EV_ACC1 : 0);
         break; }
+    case S_DUBBASS: {           /* round and heavy, with rests: one of three figures for two bars (a note: 0 root, 1 the
+                                 * third, 2 the fifth, 3 the octave, 4 a step under the root) */
+        static const int8_t DB[3][5][3] = {{{0, 3, 0}, {6, 2, 2}, {8, 2, 0}, {11, 1, 1}, {14, 2, 4}},
+                                           {{0, 4, 0}, {7, 1, 0}, {8, 3, 2}, {12, 2, 1}, {-1}},
+                                           {{0, 2, 0}, {3, 2, 3}, {6, 2, 2}, {10, 4, 0}, {-1}}};
+        rng_t m = {hash3(b / 2, 67, p)};
+        const int8_t (*f)[3] = DB[(rnd(&m) >> 16) * 3u >> 16];
+        for (i = 0; i < 5 && f[i][0] >= 0; i++) {
+            int32_t w = f[i][2], n = w == 0 ? ct(T, 0) : w == 3 ? ct(T, 0) + 12 : w == 4 ? stp(T, -1) : ct(T, w);
+            if (n > ct(T, 0) + 7 && w != 3) n -= 12;                  /* the third and fifth under the octave */
+            NOTE(G, f[i][0], f[i][1], n);
+        }
+        break; }
+    case S_OOMPAH:              /* the root on the one, the fifth under it on the three; a run down into the phrase */
+        if (b % 4 == 3) for (s = 0; s < 16; s += 2) NOTE(G, s, 2, s < 8 ? (s ? stp(T, -s / 2) : ct(T, 0)) : stp(T, (s - 8) / 2 - 4));
+        else {
+            int32_t f5 = T->H->nt == 3 ? ct(T, 2) : ct(T, 1);       /* the fifth (a power chord's second tone) */
+            NOTE(G, 0, 2, ct(T, 0));
+            NOTE(G, 8, 2, f5 - 12 >= LLO[L_BASS] ? f5 - 12 : f5);
+        }
+        break;
+    case S_WALK: {              /* a walking bass in quarters: root, a chord tone or a step, and a note a semitone from
+                                 * the next chord's root; now and then a swung pickup */
+        harm_t Hn;
+        int32_t root = ct(T, 0), nr, ap;
+        harm_at(b + 1, &Hn);
+        nr = T->base + Hn.root;
+        while (nr > root + 6) nr -= 12;
+        while (nr < root - 6) nr += 12;
+        ap = nr + (chance(r, 50) ? -1 : 1);
+        NOTE(G, 0, 3, root);
+        NOTE(G, 4, 3, chance(r, 50) ? ct(T, 1) : stp(T, 1));
+        NOTE(G, 8, 3, chance(r, 60) ? ct(T, 2) : stp(T, 2));
+        NOTE(G, 12, 3, ap);
+        for (s = 3; s < 16; s += 4) if (chance(r, 20)) { ev_t *e = NOTE(G, s, 1, s == 15 ? ap : root); if (e) e->flags = EV_ACC2; }
+        g_sort(G);
+        break; }
+    case S_DRONE:               /* the root held, its octave joining into the phrase */
+        NOTE(G, 0, b % 4 == 3 ? 8 : 16, ct(T, 0));
+        if (b % 4 == 3) NOTE(G, 8, 8, ct(T, 0) + 12);
+        break;
+    case S_PIZZ:                /* plucked chords, short, on the beats; an off-beat now and then */
+        for (s = 0; s < 16; s += 4) g_add(G, s, 1, 3, ct(T, 0), ct(T, 1), ct(T, 2), s % 8 ? EV_ACC1 : 0);
+        for (s = 6; s < 16; s += 8) if (chance(r, 40)) g_add(G, s, 1, 3, ct(T, 0), ct(T, 1), ct(T, 2), EV_ACC2);
+        break;
+    case S_BOOGIE:              /* the piano on the shuffle's off-beats (the dotted 8ths: 3, 7, 11, 15), the one now and then */
+        if (chance(r, 50)) g_add(G, 0, 2, 3, ct(T, 0), ct(T, 1), ct(T, 2), 0);
+        for (s = 3; s < 16; s += 4) g_add(G, s, 1, 3, ct(T, 1), ct(T, 2), ct(T, 3), s % 8 == 7 ? EV_ACC1 : 0);
+        if (chance(r, 40)) g_add(G, 8, 1, 3, ct(T, 1), ct(T, 2), ct(T, 3), EV_ACC2);
+        g_sort(G);
+        break;
+    case S_DDUB: {              /* the one drop: nothing on the one, kick and rim together on the three; 8th hats */
+        static const int8_t H[16] = {80, 0, 70, 0, 80, 0, 70, 0, 80, 0, 70, 0, 80, 0, 70, 0}, GH[16] = {0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 15, 0};
+        DRUM(G, 8, DK_KICK); DRUM(G, 8, DK_RIM);
+        for (s = 0; s < 16; s++) if (H[s] && chance(r, H[s])) { ev_t *e = DRUM(G, s, DK_HAT); if (e && s % 4) e->flags = EV_ACC2; }
+        for (s = 0; s < 16; s++) if (GH[s] && chance(r, GH[s])) { ev_t *e = DRUM(G, s, DK_RIM); if (e) e->flags = EV_ACC2; }
+        if (b % 4 == 3 && chance(r, 60)) DRUM(G, 14, DK_OHAT);
+        if (b % 8 == 7) for (s = 12; s < 16; s++) DRUM(G, s, DK_TOM);
+        break; }
+    case S_DTRIBAL: {           /* big drums and toms: the kick, the kettle on one and three, toms answering, rim and shaker */
+        static const int8_t K[16] = {100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 60, 0, 0, 0, 0, 0}, KT[16] = {70, 0, 0, 0, 0, 0, 0, 0, 80, 0, 0, 0, 0, 0, 0, 0},
+                            TT[16] = {0, 0, 0, 70, 0, 0, 70, 0, 0, 0, 0, 60, 0, 0, 60, 0}, RM[16] = {0, 0, 40, 0, 0, 40, 0, 40, 0, 0, 0, 0, 0, 40, 0, 0};
+        hits(G, r, DK_KICK, K); hits(G, r, DK_KETTLE, KT); hits(G, r, DK_RIM, RM);
+        if (b % 4 == 3) for (s = 12; s < 16; s++) DRUM(G, s, DK_TOM); else hits(G, r, DK_TOM, TT);
+        for (s = 0; s < 16; s += 2) if (chance(r, 50)) { ev_t *e = DRUM(G, s, DK_HAT); if (e) e->flags = s % 4 ? EV_ACC2 : EV_ACC1; }   /* the shaker */
+        if (b % 8 == 0) DRUM(G, 0, DK_CRASH);
+        break; }
+    case S_DFABLE: {            /* light: a soft bass drum, the triangle on two and four, a brush of rim, a roll into the phrase */
+        static const int8_t RM[16] = {0, 0, 30, 0, 0, 0, 30, 0, 0, 0, 30, 0, 0, 0, 30, 0};
+        { ev_t *e = DRUM(G, 0, DK_KETTLE); if (e) e->flags = EV_ACC1; }
+        if (chance(r, 50)) { ev_t *e = DRUM(G, 8, DK_KICK); if (e) e->flags = EV_ACC1; }
+        DRUM(G, 4, DK_OHAT); DRUM(G, 12, DK_OHAT);
+        for (s = 0; s < 16; s++) if (RM[s] && chance(r, RM[s])) { ev_t *e = DRUM(G, s, DK_RIM); if (e) e->flags = EV_ACC2; }
+        if (b % 4 == 3) for (s = 12; s < 16; s++) { ev_t *e = DRUM(G, s, DK_SNARE); if (e) e->flags = s < 15 ? EV_ACC2 : EV_ACC1; }
+        break; }
+    case S_DBOOGIE: {           /* the shuffle: hats long-short (the dotted 8th on 3, 7, 11, 15), a hard snare on two and four */
+        static const int8_t H[16] = {90, 0, 0, 70, 90, 0, 0, 70, 90, 0, 0, 70, 90, 0, 0, 70};
+        DRUM(G, 0, DK_KICK); DRUM(G, 8, DK_KICK);
+        if (chance(r, 30)) { ev_t *e = DRUM(G, 11, DK_KICK); if (e) e->flags = EV_ACC1; }
+        DRUM(G, 4, DK_SNARE); DRUM(G, 12, DK_SNARE);
+        for (s = 7; s < 16; s += 8) if (chance(r, 25)) { ev_t *e = DRUM(G, s, DK_SNARE); if (e) e->flags = EV_ACC2; }
+        for (s = 0; s < 16; s++) if (H[s] && chance(r, H[s])) { ev_t *e = DRUM(G, s, b % 2 && s == 15 ? DK_OHAT : DK_HAT); if (e && s % 4) e->flags = EV_ACC2; }
+        if (b % 8 == 0) DRUM(G, 0, DK_CRASH);
+        break; }
+    case S_DZEN: {              /* one big drum on the one, the bass drum every other bar, a wood block, a roll into the phrase */
+        DRUM(G, 0, DK_KETTLE);
+        if (b % 2 == 0) { ev_t *e = DRUM(G, 0, DK_KICK); if (e) e->flags = EV_ACC1; }
+        if (chance(r, 35)) { ev_t *e = DRUM(G, chance(r, 50) ? 12 : 14, DK_KETTLE); if (e) e->flags = EV_ACC1; }
+        for (s = 4; s < 16; s += 8) if (chance(r, 30)) { ev_t *e = DRUM(G, s, DK_RIM); if (e) e->flags = EV_ACC2; }
+        if (b % 4 == 3) for (s = 8; s < 16; s += 2) { ev_t *e = DRUM(G, s, DK_KETTLE); if (e) e->flags = s < 12 ? EV_ACC2 : s < 14 ? EV_ACC1 : 0; }
+        break; }
+    case S_DFACTORY: {          /* half-time: the kick on one, the snare and a clap on three, clanks (rim shots) all over, toms */
+        static const int8_t K[16] = {100, 0, 0, 40, 0, 0, 0, 0, 0, 0, 80, 0, 0, 0, 40, 0}, H[16] = {0, 0, 70, 0, 0, 0, 70, 0, 0, 0, 70, 0, 0, 0, 70, 0},
+                            TT[16] = {0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 30, 0, 0};
+        hits(G, r, DK_KICK, K); hits(G, r, DK_HAT, H); hits(G, r, DK_TOM, TT);
+        DRUM(G, 8, DK_SNARE); DRUM(G, 8, DK_CLAP);
+        for (s = 0; s < 16; s++) if (s != 8 && chance(r, 20)) { ev_t *e = DRUM(G, s, DK_RIM); if (e) e->flags = s % 2 ? EV_ACC2 : EV_ACC1; }
+        if (b % 4 == 3) for (s = 12; s < 16; s++) DRUM(G, s, DK_SNARE);
+        if (b % 8 == 0) DRUM(G, 0, DK_CRASH);
+        break; }
     case S_DTROPIC: {           /* the one and the three, rim shots on two and four with a push, congas, shaker 8ths */
         static const int8_t K[16] = {100, 0, 30, 20, 0, 0, 30, 0, 90, 0, 40, 0, 0, 0, 25, 0}, SN[16] = {0, 0, 0, 0, 90, 0, 0, 45, 0, 35, 0, 0, 90, 0, 25, 30},
                             H[16] = {50, 0, 85, 0, 50, 0, 85, 0, 50, 0, 85, 0, 50, 0, 85, 0}, TT[16] = {0, 0, 0, 45, 0, 0, 55, 0, 0, 0, 0, 45, 0, 0, 55, 0};
@@ -768,6 +910,34 @@ static void gen_sfx(gen_t *G, rng_t *r, const tools_t *T, int32_t b, int32_t p, 
             for (i = 0; i < 4; i++) if (chance(r, x * 35 / 100)) SFX(G, OFF[i], 1, SX_ZAP, root + PICK(r, 12, 19, 24));
             if (b % 4 == 3 && !drop) SFX(G, 8, 8, SX_GALE, root);
             break;
+        case 10:                                                    /* DUB: the siren climbing into the phrase, a wash on it */
+            if (b % 4 == 3) for (i = 0; i < 4; i++) if (chance(r, x * 70 / 100)) SFX(G, 8 + i * 2, 1, SX_ZAP, root + PICK(r, 12, 12, 19) + i * 2);
+            if (b % 8 == 0 && !drop && chance(r, x)) SFX(G, 0, 16, SX_WASH, root);
+            break;
+        case 11:                                                    /* TRIBAL: the river, the wind in the trees */
+            if (b % 2 == 1 && chance(r, x)) SFX(G, 0, 16, SX_SURF, root);
+            if (b % 8 == 4 && chance(r, x * 60 / 100)) SFX(G, 0, 16, SX_GALE, root);
+            break;
+        case 12:                                                    /* FABLE: sparkles high up, a soft wash a phrase */
+            for (i = 0; i < 4; i++) if (chance(r, x * 15 / 100)) SFX(G, OFF[i] + 1, 1, SX_ZAP, root + PICK(r, 24, 31, 36));
+            if (b % 4 == 0 && !drop && chance(r, x * 60 / 100)) SFX(G, 0, 16, SX_WASH, root);
+            break;
+        case 13:                                                    /* PC FM: a zap into the phrase, bits at the top */
+            if (b % 4 == 3 && chance(r, x * 60 / 100)) SFX(G, 14, 1, SX_ZAP, root + 12);
+            if (e > 200) for (i = 0; i < 4; i++) if (chance(r, x * 20 / 100)) SFX(G, OFF[i], 1, SX_BITS, root);
+            break;
+        case 14:                                                    /* BOOGIE: the old record */
+            if (chance(r, x)) SFX(G, 0, 16, SX_CRACKLE, root);
+            break;
+        case 15:                                                    /* ZEN: water and a far wind */
+            if (chance(r, x)) SFX(G, 0, 16, SX_SURF, root);
+            if (b % 4 == 0 && !drop && chance(r, x * 50 / 100)) SFX(G, 0, 16, SX_WASH, root);
+            break;
+        case 16:                                                    /* FACTORY: machines: bits, a hammer on the phrase, screams */
+            for (s = 1; s < 16; s += 2) if (chance(r, x * 25 / 100)) SFX(G, s, 1, SX_BITS, root);
+            if (b % 4 == 0 && !drop && chance(r, x * 70 / 100)) SFX(G, 0, 2, SX_IMPACT, root);
+            if (b % 4 == 2 && chance(r, x * 50 / 100)) SFX(G, 0, 16, SX_GALE, root);
+            break;
         default:                                                    /* OLDSKOOL: crackle under everything, bits */
             if (chance(r, x)) SFX(G, 0, 16, SX_CRACKLE, root);
             for (i = 0; i < 4; i++) if (chance(r, x * e / 256 * 30 / 100)) SFX(G, OFF[i] + 1, 1, SX_BITS, root);
@@ -857,6 +1027,32 @@ static void style_fx(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t p,
             if (l == L_PAD) e->fx = FX_CUT << 4 | 1;
             else if (l == L_BASS && chance(r, 20)) e->fx = FX_SLIDE << 4;
             break;
+        case 10:                                                    /* DUB: the skank cut short, the melodica's long notes waver */
+            if (l == L_PAD) e->fx = FX_CUT << 4 | 1;
+            else if (l == L_LEAD && e->len >= 4) e->fx = FX_VIB << 4 | 4;
+            break;
+        case 11:                                                    /* TRIBAL: the flute sings and slides */
+            if (l == L_LEAD) { if (e->len >= 3 && chance(r, 50)) e->fx = FX_VIB << 4 | 6; else if (chance(r, 15)) e->fx = FX_SLIDE << 4; }
+            break;
+        case 12:                                                    /* FABLE: the pizzicato short, the flute staccato now and then */
+            if (l == L_PAD) e->fx = FX_CUT << 4 | 1;
+            else if (l == L_LEAD && e->len <= 2 && chance(r, 40)) e->fx = FX_CUT << 4 | 2;
+            break;
+        case 13:                                                    /* PC FM: a vibrato on the long lead notes */
+            if (l == L_LEAD && e->len >= 3 && chance(r, 30)) e->fx = FX_VIB << 4 | 5;
+            break;
+        case 14:                                                    /* BOOGIE: the sax slides in, the piano short */
+            if (l == L_LEAD && chance(r, 20)) e->fx = FX_SLIDE << 4;
+            else if (l == L_PAD) e->fx = FX_CUT << 4 | 2;
+            break;
+        case 15:                                                    /* ZEN: the flute bends into its notes, a slow vibrato */
+            if (l == L_LEAD) { if (chance(r, 35)) e->fx = FX_SLIDE << 4; else if (e->len >= 4) e->fx = FX_VIB << 4 | 3; }
+            break;
+        case 16:                                                    /* FACTORY: the lead dives off the phrase, the bass chopped, snare rolls */
+            if (l == L_LEAD && end && i == last) e->fx = FX_DOWN << 4 | 14;
+            else if (l == L_BASS) e->fx = FX_CUT << 4 | 2;
+            else if (l == L_DRUMS && end && e->st >= 12 && e->note[0] == DK_SNARE) e->fx = FX_RETRIG << 4 | 3;
+            break;
         default: break;
         }
     }
@@ -864,7 +1060,8 @@ static void style_fx(int32_t l, gen_t *G, rng_t *r, const tools_t *T, int32_t p,
         int hit = A->drop                                           /* every style: the orchestra on the drop */
                || (p == 0 && b % 4 == 0)
                || (p == 4 && (A->drop || (A->mode == A_OFF && b > 0 && b % 16 == 0)))
-               || (p == 9 && (A->drop || (A->mode == A_OFF && b > 0 && b % 8 == 0)));
+               || (p == 9 && (A->drop || (A->mode == A_OFF && b > 0 && b % 8 == 0)))
+               || (p == 16 && A->mode == A_OFF && b > 0 && b % 8 == 0);   /* FACTORY: a hit every eight bars */
         if (hit) { ev_t *e = NOTE(G, 0, 2, ct(T, 0)); if (e) e->flags |= EV_ORCH; g_sort(G); }
     }
 }
@@ -1305,7 +1502,9 @@ static void fx_apply(void)
         lanefx_t *F = &fx[l];
         int32_t v = U->vary, c = v ? (int32_t)((hash3(ph, l, 4242) >> 8) % 6u) : 0;
         int32_t filt = U->filt, res = U->res, wob = U->wob, bright = U->bright, drive = U->drive, slide = U->slide;
-        int32_t retrig = U->retrig, rate = U->rtg_rate, echo = U->echo + (l == L_LEAD ? PROF[ln[L_LEAD].prof].echo : 0);   /* the style's echo channel */
+        const sstyle_t *SS = &SSTYLE[eff_prof(l, cur_bar())];
+        int32_t retrig = U->retrig, rate = U->rtg_rate, echo = U->echo + (l == L_LEAD ? PROF[ln[L_LEAD].prof].echo : 0) + SS->echo[l];   /* the style's echo channel */
+        drive += SS->drive[l];
         if (HITS(l) && (c == 2 || c == 3)) c = 1;                   /* no slide or brightness on hits: echo instead */
         switch (c) {
         case 1: echo += 60 * v / 100; break;

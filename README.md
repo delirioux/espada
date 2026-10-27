@@ -6,7 +6,7 @@
 
 Makohai is Finnish for the longfin mako shark. It was called Espada before 1.0.
 
-Six lanes (lead, arp, pad, bass, drums and sfx) play parts that are composed live in one of ten styles: chords, bass
+Six lanes (lead, arp, pad, bass, drums and sfx) play parts that are composed live in one of seventeen styles: chords, bass
 lines, melodies, drum patterns and noise in the manner of the S3M scene, played as a tracker musician plays them, with
 glides, swells and an echo channel. You do not program steps; you mix styles. Queue the next style, blend it in lane by
 lane from the bottom up, or launch it at once with its own tempo. Shape each lane with a
@@ -38,7 +38,7 @@ the kind of setting, PRESETS steps through them.
 <tr>
 <td align="center"><img src="docs/screens/song.png" width="240" alt="SONG, KEY"><br><b>SONG</b> (GLO): the knobs are four settings of their own. KEY: key, scale, chords, bars per chord, the chord playing lit.</td>
 <td align="center"><img src="docs/screens/arc.png" width="240" alt="SONG, ARC"><br><b>ARC</b> (off until you turn it on): the energy over the coming bars, build, break, peak and down.</td>
-<td align="center"><img src="docs/screens/live.png" width="240" alt="SONG, LIVE"><br><b>LIVE</b>: the next of ten styles, blend, energy and space; SEQ launches it at once, with its tempo.</td>
+<td align="center"><img src="docs/screens/live.png" width="240" alt="SONG, LIVE"><br><b>LIVE</b>: the next of seventeen styles, blend, energy and space; SEQ launches it at once, with its tempo.</td>
 </tr>
 <tr>
 <td align="center"><img src="docs/screens/edit.png" width="240" alt="EDIT, the drums"><br><b>EDIT</b>: the lane's own part, bar by bar, up to 512 bars, in scale steps from the chord root; the drums' nine hits by row. RECORD live, an effect column per step, undo, bar and range tools, FILL a bar from any style, COPY another lane's part; after your last bar: LOOP, PROFILE or MY STYLE (new bars in your manner).</td>
@@ -111,7 +111,7 @@ the kind of setting, PRESETS steps through them.
   energy rises, breaks, drops and builds again.
 - **Your own parts.** On the EDIT page you enter notes step by step, tracker style: white keys are scale steps
   counted from the chord root, so a melody follows the chords and stays in key. A part is as long as you write it, up
-  to 512 bars a lane. FILL writes a bar in any of the ten styles, or a variation of yours, never the same one twice;
+  to 512 bars a lane. FILL writes a bar in any of the seventeen styles, or a variation of yours, never the same one twice;
   REPEAT copies the bar before; COPY takes another lane's part (a lead line becomes a bass line in the same chords).
   RECORD what you play, live, into the part; a tracker's effect column per step (volume, slide, porta up and down,
   vibrato, retrigger, cut, delay); undo, transpose, shift, bars in and out, copy and paste a range of bars. On PAD a
@@ -172,7 +172,7 @@ above come from host mode, pixel for pixel what the FM-1 draws, at twice the siz
 ```
 firmware/src/makohai.c         the app: shared state, includes the parts below
 firmware/src/makohai_synth.c   the audio interrupt: FM, drum and sfx voices, lane effects, the step clock
-firmware/src/makohai_music.c   harmony, the ten styles, generators, density, the arc, your patterns, the bar cache
+firmware/src/makohai_music.c   harmony, the seventeen styles, generators, density, the arc, your patterns, the bar cache
 firmware/src/makohai_ui.c      the screen, the views and pages, the panel, saving
 firmware/src/platform.c       Dinghy's wiring of the FM-1 platform (boot, USB, updates, panel, screen, settings)
 ```

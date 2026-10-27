@@ -203,13 +203,16 @@ static const patch_t PATCH[] = {
     {"CHIP 25",  16,    0,   0, 100,   2, 1730,  230,  50, 1, 0,    0, 0,  0, W_P25},
     {"CHIP 12",  16,    0,   0, 100,   2, 2650,  230,  50, 1, 0,    0, 0,  0, W_P12},
     {"CHIP TRI", 16,    0,   0, 100,   2, 2160,  240,  50, 0, 0,    0, 0,  0, W_STEPTRI},
+    /* the styles since 1.3: BOOGIE's piano, ZEN's bamboo flute */
+    {"HONKYTNK", 16,  700,  90, 450,   1, 2500,    0, 260, 0, 0, 1100, 2},                        /* a piano and two more, out of tune */
+    {"SHAKU",    16,   90,  40, 300,  80, 2400,  220, 300, 1, 0,    0, 0, 90},                    /* breath first, then the tone */
 };
 #define NPATCH (sizeof PATCH / sizeof PATCH[0])
 #define P_ORCH 19u                              /* the orchestra hit (the styles' hits) */
 /* what a voice of each patch costs the audio interrupt, in units (a plain FM voice is 2), measured: the voice budget */
 static const uint8_t PATCH_W[] = {2, 2, 2, 2, 5, 4, 2, 2, 3, 3, 3, 3, 2, 2, 5, 5, 5, 4, 3, 4,
                                   3, 3, 2, 3, 3, 2, 3,  3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,           /* a drawn or chip waveform: 3 */
-                                  2, 2, 2, 3, 3, 3, 3, 3, 2, 3, 2, 2, 2, 3,  3, 3, 3,  5, 5, 5, 5, 4, 5, 5,  3, 3, 3};
+                                  2, 2, 2, 3, 3, 3, 3, 3, 2, 3, 2, 2, 2, 3,  3, 3, 3,  5, 5, 5, 5, 4, 5, 5,  3, 3, 3,  4, 3};
 typedef char patch_w_all[sizeof PATCH_W == NPATCH ? 1 : -1];
 
 typedef struct { const char *name; uint16_t kh, kl, kd, sf, sd, hf, hd; uint8_t sharp; } kit_t;   /* Hz and ms; sharp: a click, a crack, open hats */
@@ -219,6 +222,7 @@ static const kit_t KITS[] = {
     {"ELECTRO",  120, 38, 600, 1200, 600, 10000, 35},
     {"DEEP",     140, 33, 750, 1500, 620, 7500, 70},     /* a kick that drops very low and rings long, a dry kit around it */
     {"PUNCH",    260, 52, 240, 2600, 360, 9000, 45, 1},  /* sharp: the kick clicks, the snare cracks, the hats one pole bright */
+    {"METAL",    300, 48, 200, 3200, 300, 11000, 30, 1}, /* hard and short: FACTORY's (its rim shots clank) */
 };
 #define NKIT (sizeof KITS / sizeof KITS[0])
 

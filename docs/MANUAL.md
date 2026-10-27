@@ -157,7 +157,8 @@ lane faded out, a save waiting, the keys' octave off 0.
   says how far).
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.
 - **Sound** (PLAY): AUTO follows the style (with MUTATE on, the style picks one of its fitting sounds per song, see
-  below); or one of 66 patches, or one of five drum kits (STANDARD, TRACKER, ELECTRO, DEEP, PUNCH). The patches, in
+  below); or one of 68 patches, or one of six drum kits (STANDARD, TRACKER, ELECTRO, DEEP, PUNCH, METAL: hard and
+  short). The patches, in
   families:
   - the first twenty: FM BASS, SLAP, PIZZ, SUB, BRASS, STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO,
     E.PIANO, CHAOS, VIOLINS, CELLOS, SUPERSAW, AH VOX, ORCH HIT;
@@ -167,7 +168,9 @@ lane faded out, a save waiting, the keys' octave off 0.
     TUBULAR, GLOCK, TOYPIANO;
   - organs: DRAWBAR, PERC ORG, REED ORG;
   - pads (sections of three players): WARM PAD, GLASSPAD, VOX PAD, ENSEMBLE, SWEEP, SAW PAD, SYNBRASS;
-  - chips: CHIP 25 and CHIP 12 (pulses of a quarter and an eighth), CHIP TRI (a 16-step triangle).
+  - chips: CHIP 25 and CHIP 12 (pulses of a quarter and an eighth), CHIP TRI (a 16-step triangle);
+  - and HONKYTNK (a piano with two more a little out of tune: BOOGIE's) and SHAKU (a bamboo flute, breath first:
+    ZEN's).
 
   All of them are FM: two operators, and each operator has a waveform. Besides the sine there are the PC sound card's
   (half sine, rectified, quarter pulses, alternating, camel), a square and a saw, and sixteen single cycles drawn at
@@ -234,7 +237,7 @@ lane faded out, a save waiting, the keys' octave off 0.
   - **END** (PLAY while playing): lead (with the arp), sfx and pad fade out one by one, a bar apart, then bass or drums; the one
     left (chosen at random) plays alone two bars and fades last. Then Makohai stops. The title says INTRO, INTER or
     END while one is running.
-- **The ten styles.** Each is a chord progression, a part for each lane, an instrument for each, a tempo, and a way
+- **The seventeen styles.** Each is a chord progression, a part for each lane, an instrument for each, a tempo, and a way
   of playing. Change the mood with STYLE (SONG, LIVE) and SEQ. Without a saved set Makohai starts with OLDSKOOL.
 
 | Style | Tempo | What it is |
@@ -249,6 +252,13 @@ lane faded out, a save waiting, the keys' octave off 0.
 | DRIFT | 96 | floating: sus chords resolving, two bars a chord, swells, a breathy lead with a long echo, no snare, a soft rim |
 | FUNK | 112 | a major vamp with a diminished passing chord: slap bass, clav stabs, ghost notes, an open hat, a rim |
 | RAVE | 138 | four on the floor, claps, open hats: an acid bass that slides, organ chords, brass stabs, gusts of noise |
+| DUB | 105 | the one drop (kick and rim on the three), an organ skank off the beat, a round bass with rests, a melodica in a long echo, a siren into the phrase |
+| TRIBAL | 125 | minor pentatonic over open fifths: big drums, toms, a shaker, a breathy flute, brass held for the climax |
+| FABLE | 150 | a fairy tale in major: pizzicato chords, an oom-pah clarinet bass, a flute, the xylophone, a triangle |
+| PC FM | 125 | the 90s PC sound card: thin two-operator lead and chords, a fat FM bass, a plain beat |
+| BOOGIE | 125 | the shuffle: a walking bass, honky-tonk piano on the off-beats, a hard snare, a sax riff |
+| ZEN | 60 | slow, a five-note scale over fifths: a bamboo flute that bends, a held drone, a choir, one big drum, water |
+| FACTORY | 185 | industrial, half-time: phrygian power chords, metal clanks, a growling bass, distorted strings, machine noise |
 
 - **How a style plays.** As a tracker musician plays the notes by hand: some lead notes glide in from the last one
   (STEEL most, DRIFT and FUSION often), long chords swell in or fade out (DRIFT and SYMPHONY most), and the lead
@@ -261,7 +271,11 @@ lane faded out, a save waiting, the keys' octave off 0.
   or every 16 bars with the arc off); TROPIC swings drums and arp and spreads lead and arp wide; STEEL dives the lead
   off the phrase's last note and chugs the bass; DRIFT gives the pad a slow tremolo and the lead vibrato, spread wide;
   FUNK swings the drums, plays the clav and bass short and slides the bass; RAVE chops the pad in 16ths (a trance
-  gate), hits the orchestra on the drop (every 8 bars with the arc off), on the DEEP kit with a supersaw arp. All of
+  gate), hits the orchestra on the drop (every 8 bars with the arc off), on the DEEP kit with a supersaw arp; DUB
+  cuts the skank short and echoes it and the rim shots, and its melodica wavers; TRIBAL's flute sings and slides;
+  FABLE keeps its pizzicato short and its flute staccato now and then; PC FM gives the long lead notes vibrato; BOOGIE
+  slides the sax in and keeps the piano short; ZEN bends the flute into its notes; FACTORY drives lead, strings and
+  arp, dives the lead off the phrase, chops the bass, rolls the snare and hits the orchestra every 8 bars. All of
   it comes on top of your settings: your knobs show yours, the lanes play both.
 - **SYMPHONY** is the orchestra: two bars a chord in minor with a major dominant before the
   return; strings in open voicing (root, fifth, tenth) with a suspension resolving on each new chord and the inner
@@ -283,7 +297,9 @@ The sixth lane plays arpeggios: the notes of the chord that is playing, one afte
 harmony and moves with every chord change. Each style brings its own: EPIC plucks up and down, HYPERSPACE a pulse
 going up, FUSION bells in broken thirds, OLDSKOOL the chip arpeggio, SYMPHONY a harp-like pizzicato in 8ths, TROPIC
 an Alberti figure on electric piano, STEEL a saw running down, DRIFT slow bells, FUNK a random electric piano, RAVE
-a supersaw going up.
+a supersaw going up, DUB an electric piano up and down in 8ths, TRIBAL a marimba in broken thirds, FABLE the
+xylophone up and down in 16ths, PC FM a thin FM pulse going up, BOOGIE an Alberti figure on piano, ZEN a slow koto
+in broken thirds, FACTORY random 16ths on a hard-sync lead.
 
 Its settings are on the knobs as every lane's (ALGORITHM to ARP, and the window shows it). **MELODY** steps to the next pattern: UP, DOWN, UP-DOWN, ALBERTI (low, high, middle,
 high), BROKEN (in thirds) and RANDOM. **RHYTHM** makes it faster or slower (16ths, 8ths, quarters), **PITCH** wider or
@@ -303,7 +319,9 @@ noise through a narrow band that wanders, a wind in gusts).
 On **AUTO** (the default) it follows the arc: a gale fills the bar before each drop, the impact lands on it, and in
 between it plays what fits the style: washes and surf for FUSION and DRIFT, surf and washes for TROPIC, washes and a
 gale for EPIC, a cymbal swell and a far wind for SYMPHONY, zaps, gusts and bits for HYPERSPACE, crackle and bits for
-OLDSKOOL, crackle for FUNK, impacts and a storm for STEEL, zaps and a gust into every phrase for RAVE, more as the
+OLDSKOOL, crackle for FUNK and BOOGIE, impacts and a storm for STEEL, zaps and a gust into every phrase for RAVE, a
+siren into the phrase for DUB, a river and wind for TRIBAL, sparkles for FABLE, a zap and bits for PC FM, water for
+ZEN, machines (bits, a hammer, screams) for FACTORY, more as the
 energy and the density rise. With the arc off: a gale every 8th bar, an impact after it. The RISER is never chosen
 on AUTO; turn it on yourself.
 Turn **SOUND** (PLAY, the SFX knob) to one of the eight to hear only that one, in its own pattern. SOUND and TRACKER

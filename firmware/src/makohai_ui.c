@@ -180,7 +180,9 @@ static void toast(const char *s) { uint32_t i; for (i = 0; i < 47u && s[i]; i++)
 static const char *const NN[12] = {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
 static const char *const WOBN[6] = {"OFF", "1/1", "1/2", "1/4", "1/8", "1/16"};
 static const char *const DKN[NDK] = {"K", "S", "H", "T", "C", "X", "O", "M", "R"};   /* EDIT rows: kick, snare, hat, timpani, crash, clap, open hat, tom, rim */
-static const char *const PSHORT[10] = {"EPIC", "HYPER", "FUSION", "OLDSKOOL", "SYMPHONY", "TROPIC", "STEEL", "DRIFT", "FUNK", "RAVE"};
+static const char *const PSHORT[] = {"EPIC", "HYPER", "FUSION", "OLDSKOOL", "SYMPHONY", "TROPIC", "STEEL", "DRIFT", "FUNK", "RAVE",
+                                     "DUB", "TRIBAL", "FABLE", "PC FM", "BOOGIE", "ZEN", "FACTORY"};
+typedef char pshort_count[sizeof PSHORT / sizeof PSHORT[0] == NPROF ? 1 : -1];
 static const char *const SSHORT[13] = {"AUTO", "MAJOR", "MINOR", "DORIAN", "PHRYGIAN", "LYDIAN", "MIXOLYD", "LOCRIAN",
                                        "HARM MIN", "MEL MIN", "MAJ PENT", "MIN PENT", "BLUES"};
 static void set_key(int32_t k) { key = fmodp(k, 12); key_off = key - 2 > 5 ? key - 14 : key - 2; invalidate(); }
@@ -1957,7 +1959,7 @@ static void edit_key(int32_t k, int32_t sel_held_now)
         int32_t nk = sel == L_DRUMS ? NDK : NSX;
         if (wi >= 0 && wi < nk) {
             UKIND(l, cursor) ^= (uint16_t)(1u << wi); pat_touched(l, cursor >> 4);
-            if (!seq_playing) audition((uint32_t)sel, (uint32_t)wi, sel == L_SFX ? 0u : fxu[L_DRUMS].inst >= 0 ? (uint32_t)fxu[L_DRUMS].inst : PROF[ln[L_DRUMS].prof].inst[L_DRUMS]);
+            if (!seq_playing) audition((uint32_t)sel, (uint32_t)wi, sel == L_SFX ? 0u : fxu[L_DRUMS].inst >= 0 ? (uint32_t)fxu[L_DRUMS].inst : style_inst(L_DRUMS, ln[L_DRUMS].prof));
         }
         else cursor = clampi(cursor + 1, 0, nav_steps(sel) - 1);
         area_dirty = 1; return;
@@ -1980,7 +1982,7 @@ static void edit_key(int32_t k, int32_t sel_held_now)
             harm_t H; tools_t T; uint8_t nt;
             harm_at(cur_bar(), &H); tools_make(&T, &H, LBASE[sel] + ln[sel].oct * 12 + key_off);
             nt = (uint8_t)clampi(stp(&T, UK(l, cursor)), 0, 127);
-            audition((uint32_t)sel, nt, fxu[sel].inst >= 0 ? (uint32_t)fxu[sel].inst : PROF[ln[sel].prof].inst[sel]);
+            audition((uint32_t)sel, nt, (uint32_t)inst_eff(sel));
         }
         cursor = clampi(cursor + entry_len, 0, n - 1);
         area_dirty = 1;
