@@ -358,15 +358,26 @@ typedef struct { uint32_t when, dur; uint8_t lane, n, flags, lvl, kind, orig; ui
 static pend_t pend[NPEND];
 static uint32_t npend;
 
-/* ---- MIDI out (the interrupt queues, the main loop sends). Names with an esp_ prefix: usb.c is in this same
- * file and has its own mo_w / mo_r, and C merges two `static` declarations of one name into one variable. Shared,
- * every midi_send() moved the counter the main loop drains to, so it never finished (a freeze on PLAY). */
-static volatile uint32_t esp_mq[64];
-static volatile uint32_t esp_mq_w, esp_mq_r;
-static void mo_push(uint32_t st, uint32_t d1, uint32_t d2)
+/* ---- MIDI out, all of it sent from here (the audio ISR is USB-MIDI's one sender): notes, bends and the clock at
+ * once, in time with the sound; what the main loop sends (controllers, settings) waits in mm_q and goes at the
+ * next block. SYNC (SETUP) turns the clock and the controllers off. */
+static volatile uint32_t mm_q[128], mm_w, mm_r;          /* main loop -> ISR */
+static volatile uint8_t clk_out_on = 1, cc_out_on = 1;   /* SYNC: CLOCK OUT, CC OUT */
+static volatile uint8_t clk_ext;                         /* a clock comes in (the main loop): none goes out then */
+static volatile int32_t seq_nudge_q8;                    /* the clock in's correction, in samples (Q8), taken once */
+static volatile int32_t pos_q8;                          /* where the last block ended (16ths Q8), and when (clk_now) */
+static volatile uint32_t pos_ticks;
+static void mo_push(uint32_t st, uint32_t d1, uint32_t d2) { if (midi_out_room() > 2u) midi_isr_send(st, d1, d2); }   /* ISR */
+static void mm_push(uint32_t st, uint32_t d1, uint32_t d2)                                                            /* main loop */
 {
-    if (esp_mq_w - esp_mq_r < 64u) { esp_mq[esp_mq_w % 64u] = st | d1 << 8 | d2 << 16; RING_PUBLISH(); esp_mq_w++; }
+    if (mm_w - mm_r < 128u) { mm_q[mm_w % 128u] = st | d1 << 8 | d2 << 16; RING_PUBLISH(); mm_w++; }
 }
+static void mm_drain(void)                                /* ISR: leaves room for the notes and the clock */
+{
+    while (mm_r != mm_w && midi_out_room() > 16u) { uint32_t m = mm_q[mm_r % 128u]; mm_r++; midi_isr_send(m & 0xFFu, m >> 8 & 0xFFu, m >> 16 & 0xFFu); }
+}
+static uint32_t vel_of(uint32_t lvl) { uint32_t v = (lvl * 127u + 128u) >> 8; return v < 1u ? 1u : v > 127u ? 127u : v; }   /* the accents as velocity */
+static uint16_t bend_now[NLANE] = {8192, 8192, 8192, 8192, 8192, 8192};   /* the bend each lane's channel is at */
 static const uint8_t GM_DRUM[NDK] = {36, 38, 42, 47, 49, 39, 46, 45, 37};
 /* the MIDI channel of each lane (0..15; 16 = off): lead 1, pad 2, bass 3, drums 10, arp 4 (SETUP, MIDI); the sfx sends none */
 static volatile uint8_t midi_chan[NLANE] = {0, 1, 2, 9, 16, 3};
@@ -511,7 +522,10 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
     if (P->chaos == 3u) for (i = 0; i < 6u; i++) { (void)noise(); v->ss[i] = noise_s; }   /* free-running: each note starts elsewhere */
     if (P->chaos == 4u) { v->ss[0] = 0x20000000u; v->ss[1] = 0; }
     if (P->chaos == 5u) { v->s2 = v->s3 = 0; v->pph1 = 0x55555555u; }                  /* the formant filters empty, the second voice elsewhere */                      /* the hit's tenth; ss[1]: its noise burst's age */
-    if (midi) mo_push(0x90u | v->midi_ch, midi, 100);
+    if (midi) {
+        if (bend_now[lane] != 8192u) { mo_push(0xE0u | v->midi_ch, 0, 64); bend_now[lane] = 8192u; }   /* a new note starts in tune */
+        mo_push(0x90u | v->midi_ch, midi, vel_of(lvl));
+    }
 }
 
 static uint32_t tom_at, tom_n;                  /* toms in a row step down: the last one's time, how many */
@@ -569,7 +583,7 @@ static void start_drum(uint32_t kind, uint32_t lvl, uint32_t kit, int32_t is_ori
         break;
     }
     v->peak = v->amp;
-    if (is_orig && midi_chan[L_DRUMS] <= 15u) { v->midi = (uint8_t)gm; v->midi_ch = midi_chan[L_DRUMS]; mo_push(0x90u | v->midi_ch, v->midi, 100); }
+    if (is_orig && midi_chan[L_DRUMS] <= 15u) { v->midi = (uint8_t)gm; v->midi_ch = midi_chan[L_DRUMS]; mo_push(0x90u | v->midi_ch, v->midi, vel_of(lvl)); }
 }
 
 /* an sfx sound: kind SX_x, pitch a MIDI note (riser start, bits), dur in samples (wash, riser, crackle) */
@@ -650,7 +664,14 @@ static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags,
 {
     uint32_t i;
     lane_hit_ms[lane] = fm1_ms;
-    if (fx[lane].autopan > 0 && !fx[lane].aprate && smp - ap_last[lane] > 441u) { ap_side[lane] ^= 1u; ap_last[lane] = smp; }
+    if (fx[lane].autopan > 0 && !fx[lane].aprate && smp - ap_last[lane] > 441u) {
+        ap_side[lane] ^= 1u; ap_last[lane] = smp;
+        if (cc_out_on && midi_chan[lane] <= 15u && lane != L_SFX) {     /* MIDI: the side before the note */
+            int32_t pn = fx[lane].pan + (ap_side[lane] ? fx[lane].autopan : -fx[lane].autopan);
+            pn = pn < -100 ? -100 : pn > 100 ? 100 : pn;
+            mo_push(0xB0u | midi_chan[lane], 10, (uint32_t)(64 + pn * 63 / 100));
+        }
+    }
     if (lane == L_DRUMS) { if (note[0] < NDK) hit_ms[note[0]] = fm1_ms; start_drum(note[0], lvl, kind_or_inst, original); return; }
     if (lane == L_SFX) { start_sfx(note[0], note[1], dur, lvl); return; }
     {
@@ -693,6 +714,7 @@ static void note_fx(uint32_t f)                 /* the effect column's porta and
 static void trigger(uint32_t lane, const ev_t *e0, uint32_t kind)
 {
     ev_t ev = *e0, *e = &ev;
+    if (fx[lane].level <= 0) return;                               /* faded out (or VOLUME 0): no voice, no MIDI, no load */
     uint32_t step = seq_step_len_q8 >> 8, total = lane == L_DRUMS ? step : e->len * step;
     uint32_t fc = e->fx >> 4, fv = e->fx & 15u;
     int32_t rt = (fx[lane].retrig > 0 && (int32_t)(e->rv * 100u >> 8) < fx[lane].retrig) || (fc == FX_RETRIG && fv);
@@ -1081,7 +1103,9 @@ static void all_off(void)
 
 /* the keys, played live: the main loop queues key down / up, the interrupt starts and releases (only it touches
  * the voices). A melodic note sounds until its key comes up; drums and sfx are hits. */
-typedef struct { uint8_t lane, note, key, on, inst, n2, n3; } live_t;   /* n2, n3: a chord's other notes (0 = none) */
+typedef struct { uint8_t lane, note, key, on, inst, n2, n3, lvl, ext; } live_t;   /* n2, n3: a chord's other notes (0 = none); lvl Q8;
+                                                                               * ext: from MIDI in (not sent back out) */
+static uint32_t live_lvl = 230u, live_ext;      /* the next key's level (MIDI in: its velocity), its source */
 static volatile live_t live_q[16];
 static volatile uint32_t live_w, live_r;
 static voice_t *live_v[27][3];
@@ -1092,7 +1116,7 @@ static void live_push3(uint32_t lane, uint32_t note, uint32_t n2, uint32_t n3, u
     if (live_w - live_r >= 16u) return;
     e = (live_t *)&live_q[live_w % 16u];
     e->lane = (uint8_t)lane; e->note = (uint8_t)note; e->key = (uint8_t)key; e->on = (uint8_t)on; e->inst = (uint8_t)inst;
-    e->n2 = (uint8_t)n2; e->n3 = (uint8_t)n3;
+    e->n2 = (uint8_t)n2; e->n3 = (uint8_t)n3; e->lvl = (uint8_t)(live_lvl > 255u ? 255u : live_lvl); e->ext = (uint8_t)live_ext;
     RING_PUBLISH();
     live_w++;
 }
@@ -1102,16 +1126,18 @@ static void live_run(void)
     while (live_r != live_w) {
         const live_t *e = (const live_t *)&live_q[live_r % 16u];
         uint32_t k = e->key < 27u ? e->key : 0u;
+        if (e->on && fx[e->lane].level <= 0) { live_r++; continue; }   /* a silent lane: nothing to start */
         if (e->on) {
-            if (e->lane == L_DRUMS) start_drum(e->note, 230, e->inst, 0);
+            if (e->lane == L_DRUMS) start_drum(e->note, e->lvl, e->inst, 0);
             else if (e->lane == L_SFX) start_sfx(e->note, (uint32_t)(62 + key_off), 44100, 230);
             else {
                 const uint8_t nn[3] = {e->note, e->n2, e->n3};
-                uint32_t j, lv = e->n2 ? 160u : 230u;              /* a chord: quieter per voice */
+                uint32_t j, lv = e->n2 ? e->lvl * 160u / 230u : e->lvl;   /* a chord: quieter per voice */
                 for (j = 0; j < 3u; j++) {
                     live_v[k][j] = 0;
                     if (!nn[j]) continue;
-                    start_fm(e->lane, &PATCH[e->inst < NPATCH ? e->inst : 0], note_inc(nn[j]), 0xFFFFFFF0u, lv, 0, 0, 0, nn[j]);
+                    start_fm(e->lane, &PATCH[e->inst < NPATCH ? e->inst : 0], note_inc(nn[j]), 0xFFFFFFF0u, lv, 0, 0, 0, e->ext ? 0u : nn[j]);
+                    if (e->ext) last_voice->key = nn[j];      /* the keys still light it */
                     live_v[k][j] = last_voice; live_age[k][j] = last_voice->age;
                 }
             }
@@ -1137,6 +1163,44 @@ static void audition(uint32_t lane, uint32_t note, uint32_t kind)
     aud_req = 1;
 }
 
+/* the pitch a voice is at against its note, in cents (PORTA and the slides: the bend) */
+static const uint16_t SEMI_Q12[13] = {4096, 4340, 4598, 4871, 5161, 5468, 5793, 6137, 6502, 6889, 7298, 7732, 8192};
+static int32_t cents_of(uint32_t inc, uint32_t base)
+{
+    uint32_t b = base >> 12, r;
+    int32_t oct = 0, k;
+    if (!b) return 0;
+    r = inc / b;                                                    /* Q12 */
+    while (r >= 8192u) { r >>= 1; oct++; }
+    while (r < 4096u && oct > -8) { r <<= 1; oct--; }
+    for (k = 11; k > 0 && SEMI_Q12[k] > r; k--) ;
+    return oct * 1200 + k * 100 + (int32_t)((r - SEMI_Q12[k]) * 100u / (uint32_t)(SEMI_Q12[k + 1] - SEMI_Q12[k]));
+}
+static uint32_t clk_k;                                  /* clock ticks sent in this step (six a 16th: 24 a beat) */
+static uint8_t cc11_now[NLANE] = {127, 127, 127, 127, 127, 127}, midi_blk;
+static void midi_lanes(void)                            /* ISR, each block: the bends, the tremolo as expression */
+{
+    uint32_t l, v;
+    if (!cc_out_on) return;
+    midi_blk++;
+    for (l = 0; l < NLANE; l++) {
+        uint32_t ch = midi_chan[l];
+        if (ch > 15u || l == L_DRUMS || l == L_SFX) continue;
+        {                                                           /* the newest note's bend: PORTA, the slides up and down */
+            const voice_t *nv = 0;
+            for (v = VLO[l]; v < VHI[l]; v++) if (vc[v].kind == V_FM && vc[v].midi && vc[v].arp_n <= 1u && vc[v].stage != 2u && (!nv || (int32_t)(vc[v].age - nv->age) > 0)) nv = &vc[v];
+            if (nv && (fx[l].porta || nv->fx_porta || bend_now[l] != 8192u)) {
+                int32_t c = cents_of(nv->target, note_inc(nv->midi)), b = 8192 + c * 8192 / 1200;   /* the range: 12 semitones */
+                b = b < 0 ? 0 : b > 16383 ? 16383 : b;
+                if (b - (int32_t)bend_now[l] >= 32 || (int32_t)bend_now[l] - b >= 32) { mo_push(0xE0u | ch, (uint32_t)b & 127u, (uint32_t)b >> 7); bend_now[l] = (uint16_t)b; }
+            }
+        }
+        if (midi_blk % 3u == l % 3u) {                              /* TREMOLO, TREMOR: expression, every 3rd block */
+            int32_t e = fx[l].trem > 0 || fx[l].tremor > 0 ? trem_g[l] * 127 / 32768 : 127, d = e - cc11_now[l];
+            if (d >= 4 || d <= -4 || (e == 127 && cc11_now[l] != 127) || (e == 0 && cc11_now[l])) { mo_push(0xB0u | ch, 11, (uint32_t)e); cc11_now[l] = (uint8_t)e; }
+        }
+    }
+}
 static void app_audio(int32_t *out, uint32_t n)
 {
     uint32_t t0 = fm1_ticks(), i = 0, l, k;
@@ -1144,14 +1208,32 @@ static void app_audio(int32_t *out, uint32_t n)
     for (l = 0; l < NBUS; l++)
         for (k = 0; k < n; k++) bus[l][k] = 0;
     if (aud_req) { uint8_t nt[3] = {(uint8_t)aud_note, (uint8_t)(62 + key_off), 0}; fire(aud_lane, nt, 1, 0, aud_lane == L_SFX ? 33075u : 9000u, 256, aud_kind, 0); aud_req = 0; }
+    mm_drain();
     live_run();
-    if (seq_stop_req) { seq_stop_req = 0; seq_playing = 0; all_off(); }
-    if (seq_start_req) {
-        seq_start_req = 0; seq_playing = 1; seq_step = (uint32_t)seq_start_step; seq_acc_q8 = 0; npend = 0;
-        step_fire(seq_step);
+    {
+        int clk = clk_out_on && !clk_ext;
+        if (seq_stop_req) { seq_stop_req = 0; seq_playing = 0; all_off(); if (clk) mo_push(0xFCu, 0, 0); }
+        if (seq_start_req) {
+            seq_start_req = 0; seq_playing = 1; seq_step = (uint32_t)seq_start_step; seq_acc_q8 = 0; npend = 0; clk_k = 0; seq_nudge_q8 = 0;
+            if (clk) {                                                  /* start from the top, or continue at the position */
+                if (seq_step) { mo_push(0xF2u, seq_step & 127u, seq_step >> 7 & 127u); mo_push(0xFBu, 0, 0); }
+                else mo_push(0xFAu, 0, 0);
+            }
+            step_fire(seq_step);
+        }
+    }
+    if (seq_playing && seq_nudge_q8) {                              /* the clock in pulls us to its beat */
+        int32_t nd = seq_nudge_q8;
+        seq_nudge_q8 = 0;
+        if (nd < 0 && (uint32_t)-nd > seq_acc_q8) nd = -(int32_t)seq_acc_q8;
+        seq_acc_q8 += (uint32_t)nd;
     }
     while (i < n) {
-        uint32_t span = n - i, p;
+        uint32_t span = n - i, p, ct = seq_step_len_q8 / 6u;
+        if (seq_playing && clk_out_on && !clk_ext) {                /* MIDI clock out: 24 a beat, sample-accurate */
+            while (clk_k < 6u && seq_acc_q8 >= clk_k * ct) { mo_push(0xF8u, 0, 0); clk_k++; }
+            if (clk_k < 6u) { uint32_t lt = (clk_k * ct - seq_acc_q8 + 255u) >> 8; if (lt < span) span = lt ? lt : 1u; }
+        }
         if (seq_playing) {
             uint32_t left = (seq_step_len_q8 - seq_acc_q8 + 255u) >> 8;   /* samples to the next step */
             if (left < span) span = left ? left : 1u;
@@ -1174,9 +1256,11 @@ static void app_audio(int32_t *out, uint32_t n)
                 pend[p] = pend[--npend];
             } else p++;
         }
-        if (seq_playing && seq_acc_q8 >= seq_step_len_q8) {
+        while (seq_playing && seq_acc_q8 >= seq_step_len_q8) {
+            if (clk_out_on && !clk_ext) while (clk_k < 6u) { mo_push(0xF8u, 0, 0); clk_k++; }   /* none lost to a nudge */
             seq_acc_q8 -= seq_step_len_q8;
             seq_step++;
+            clk_k = 0;
             step_fire(seq_step);
         }
     }
@@ -1196,6 +1280,7 @@ static void app_audio(int32_t *out, uint32_t n)
         gl = pan_cl[l] << 16; gr = pan_cr[l] << 16;                     /* glide to the new place over the block: no clicks */
         dl = (tl - pan_cl[l]) * 65536 / (int32_t)(n ? n : 1u); dr = (tr - pan_cr[l]) * 65536 / (int32_t)(n ? n : 1u);
         pan_cl[l] = tl; pan_cr[l] = tr;
+        if (F->level <= 0) { trem_g[l] = 32768; continue; }        /* faded out: nothing to hear, nothing to work */
         lane_fx(l, bus[l], n);
         if (F->trem > 0 || F->tremor > 0) {                             /* TREMOLO and TREMOR, in time with the beat */
             uint32_t L = seq_step_len_q8 >> 8, t0 = seq_playing ? (blk_step0 & 1u) * L + (blk_acc0 >> 8) : blk_smp0 % (2u * (L ? L : 1u));
@@ -1234,6 +1319,8 @@ static void app_audio(int32_t *out, uint32_t n)
         for (v = 0; v < NVOICE; v++) if (vc[v].kind != V_OFF) t += vc[v].wt;
         voice_now = t; if (t > voice_peak) voice_peak = t;
     }
+    midi_lanes();
+    pos_q8 = (int32_t)(seq_step * 256u + (seq_step_len_q8 >> 8 ? (seq_acc_q8 >> 8) * 256u / (seq_step_len_q8 >> 8) : 0u)); pos_ticks = clk_now();   /* for the clock in */
     vis_step = seq_step;
     vis_frac = seq_step_len_q8 ? (seq_acc_q8 >> 8) * 65536u / (seq_step_len_q8 >> 8 ? seq_step_len_q8 >> 8 : 1u) : 0u;
     isr_us_last = (fm1_ticks() - t0) / FM1_TICKS_PER_US;

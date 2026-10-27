@@ -89,8 +89,20 @@ static int midi_get(uint8_t *st, uint8_t *d1, uint8_t *d2)
     mq_r++;
     return 1;
 }
-static uint32_t host_midi_out;
-static void midi_send(uint32_t st, uint32_t d1, uint32_t d2) { (void)st; (void)d1; (void)d2; host_midi_out++; }
+static uint32_t host_midi_out, host_mo_note, host_mo_cc, host_mo_clk, host_mo_bend, host_mo_vel[128], host_mo_rt;
+static void midi_isr_send(uint32_t st, uint32_t d1, uint32_t d2)   /* counted by kind (the stats at the end) */
+{
+    host_midi_out++;
+    if ((st & 0xF0u) == 0x90u && d2) { host_mo_note++; host_mo_vel[d2 & 127u]++; }
+    else if ((st & 0xF0u) == 0xB0u) host_mo_cc++;
+    else if ((st & 0xF0u) == 0xE0u) host_mo_bend++;
+    else if (st == 0xF8u) host_mo_clk++;
+    else if (st >= 0xF2u) host_mo_rt++;
+    (void)d1;
+}
+static uint32_t midi_out_room(void) { return 64u; }
+static uint32_t clk_now(void) { return fm1_ms * 1000u * FM1_TICKS_PER_US; }   /* the clock in's time base: the script's ms */
+static volatile uint32_t clk_in_t[32], clk_in_w;            /* the clock in's ticks, stamped as they come */
 #define LONGS_LEN 0x25000u                         /* the own parts' store, in memory (it starts erased) */
 #define FL_IN(off, n, lo, hi) ((uint32_t)(off) >= (lo) && (uint32_t)(off) <= (hi) && (uint32_t)(n) <= (hi) - (uint32_t)(off))
 static uint8_t host_longs[LONGS_LEN];
@@ -210,6 +222,7 @@ static void platform_poll(void)                 /* one call = one millisecond */
         else if (script[step].enc > 0) host_enc[script[step].enc - 1] += script[step].delta;
         else if (script[step].st) {
             mq[mq_w % 64u][0] = script[step].st; mq[mq_w % 64u][1] = script[step].d1; mq[mq_w % 64u][2] = script[step].d2;
+            if (script[step].st == 0xF8u) { clk_in_t[clk_in_w % 32u] = fm1_ms * 1000u * FM1_TICKS_PER_US; clk_in_w++; }   /* stamped, as usb.c does */
             mq_w++;
         } else if (script[step].btn >= 0 && script[step].rel) {
             host_rel |= 1u << script[step].btn; fm1_in.buttons &= ~(1u << script[step].btn);

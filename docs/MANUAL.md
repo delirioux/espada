@@ -66,6 +66,7 @@ Hold **HOME** for SETUP; HOME (or any group button, or EDIT) leaves it. PRESETS 
 | LOOK | palette: MAKOHAI (its colours), AMBER, GREEN, CYAN, RED, MONO | screen: 100, 75, 50 or 25 % | lights: the keys' and buttons' glow on or off | SCOPE (a picture) |
 | MIDI | the lead's channel | the pad's | the bass's | the drums' (1..16 or OFF) |
 | MIDI 2 | the arp's channel | LANES (a picture) | STEREO (a picture) | SPECTRUM (a picture) |
+| SYNC | CLK OUT: MIDI clock and START / CONTINUE / STOP out, on or off | CLK IN: follow a MIDI clock (EXT and its tempo while one comes in) | NOTES IN: MIDI notes play the marked lane | CC OUT: the lanes' settings as controllers |
 | BACK | a picture behind the whole screen: OFF or one of the thirteen below | its brightness, 10..60 % (30) | CYCLE: the next picture every 4, 8 or 16 bars, or OFF | PREVIEW: the picture itself |
 | RESET | defaults: five clicks to the right puts everything back as it comes (patterns cleared); SAVE keeps it | a picture (turn: the next) | a picture | a picture |
 | SYSTEM | stack: free, of 23 K (the least it has had free since power-on) | the interrupts' stack: the same, of 7 K | RAM free | the pool free (the big buffers) |
@@ -397,5 +398,34 @@ stop, as always. Parts saved before the effect column came in are not read: ente
 
 ## MIDI
 
-USB-MIDI out: lead, pad and bass on channels 1 to 3, the arp on 4, the drums on channel 10 (kick 36, snare 38, hat 42,
-kettle drum 47, crash 49, clap 39, open hat 46, toms 50 48 47 45 43 as they step down, rim shot 37); SETUP, MIDI changes the channels or turns a lane off. MIDI in: start, continue and stop.
+USB-MIDI, both ways. All of it is set on SETUP: MIDI and MIDI 2 (the channels), SYNC (what goes in and out); SAVE
+keeps it.
+
+**Out.** Lead, pad and bass on channels 1 to 3, the arp on 4, the drums on channel 10 (kick 36, snare 38, hat 42,
+kettle drum 47, crash 49, clap 39, open hat 46, toms 50 48 47 45 43 as they step down, rim shot 37); MIDI changes
+the channels or turns a lane off. The notes carry the accents as velocity. They leave from the sound engine itself,
+in time with the sound, not a screen frame later. With CC OUT on, each lane's settings go out on its channel as they
+change:
+
+| Makohai | MIDI |
+| --- | --- |
+| VOLUME, and every fade and mute | CC 7 (volume) |
+| PAN; AUTOPAN (each note's side before the note, a sweep as it moves) | CC 10 (pan) |
+| VIBRATO | CC 1 (modulation) |
+| SLIDE | CC 65 (portamento on) and CC 5 (its time) |
+| FILTER (the low-pass side) and RESO | CC 74 (cutoff) and CC 71 (resonance) |
+| REVERB | CC 91 |
+| TREMOLO and TREMOR | CC 11 (expression), as they move |
+| PORTA and the slides UP and DOWN | pitch bend, a range of 12 semitones (set on each channel with RPN 0) |
+
+The drums send volume, pan and reverb only; the sfx sends nothing. A lane faded out (ENV, END, VOLUME 0) is silent
+everywhere: no notes, no MIDI, and no load on the sound engine. With CLK OUT on, START (from the top) or the song
+position and CONTINUE go out on PLAY, the clock (24 a beat) while it plays, STOP when it stops; not while a clock
+comes in.
+
+**In.** START plays from the top, every lane at once; CONTINUE goes on from where it stopped, or from a song
+position the sender gave; STOP stops. With CLK IN on, an incoming clock sets the tempo (the header shows it, SYNC
+says EXT) and keeps the beat in step with the sender; the tempo knob and the styles' tempos wait until the clock
+stops. With NOTES IN on, notes on any channel play the marked lane as its keys do, with their velocity: chords on the
+pad, the drums by their GM notes (the ones above, 35..57), the sfx on the white keys from F3; on EDIT they enter
+steps, or record with REC. They are not sent back out. The browser version takes all of this from Web MIDI.

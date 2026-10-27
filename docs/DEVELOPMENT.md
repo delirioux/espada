@@ -42,7 +42,7 @@ stand-in.
 | File | Does |
 | --- | --- |
 | `firmware/src/makohai.c` | the app's shared state (lanes, effects, the clock), includes the parts below |
-| `firmware/src/makohai_synth.c` | the audio interrupt: FM voices (patches with ensembles), drums, sfx voices, the stereo buses and the room, lane effects, the step clock, MIDI out |
+| `firmware/src/makohai_synth.c` | the audio interrupt: FM voices (patches with ensembles), drums, sfx voices, the stereo buses and the room, lane effects, the step clock, all MIDI out (notes, bends, expression, the clock) |
 | `firmware/src/makohai_music.c` | harmony, scales and progressions, the seventeen styles, their generators, the lead's long arcs, density, the arc, your own patterns, the bar cache, mute fades |
 | `firmware/src/makohai_ui.c` | the screen (header, title, lanes, knobs), the groups and their settings, the panel, the LEDs, saving |
 | `firmware/src/platform.c` | Dinghy's wiring of the FM-1 platform |
@@ -135,8 +135,9 @@ In order of value; open to change as Makohai is played.
    parts along.
 5. **More of the trackers' moves.** A key change up a step for the last chorus, a breakdown with only the pad,
    sample-offset style stutters, vibrato that sets in late on long notes.
-6. **MIDI clock.** Follow an external clock and send one, so Makohai plays in time with other gear.
-7. **The SFX lane on MIDI.** Today only lead, pad, bass (channels 1 to 3) and the drums (10) go out.
+6. **MIDI clock on real gear.** In and out are in (1.3); to be tried against a DAW and a hardware sequencer:
+   how close the beat stays, how fast it catches a tempo change.
+7. **The SFX lane on MIDI.** Lead, pad, bass, arp and drums go out; the sfx has no notes to send yet.
 
 ## Release checklist
 

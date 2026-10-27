@@ -436,7 +436,7 @@ function saveFlash(sectors) {
   } catch { return false; }                                       // private mode, full: this session only
 }
 
-// ------------------------------------------------------------------ Web MIDI in (channel messages)
+// ------------------------------------------------------------------ Web MIDI in (channel messages, the clock, transport)
 // With the page's checkbox on, CC 20..27 turn the panel's knobs (worklet.js midiKnob), any channel, CC 20..26 sent
 // as the select says; off (the default), and the rest, go to the firmware
 const knobCC = [], knobBox = document.getElementById("knobson"), knobSelect = document.getElementById("knobmode");
@@ -469,9 +469,10 @@ async function midiOn() {
       for (const input of access.inputs.values()) {
         input.onmidimessage = (e) => {
           const d = e.data;
-          if (d.length < 2 || d[0] < 0x80 || d[0] >= 0xF0) return;
+          const rt = d[0] === 0xF8 || d[0] === 0xFA || d[0] === 0xFB || d[0] === 0xFC || (d[0] === 0xF2 && d.length >= 3);   // clock, transport, song position
+          if (!rt && (d.length < 2 || d[0] < 0x80 || d[0] >= 0xF0)) return;
           const k = knobsOn && (d[0] & 0xF0) === 0xB0 ? midiKnob(knobCC, d[1], d[2] || 0, knobMode) : null;
-          if (!k) send({ type: "midi", data: [d[0], d[1], d[2] || 0] });
+          if (!k) send({ type: "midi", data: [d[0], d[1] || 0, d[2] || 0] });
           else if (k.master !== undefined) { setMaster(k.master); drawKnob(knobs.find((x) => x.role === "master")); }
           else turn(knobs.find((x) => x.role === k.role), k.n);
         };

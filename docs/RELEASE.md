@@ -4,6 +4,11 @@ Since 1.2:
   ZEN (60) and FACTORY (185, industrial), each with its drums, bass, pad, lead, arp, sfx and effects. Seventeen in all.
 - HONKYTNK and SHAKU patches, the METAL kit.
 - SAVE keeps VOICES LIMIT and RESET's three pictures (settings record 16; older ones load with 80 and the first three).
+- MIDI: notes with velocity, the lanes' settings as controllers (volume, pan, vibrato, portamento, cutoff,
+  resonance, reverb, expression), pitch bend for PORTA and the slides; clock and transport out; clock in (tempo and
+  beat), CONTINUE with song position, notes in on the marked lane (SETUP, SYNC). All MIDI out now leaves from the
+  sound engine, in time.
+- A lane faded out or at VOLUME 0 starts no voices: no sound, no MIDI, no load.
 - Long runs: a message no longer stays on screen after the millisecond clock wraps (49 days); voice stealing
   and the pictures stay right past their counters' wraps.
 - SYMPHONY's lead plays CHAOS.

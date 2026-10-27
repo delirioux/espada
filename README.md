@@ -50,7 +50,7 @@ the kind of setting, PRESETS steps through them.
 
 | Control | Does |
 | --- | --- |
-| HOME / FX / ARP / GLO | the groups PLAY, SOUND, TRACKER, SONG; again: the next setting. Hold HOME: SETUP (colours, screen, lights, MIDI channels, defaults) |
+| HOME / FX / ARP / GLO | the groups PLAY, SOUND, TRACKER, SONG; again: the next setting. Hold HOME: SETUP (colours, screen, lights, MIDI channels and sync, defaults) |
 | PRESETS | the setting in the group |
 | KNOB 1-4 | that setting for the four lanes in the window, LEAD ARP PAD BASS to PAD BASS DRUMS SFX (SONG: the four shown) |
 | ALGORITHM | the lane the buttons and keys act on (turning its knob picks it too) |

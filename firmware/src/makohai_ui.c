@@ -189,6 +189,7 @@ static const char *const SSHORT[13] = {"AUTO", "MAJOR", "MINOR", "DORIAN", "PHRY
 static void set_key(int32_t k) { key = fmodp(k, 12); key_off = key - 2 > 5 ? key - 14 : key - 2; invalidate(); }
 static void set_bpm(int32_t b)
 {
+    if (clk_ext) return;                                    /* a MIDI clock comes in: it sets the tempo */
     if (b < 60) b = 60;
     if (b > 200) b = 200;
     seq_bpm = b;
@@ -1261,10 +1262,25 @@ static void s_msw(char *o) { s_cat(o, "US"); }
 static void s_load(char *o) { s_cat(o, "OF 5.8MS"); }
 static void v_tr(char *o) { s_cat(o, "TURN"); }
 static void s_tr(char *o) { s_cat(o, "WORST"); }
+/* SYNC: MIDI clock out and in, notes in, controllers out */
+static int32_t clk_in_on = 1, notes_in_on = 1;
+static void t_clko(int32_t d) { clk_out_on = d > 0; }
+static void v_clko(char *o) { s_cat(o, clk_out_on ? "ON" : "OFF"); }
+static void s_clko(char *o) { if (clk_ext) s_cat(o, "CLOCK IN"); else if (clk_out_on) s_cat(o, "24/BEAT"); }
+static void t_clki(int32_t d) { clk_in_on = d > 0; }
+static void v_clki(char *o) { s_cat(o, clk_in_on ? "ON" : "OFF"); }
+static void s_clki(char *o) { if (clk_ext) { o = s_cat(o, "EXT "); s_int(o, seq_bpm); } else if (clk_in_on) s_cat(o, "WAITING"); }
+static void t_notin(int32_t d) { notes_in_on = d > 0; }
+static void v_notin(char *o) { s_cat(o, notes_in_on ? "ON" : "OFF"); }
+static void s_notin(char *o) { if (notes_in_on) s_cat(o, "TO LANE"); }
+static void t_cco(int32_t d) { cc_out_on = d > 0; }
+static void v_cco(char *o) { s_cat(o, cc_out_on ? "ON" : "OFF"); }
+static void s_cco(char *o) { if (cc_out_on) s_cat(o, "SETTINGS"); }
 static const srow_t ROW_SETUP[] = {
     {"LOOK", -1, {{"PALETTE", t_pal, v_pal, 0}, {"SCREEN", t_scr, v_scr, 0}, {"LIGHTS", t_glow, v_glow, s_glow}, {"SCOPE", t_none, v_vis, 0, vis_scope}}},
     {"MIDI", -1, {{"LEAD", t_ch0, v_ch0, s_ch}, {"PAD", t_ch1, v_ch1, s_ch}, {"BASS", t_ch2, v_ch2, s_ch}, {"DRUMS", t_ch3, v_ch3, s_ch}}},
     {"MIDI 2", -1, {{"ARP", t_ch5, v_ch5, s_ch}, {"LANES", t_none, v_vis, 0, vis_lanes}, {"STEREO", t_none, v_vis, 0, vis_stereo}, {"SPECTRUM", t_none, v_vis, 0, vis_spectrum}}},
+    {"SYNC", -1, {{"CLK OUT", t_clko, v_clko, s_clko}, {"CLK IN", t_clki, v_clki, s_clki}, {"NOTES IN", t_notin, v_notin, s_notin}, {"CC OUT", t_cco, v_cco, s_cco}}},
     {"BACK", -1, {{"PICTURE", t_back, v_back, 0}, {"BRIGHT", t_bdim, v_bdim, 0}, {"CYCLE", t_bcyc, v_bcyc, 0}, {"PREVIEW", t_none, v_vis, 0, vis_back}}},
     {"RESET", -1, {{"DEFAULTS", t_reset, v_reset, s_reset}, {"PICTURE", t_pick0, v_vis, 0, vis_s0}, {"PICTURE", t_pick1, v_vis, 0, vis_s1}, {"PICTURE", t_pick2, v_vis, 0, vis_s2}}},
     {"SYSTEM", -1, {{"STACK", t_none, v_stk, s_stk}, {"IRQ", t_none, v_irq, s_irq}, {"RAM", t_none, v_ram, s_free}, {"POOL", t_none, v_pool, s_free}}},
@@ -1681,17 +1697,17 @@ static void draw_frame(int force)
 typedef struct {
     uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy; uint8_t space;
     struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; int8_t porta, pan; uint8_t vibr, trem, gate, tremor, swing, aglide, uon, autopan, aprate, mutate; } l[NLANE];
-    uint8_t palette, screen, glow, back, backdim, vlimit, pic[3];   /* the look, VOICES LIMIT, RESET's three pictures */
+    uint8_t palette, screen, glow, back, backdim, vlimit, pic[3], sync;   /* the look, VOICES LIMIT, RESET's three pictures, SYNC */
 } save_t;
 typedef char save_fits[sizeof(save_t) <= 256u ? 1 : -1];          /* settings_save takes at most 256 bytes */
 #define SAVE_VER 16
 /* older records, read and brought up to date: a lane of 33 bytes (11, 1.0), 34 (12, no PAN RATE), 35 (13, 14: no
- * MUTATE), 36 since; the tail 3 bytes before 14 (no BACK), 5 before 16 (no LIMIT, no pictures) */
+ * MUTATE), 36 since; the tail 3 bytes before 14 (no BACK), 5 before 16 (no LIMIT, pictures, SYNC) */
 #define SAVE_HEAD 13u
 static uint32_t save_lane(uint32_t v) { return v <= 11u ? 33u : v == 12u ? 34u : v <= 14u ? 35u : 36u; }
-static uint32_t save_tail(uint32_t v) { return v <= 13u ? 3u : v <= 15u ? 5u : 9u; }
+static uint32_t save_tail(uint32_t v) { return v <= 13u ? 3u : v <= 15u ? 5u : 10u; }
 static uint32_t save_size(uint32_t v) { return SAVE_HEAD + NLANE * save_lane(v) + save_tail(v); }
-typedef char save_bytes[sizeof(save_t) == SAVE_HEAD + NLANE * 36u + 9u ? 1 : -1];   /* bytes only, no padding: the copy below relies on it */
+typedef char save_bytes[sizeof(save_t) == SAVE_HEAD + NLANE * 36u + 10u ? 1 : -1];   /* bytes only, no padding: the copy below relies on it */
 static void save_up(const uint8_t *o, uint32_t v, save_t *S)
 {
     uint8_t *d = (uint8_t *)S;
@@ -1701,7 +1717,7 @@ static void save_up(const uint8_t *o, uint32_t v, save_t *S)
     for (l = 0; l < NLANE; l++) memcpy(d + SAVE_HEAD + l * L, o + SAVE_HEAD + l * lo, lo);
     memcpy(d + SAVE_HEAD + NLANE * L, o + SAVE_HEAD + NLANE * lo, save_tail(v));
     if (v < 15u) for (l = 0; l < NLANE; l++) S->l[l].mutate = l == L_SFX ? 0 : MUTATE0;   /* MUTATE came in 15 */
-    if (v < 16u) { S->vlimit = VOICE_LIMIT0; S->pic[0] = 0; S->pic[1] = 1; S->pic[2] = 2; }   /* LIMIT and the pictures in 16 */
+    if (v < 16u) { S->vlimit = VOICE_LIMIT0; S->pic[0] = 0; S->pic[1] = 1; S->pic[2] = 2; S->sync = 0x0F; }   /* LIMIT, the pictures, SYNC in 16 */
     S->ver = SAVE_VER;
 }
 /* the own parts, in their store: [head 16 B][lanes 20 B][to 64][each lane's bars, 32 B each]; the CRC covers all
@@ -1766,7 +1782,7 @@ static void state_get(save_t *P)                                /* everything in
     save_t S;
     int32_t l;
     memset(&S, 0, sizeof S);
-    S.ver = SAVE_VER; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.back = (uint8_t)back_pic; S.backdim = (uint8_t)(back_dim | back_cyc << 6); S.vlimit = (uint8_t)voice_limit; S.pic[0] = (uint8_t)pick[0]; S.pic[1] = (uint8_t)pick[1]; S.pic[2] = (uint8_t)pick[2];   /* CYCLE in the top two bits */ S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
+    S.ver = SAVE_VER; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.back = (uint8_t)back_pic; S.backdim = (uint8_t)(back_dim | back_cyc << 6); S.vlimit = (uint8_t)voice_limit; S.pic[0] = (uint8_t)pick[0]; S.pic[1] = (uint8_t)pick[1]; S.pic[2] = (uint8_t)pick[2]; S.sync = (uint8_t)((clk_out_on ? 1u : 0u) | (clk_in_on ? 2u : 0u) | (notes_in_on ? 4u : 0u) | (cc_out_on ? 8u : 0u));   /* CYCLE in the top two bits */ S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
     for (l = 0; l < (int32_t)NLANE; l++) {
         S.l[l].prof = ln[l].prof; S.l[l].lock = ln[l].lock; S.l[l].dens = ln[l].dens; S.l[l].oct = ln[l].oct; S.l[l].filt = (int8_t)fxu[l].filt;
@@ -1796,7 +1812,8 @@ static void state_put(const save_t *P, int setup)
     int32_t l;
     {
         if (setup) { palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0; back_pic = S.back % (NPIC + 1); back_dim = S.backdim & 63 ? clampi(S.backdim & 63, 10, 60) : 30; back_cyc = S.backdim >> 6;
-                    voice_limit = S.vlimit ? clampi(S.vlimit, 20, 100) : VOICE_LIMIT0; pick[0] = S.pic[0] % NPIC; pick[1] = S.pic[1] % NPIC; pick[2] = S.pic[2] % NPIC; }
+                    voice_limit = S.vlimit ? clampi(S.vlimit, 20, 100) : VOICE_LIMIT0; pick[0] = S.pic[0] % NPIC; pick[1] = S.pic[1] % NPIC; pick[2] = S.pic[2] % NPIC;
+                    clk_out_on = S.sync & 1u; clk_in_on = (S.sync >> 1) & 1u; notes_in_on = (S.sync >> 2) & 1u; cc_out_on = (S.sync >> 3) & 1u; }
         energy = clampi(S.energy, -50, 50); space = clampi(S.space, 0, 100);
         set_key(S.key % 12u); scale_sel = S.scale < NSCALE ? S.scale : 0; prog_sel = S.prog <= NPROG ? S.prog : 0; bpc = clampi(S.bpc, 1, 4);
         { int32_t was = arc_on; arc_on = S.arc != 0; build_ph = clampi(S.build, 2, 16); if (arc_on && (setup || !was)) arc_restart(seq_playing ? cur_bar() + 1 : 0); } peak_ph = clampi(S.peak, 1, 8); auto_drop = S.autod != 0; target = S.target % NPROF; set_bpm(S.bpm);
@@ -1911,10 +1928,11 @@ static void drop_hit(void)
     audition(L_PAD, (uint32_t)clampi(ct(&T, 0), 24, 96), P_ORCH);   /* and the orchestra hit, on the chord's root */
 }
 static int is_black(int32_t k) { return (0x54Au >> ((53 + k) % 12)) & 1u; }
+static int32_t stop_pos;                        /* where it stopped (a MIDI CONTINUE goes on from there) */
 static int32_t white_index(int32_t k) { int32_t i, w = 0; for (i = 0; i < k; i++) if (!is_black(i)) w++; return is_black(k) ? -1 : w; }
 static void start_stop(int from_top)
 {
-    if (seq_playing && !from_top) { frozen_step = 0; seq_stop_req = 1; form_arm(); return; }   /* the next PLAY starts from the top, with a new INTRO */
+    if (seq_playing && !from_top) { stop_pos = cur_step(); frozen_step = 0; seq_stop_req = 1; form_arm(); return; }   /* the next PLAY starts from the top, with a new INTRO */
     if (from_top) { if (seq_playing) { seq_stop_req = 1; while (seq_playing) platform_poll(); } frozen_step = 0; launch_bar = -1; arc_restart(0); invalidate_from(0); }
     while (bars_update()) ;                                         /* the first bars exist before the clock starts */
     seq_start_step = frozen_step;
@@ -2260,7 +2278,7 @@ static void defaults(void)
     set_key(2); set_bpm(125); scale_sel = 0; prog_sel = 0; bpc = 1; energy = 0; space = 35;
     arc_on = 0; build_ph = 6; peak_ph = 4; auto_drop = 1; target = PROF_START; blend = 0;
     palette = 0; screen_lvl = 100; glow_on = 1; back_pic = 0; back_dim = 30; back_cyc = 0; fm1_glow_all();
-    voice_limit = VOICE_LIMIT0; pick[0] = 0; pick[1] = 1; pick[2] = 2;
+    voice_limit = VOICE_LIMIT0; pick[0] = 0; pick[1] = 1; pick[2] = 2; clk_out_on = clk_in_on = notes_in_on = cc_out_on = 1;
     if (seq_playing) invalidate_from(cur_bar()); else form_arm();
     area_dirty = 1;
 }
@@ -2284,19 +2302,147 @@ static void app_boot(void)
     lcd_fill(0, 0, 240, 240, C_BG);
     if (glow_on) fm1_glow_all(); else fm1_glow_none();
 }
-static void app_pass(void)
+/* ---- MIDI in: the clock (it sets the tempo and keeps the beat in step), START / CONTINUE / STOP, the song position,
+ * notes on the marked lane (as the keys play it: chords on the pad, the drums by their GM notes, recording and step
+ * entry on EDIT). MIDI out: each lane's settings as controllers on its channel */
+static int32_t spp_pos = -1, ext_run, ext_ticks, ext_base;       /* ext_base: the 16th the clock's count starts at */
+static uint32_t clk_seen, clk_last_ms, clk_len_q8;
+static uint8_t mid_slot[128];                   /* the key slot each MIDI note plays on, + 1 (0: none) */
+static uint32_t slots_busy;
+static void play_from(int32_t pos)              /* CONTINUE: every lane at once, from this 16th */
+{
+    if (seq_playing) return;
+    form_reset(); launch_bar = -1;
+    frozen_step = pos; invalidate_from(0);
+    while (bars_update()) ;
+    seq_start_step = pos; seq_start_req = 1;
+}
+static void clock_in(void)
+{
+    uint32_t w = clk_in_w, n = w - clk_seen;
+    if (!clk_in_on) { clk_seen = w; if (clk_ext) { clk_ext = 0; set_bpm(seq_bpm); } return; }
+    if (n) {
+        clk_seen = w; clk_last_ms = fm1_ms;
+        if (ext_run) ext_ticks += (int32_t)n;
+        if (w >= 25u) {
+            uint32_t dt = clk_in_t[(w - 1u) % 32u] - clk_in_t[(w - 25u) % 32u], us = dt / (4u * FM1_TICKS_PER_US);   /* a beat (24 ticks) / 4: a 16th, in us */
+            if (us >= 50000u && us <= 375000u) {                    /* 300 .. 40 BPM */
+                uint32_t len = us * 2890u >> 8;                     /* samples a 16th, Q8 (44.1 per ms) */
+                clk_len_q8 = clk_ext && clk_len_q8 ? (clk_len_q8 * 3u + len) / 4u : len;
+                seq_step_len_q8 = clk_len_q8;
+                seq_bpm = (int32_t)((15000000u + us / 2u) / us);
+                clk_ext = 1;
+            }
+            if (ext_run && seq_playing && clk_ext && ext_ticks > 0) {   /* the beat: where the clock is against where we are */
+                uint32_t t = clk_in_t[(w - 1u) % 32u], at = pos_ticks, len = clk_len_q8 >> 8 ? clk_len_q8 >> 8 : 1u;
+                int32_t el = (int32_t)(at - t) / (int32_t)FM1_TICKS_PER_US;   /* us from the tick to our last block */
+                int32_t want = ext_base * 256 + (ext_ticks - 1) * 256 / 6 + el * 256 / (int32_t)(us ? us : 1u);
+                int32_t e = want - pos_q8;
+                if (us < 50000u || us > 375000u) e = 0;
+                if (e > 512 || e < -512) { seq_start_step = want >> 8; seq_start_req = 1; }   /* far off: jump there */
+                else if (e > 12 || e < -12) seq_nudge_q8 = e * (int32_t)len / 8;            /* near: an eighth of it */
+            }
+        }
+    }
+    if (clk_ext && fm1_ms - clk_last_ms > 600u) { clk_ext = 0; set_bpm(seq_bpm); }   /* the clock stopped: our own tempo */
+}
+static int32_t key_for_white(int32_t wi) { int32_t k; for (k = 0; k < 27; k++) if (white_index(k) == wi) return k; return -1; }
+static int32_t gm_kind(int32_t n)               /* a GM drum note: our hit */
+{
+    static const int8_t GM[][2] = {{35, DK_KICK}, {36, DK_KICK}, {37, DK_RIM}, {38, DK_SNARE}, {40, DK_SNARE}, {39, DK_CLAP},
+                                   {42, DK_HAT}, {44, DK_HAT}, {46, DK_OHAT}, {41, DK_TOM}, {43, DK_TOM}, {45, DK_TOM}, {48, DK_TOM},
+                                   {50, DK_TOM}, {47, DK_KETTLE}, {49, DK_CRASH}, {51, DK_CRASH}, {57, DK_CRASH}};
+    uint32_t i;
+    for (i = 0; i < sizeof GM / sizeof GM[0]; i++) if (GM[i][0] == n) return GM[i][1];
+    return n >= 53 && n < 80 ? white_index(n - 53) : -1;           /* else the white keys F3 .. */
+}
+static void note_in(int32_t note, int32_t vel)  /* vel 0: off */
+{
+    int32_t l = sel, k = -1, o = kb_oct, keep, step_entry = edit_on && !(rec_on && seq_playing);
+    if (note < 0 || note > 127) return;
+    if (!vel) {
+        k = mid_slot[note] - 1; mid_slot[note] = 0;
+        if (k < 0) return;
+        slots_busy &= ~(1u << k);
+        if (!step_entry) keys_play(0, 1u << k, 0);
+        return;
+    }
+    if (mid_slot[note]) note_in(note, 0);                           /* the same note again: off first */
+    if (HITS(l)) {
+        int32_t wi = l == L_DRUMS ? gm_kind(note) : note >= 53 && note < 80 ? white_index(note - 53) : -1;
+        if (wi < 0 || (k = key_for_white(wi)) < 0) return;
+    } else {
+        int32_t pc = fmodp(note - 53, 12), c;
+        for (c = pc; c < 27; c += 12) if (!(slots_busy >> c & 1u) && !(keys_down >> c & 1u)) { k = c; break; }
+        if (k < 0) k = pc;
+        o = (note - 53 - k) / 12;                                   /* exact: the keys' octave that plays this note on slot k */
+    }
+    slots_busy |= 1u << k; mid_slot[note] = (uint8_t)(k + 1);
+    keep = kb_oct; kb_oct = o; live_lvl = (uint32_t)vel * 2u; live_ext = 1;
+    if (step_entry) { edit_key(k, 0); area_dirty = 1; }
+    else keys_play(1u << k, 0, 0);
+    kb_oct = keep; live_lvl = 230u; live_ext = 0;
+}
+static void midi_in(void)
 {
     uint8_t st, d1, d2;
+    clock_in();
+    while (midi_get(&st, &d1, &d2)) {
+        if (st == 0xFA) { if (!seq_playing) { form_reset(); start_stop(1); } ext_run = 1; ext_ticks = 0; ext_base = 0; spp_pos = -1; }   /* START: the top, everything at once */
+        else if (st == 0xFB) {                                          /* CONTINUE: where it stopped, or the song position */
+            int32_t pos = spp_pos >= 0 ? spp_pos : stop_pos;
+            if (!seq_playing) play_from(pos);
+            ext_run = 1; ext_ticks = 0; ext_base = pos; spp_pos = -1;
+        }
+        else if (st == 0xFC) { if (seq_playing) start_stop(0); ext_run = 0; }
+        else if (st == 0xF2) spp_pos = d1 | d2 << 7;
+        else if (st == 0xF8) ;                                          /* the clock: clock_in() has its times */
+        else if (notes_in_on && (st & 0xF0) == 0x90) note_in(d1, d2);
+        else if (notes_in_on && (st & 0xF0) == 0x80) note_in(d1, 0);
+    }
+    if (clk_in_w != clk_seen) clock_in();
+}
+static void midi_cc_out(void)                   /* each lane's settings, on its channel, when they change */
+{
+    static const uint8_t CC[8] = {7, 10, 1, 65, 5, 74, 71, 91};    /* volume, pan, vibrato, portamento on and time, cutoff, resonance, reverb */
+    static uint8_t last[NLANE][8], ch_was[NLANE];
+    static uint32_t was_room;
+    uint32_t l, i, room = midi_out_room();
+    int fresh = room && !was_room;
+    was_room = room;
+    if (!room || !cc_out_on) return;
+    for (l = 0; l < NLANE; l++) {
+        uint32_t ch = midi_chan[l];
+        const lanefx_t *F = &fx[l];
+        int32_t v[8], pn = F->pan;
+        if (ch > 15u || l == L_SFX) continue;
+        if (fresh || ch != ch_was[l]) {                             /* a host or a channel anew: all again, and the bend's range */
+            memset(last[l], 0xFF, sizeof last[l]); ch_was[l] = (uint8_t)ch;
+            if (l != L_DRUMS) { mm_push(0xB0u | ch, 101, 0); mm_push(0xB0u | ch, 100, 0); mm_push(0xB0u | ch, 6, 12); mm_push(0xB0u | ch, 38, 0); mm_push(0xB0u | ch, 101, 127); mm_push(0xB0u | ch, 100, 127); }
+        }
+        if (F->autopan > 0 && F->aprate) {                          /* a sweep: where it is now (note by note: the ISR) */
+            uint32_t per = AP_STEPS[F->aprate & 7], ph = ((vis_step % per) * 65536u + (vis_frac & 0xFFFFu)) / per;
+            pn += F->autopan * SIN[(ph >> 6) & 1023u] >> 15;
+        }
+        pn = clampi(pn, -100, 100);
+        v[0] = F->level * 127 / 100; v[1] = 64 + pn * 63 / 100; v[2] = F->vibr * 127 / 100; v[3] = F->slide > 0 ? 127 : 0;
+        v[4] = F->slide * 127 / 100; v[5] = F->filt < 0 ? 127 + F->filt * 127 / 100 : 127; v[6] = F->res * 127 / 100; v[7] = F->send * 127 / 100;
+        for (i = 0; i < 8u; i++) {
+            if (i == 1 && F->autopan > 0 && !F->aprate) continue;
+            if (l == L_DRUMS && i >= 2 && i <= 6) continue;
+            v[i] = clampi(v[i], 0, 127);
+            if (v[i] != last[l][i]) { mm_push(0xB0u | ch, CC[i], (uint32_t)v[i]); last[l][i] = (uint8_t)v[i]; }
+        }
+    }
+}
+static void app_pass(void)
+{
     static int32_t oct_bar = -1;
     platform_poll();
     input();
     if (seq_playing && !edit_on && cur_bar() != oct_bar) { oct_bar = cur_bar(); follow_oct(sel, 0); }   /* the keys go where the lane plays */
-    while (midi_get(&st, &d1, &d2)) {                           /* MIDI in: start / stop / continue */
-        if (st == 0xFA) { if (!seq_playing) { form_reset(); start_stop(1); } }      /* MIDI start: everything at once */
-        else if (st == 0xFB) { if (!seq_playing) start_stop(0); }
-        else if (st == 0xFC) { if (seq_playing) start_stop(0); }
-    }
-    while (esp_mq_r != esp_mq_w) { uint32_t m = esp_mq[esp_mq_r % 64u]; esp_mq_r++; midi_send(m & 0xFFu, m >> 8 & 0xFFu, m >> 16 & 0xFFu); }
+    midi_in();
+    midi_cc_out();
     if (launch_bar >= 0 && cur_bar() >= launch_bar) { commit_launch(); toast("LAUNCHED"); }
     if (seq_playing && end_from >= 0 && cur_bar() >= end_from + END_LEN) { start_stop(0); toast("THE END"); }
     fx_apply();

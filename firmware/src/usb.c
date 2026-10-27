@@ -167,6 +167,10 @@ static void midi_out_event(uint32_t pkt)            /* from the audio ISR */
         mo_w++;
     }
 }
+static uint32_t midi_out_room(void) { return usb.config ? MQ - (mo_w - mo_r) : 0u; }   /* free packets (0: no host) */
+/* MIDI clock in: each tick's time (TIMER4), stamped as it arrives, so the tempo is measured without the main
+ * loop's delay */
+static volatile uint32_t clk_in_t[32], clk_in_w;
 
 /* ------------------------------------------------------- descriptors --- */
 /* interfaces: 0 audio control, 1 MIDI streaming, 2 audio streaming (FELUCCA_UAC), then CDC's two.
@@ -744,8 +748,17 @@ static void midi_in_event(uint32_t pkt)
 #endif
     }
     if (cin == 0xFu && (st == 0xF8u || st == 0xFAu || st == 0xFBu || st == 0xFCu)) {   /* clock, transport */
+        if (st == 0xF8u) { clk_in_t[clk_in_w % 32u] = fm1_ticks(); RING_PUBLISH(); clk_in_w++; }
         if (mi_w - mi_r < MQ) {
             midi_in_q[mi_w % MQ] = 0xFu | st << 8;
+            RING_PUBLISH();
+            mi_w++;
+        }
+        return;
+    }
+    if (cin == 3u && st == 0xF2u && !(pkt & 0x80800000u)) {   /* song position (16ths): where CONTINUE goes on */
+        if (mi_w - mi_r < MQ) {
+            midi_in_q[mi_w % MQ] = pkt;
             RING_PUBLISH();
             mi_w++;
         }

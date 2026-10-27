@@ -127,7 +127,10 @@ static int midi_get(uint8_t *st, uint8_t *d1, uint8_t *d2)
     mq_r++;
     return 1;
 }
-static void midi_send(uint32_t st, uint32_t d1, uint32_t d2) { (void)st; (void)d1; (void)d2; }
+static void midi_isr_send(uint32_t st, uint32_t d1, uint32_t d2) { (void)st; (void)d1; (void)d2; }
+static uint32_t midi_out_room(void) { return 0u; }          /* no MIDI out here: no controllers queued */
+static uint32_t clk_now(void) { return fm1_ticks(); }
+static volatile uint32_t clk_in_t[32], clk_in_w;             /* the clock in's ticks, stamped as they come */
 
 static void app_audio(int32_t *out, uint32_t n);
 static void app_boot(void);
@@ -213,6 +216,7 @@ EXPORT void web_enc(uint32_t role, int32_t n) { if (role < 7u) web_enc_steps[ROL
 EXPORT uint32_t web_midi(uint32_t st, uint32_t d1, uint32_t d2)
 {
     if (mq_w - mq_r >= 64u) return 0;
+    if (st == 0xF8u) { clk_in_t[clk_in_w % 32u] = fm1_ticks(); clk_in_w++; }   /* the clock, stamped (to the ms here) */
     mq[mq_w % 64u][0] = (uint8_t)st; mq[mq_w % 64u][1] = (uint8_t)d1; mq[mq_w % 64u][2] = (uint8_t)d2;
     mq_w++;
     return 1;

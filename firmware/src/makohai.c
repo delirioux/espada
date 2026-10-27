@@ -102,5 +102,7 @@ static volatile int32_t key_off;    /* the key: semitones from D, -6..5 (the ket
 static void makohai_host_stats(void)            /* host mode: the audio interrupt's worst time and the frames drawn */
 {
     printf("audio interrupt: worst %u us, average %u us of 5805 (on this computer); voices at most %d of %d units\n", isr_us_max, isr_n ? isr_us_sum / isr_n : 0, (int)voice_peak, (int)voice_limit);
+    { uint32_t v, lo = 127, hi = 0; for (v = 1; v < 128u; v++) if (host_mo_vel[v]) { if (v < lo) lo = v; if (v > hi) hi = v; }
+      printf("midi out: %u notes (velocity %u..%u), %u controllers, %u bends, %u clock ticks, %u transport\n", host_mo_note, host_mo_note ? lo : 0, hi, host_mo_cc, host_mo_bend, host_mo_clk, host_mo_rt); }
 }
 #endif

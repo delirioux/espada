@@ -5,7 +5,7 @@
  *   boot + boot guard   a firmware that crashes at boot falls back to the USB rescue, then to the ROM
  *   USB rescue          OCT- held at power-on: no audio, only the updater (the web installer still works)
  *   updater             the M-UPGRADE SysEx path: the web installer / the hub can always reach the FM-1
- *   USB-MIDI            in and out (midi_get, midi_send)
+ *   USB-MIDI            in and out (midi_get, midi_isr_send, midi_out_room, clk_in_t)
  *   USB audio           the output as a class-compliant 16-bit stereo input, 44.1 or 48 kHz
  *   keys, knobs, LEDs   fm1_in.notes / buttons, fm1_input_edges, fm1_enc_take, fm1_led_key (hal/fm1_input.h)
  *   screen              240 x 240, lcd_fill, draw_text_box with FONT_S (16 px) / FONT_L (32 px) (gfx.c)
@@ -264,9 +264,13 @@ static void fm1_glow_none(void)                 /* the glow off (the app's LIGHT
     for (p = 0; p < FM1_NCOL; p++) fm1_led_dim[p] = 0;
 }
 
-static void midi_send(uint32_t st, uint32_t d1, uint32_t d2)   /* from the main loop only */
+/* MIDI out from the audio ISR, the one sender (the app queues the main loop's messages to it): a channel message,
+ * the clock and transport (one byte), the song position (three) */
+static uint32_t clk_now(void) { return fm1_ticks(); }   /* the clock in's time base (TIMER4, as usb.c stamps) */
+static void midi_isr_send(uint32_t st, uint32_t d1, uint32_t d2)
 {
-    midi_out_event((st >> 4) | st << 8 | (d1 & 0x7Fu) << 16 | (d2 & 0x7Fu) << 24);
+    uint32_t cin = st >= 0xF8u ? 0xFu : st == 0xF2u ? 0x3u : st >> 4;
+    midi_out_event(cin | st << 8 | (st >= 0xF8u ? 0u : (d1 & 0x7Fu) << 16 | (d2 & 0x7Fu) << 24));
 }
 
 /* ---- the timer: 10 kHz key scan, milliseconds, USB at 2 kHz. It outranks the audio ISR; nested in a
