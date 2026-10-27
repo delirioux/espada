@@ -1,6 +1,8 @@
 Since 1.2:
 
 - SYMPHONY's lead plays CHAOS.
+- EDIT opens on the bar that plays, filled with what the style plays there when the bar is still empty.
+- STYLE (SONG, LIVE) while stopped also starts a new song: MELODY at random on every lane.
 
 Makohai 1.2: three new pictures, on RESET's knobs, in BACK and in DEMO.
 

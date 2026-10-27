@@ -244,10 +244,17 @@ static void set_sel(int32_t l)
 }
 static void t_lprof(int32_t d) { ln[sel].prof = (uint8_t)fmodp(ln[sel].prof + (d > 0 ? 1 : -1), NPROF); invalidate(); }
 static void v_lprof(char *o) { s_cat(o, PSHORT[ln[sel].prof]); }
-static void t_prof(int32_t d)                                   /* playing: the next style (SEQ or BLEND bring it in); stopped: at once */
+static void t_prof(int32_t d)                                   /* playing: the next style (SEQ or BLEND bring it in); stopped: at once,
+                                                                 * with a new song (MELODY at random on every lane) */
 {
     target = fmodp(target + (d > 0 ? 1 : -1), NPROF);
-    if (!seq_playing) { launch_tempo = 1; commit_launch(); form_arm(); }
+    if (!seq_playing) {
+        rng_t r;
+        int32_t l;
+        r.a = (sys_seed() ^ fm1_ms * 2654435761u) | 1u;
+        for (l = 0; l < (int32_t)NLANE; l++) ln[l].mel = (uint8_t)((rnd(&r) >> 16) * 100u >> 16);
+        launch_tempo = 1; commit_launch(); form_arm();
+    }
     else invalidate();
 }
 static void v_prof(char *o) { s_cat(o, PSHORT[target]); }
@@ -2010,6 +2017,22 @@ static void rec_release(int32_t l, int32_t key)
     rec_at[key] = -1;
 }
 /* the keys play the marked lane; on PAD a key is a chord in key: the triad on that note (SEL: the sus4) */
+/* EDIT opens where the music is: on your part's bar that plays now; and while the lane plays the style (your part is
+ * off), that bar shows what the style plays there, to change from. Only a bar that is empty, or that EDIT filled
+ * itself before and you have not touched, is filled; it stays off until you change a step */
+static void edit_enter(void)
+{
+    int32_t l = sel, cb = cur_bar(), b;
+    upat_t *U = &ln[l].up;
+    b = U->on ? (cb < U->bars ? cb : -1) : 0;
+    if (b < 0) return;
+    if (!U->on && (ubar_empty(l, b) || auto_bar[l] == b + 1)) {
+        pat_grab(l, b);
+        U->on = 0; U->ver++; invalidate_now();                      /* shown, not played: the style goes on */
+        auto_bar[l] = b + 1;
+    }
+    cursor = b * 16;
+}
 static void keys_play(uint32_t pressed, uint32_t released, int sel_held_now)
 {
     int32_t k, l = sel, rec = edit_on && rec_on && seq_playing;
@@ -2078,7 +2101,7 @@ static void input(void)
     else if (b & (1u << BTN_EDIT) && setup_on) { setup_on = 0; area_dirty = 1; }
     else if (b & (1u << BTN_EDIT)) {
         if (held && edit_on) clear_bar_ui();
-        else { edit_on = !edit_on; cursor = clampi(cursor, 0, nav_steps(sel) - 1); area_dirty = 1; }
+        else { edit_on = !edit_on; if (edit_on) edit_enter(); cursor = clampi(cursor, 0, nav_steps(sel) - 1); area_dirty = 1; }
     }
     if (b & (1u << BTN_SEQ)) {
         if (edit_on) {                                              /* EDIT: copy the COPY lane's pattern into this one */

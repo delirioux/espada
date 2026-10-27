@@ -1315,9 +1315,11 @@ static void fx_apply(void)
 static uint32_t seen[NLANE][64], nseen[NLANE];
 static rng_t ui_rng = {0x1234567u};
 /* a bar was written: past the end it lengthens the part (only the bar right after it can be reached) */
+static int32_t auto_bar[NLANE];                                 /* a bar EDIT filled by itself from what played (+1; 0 = none) */
 static void pat_touched(int32_t l, int32_t b)
 {
     upat_t *U = &ln[l].up;
+    auto_bar[l] = 0;                                                /* yours now */
     if (b >= U->bars && b < MAXB) U->bars = (uint16_t)(b + 1);
     U->on = 1; U->ver++;
     invalidate_now();

@@ -44,7 +44,7 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 
 | SONG (GLO) | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
 | --- | --- | --- | --- | --- |
-| LIVE | style: playing, the next one; stopped, every lane at once | blend | energy | space (the room) |
+| LIVE | style: playing, the next one; stopped, every lane at once, and a new song (MELODY at random) | blend | energy | space (the room) |
 | KEY | key | scale | chords | bars per chord |
 | ARC | arc on / off | build | peak | auto drop |
 | SETS | set 1..8 (its style, or EMPTY) | load: turn right, the set at once | store: turn right, what plays now into the set | clear: three clicks right |
@@ -311,7 +311,10 @@ Your patterns follow the chords, as the generated parts do: they are written in 
 
 ## Your own parts
 
-Each lane can have a part of its own, as long as you write it: up to 512 bars. EDIT shows one bar at a time, with a
+Each lane can have a part of its own, as long as you write it: up to 512 bars. EDIT opens where the music is: with your
+part playing, on the bar that plays now; while the lane plays the style, on your first bar, filled with what the style
+plays there (only if that bar is empty, or was filled this way and not touched since), so you start from what you
+hear. It sounds once you change a step. EDIT shows one bar at a time, with a
 band over it: the page (NOTES, FX, PART, BAR, RANGE; PRESETS steps through them) and a map of your bars, the one you
 are on white, the one playing marked cyan. BAR moves through your bars and one more, the new bar after the last (the
 grid says NEW BAR). Writing there makes the part a bar longer; you cannot go further, so a part never has holes at
