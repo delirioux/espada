@@ -4,6 +4,11 @@ Since 1.2:
 - OLDSKOOL's pad plays chords, struck on the one and the three; the chip arpeggio comes on a phrase's last bar and now and then.
 - EDIT opens on what plays: an empty part gets four bars of what the style plays from the bar playing on.
 - STYLE (SONG, LIVE) while stopped also starts a new song: MELODY at random on every lane.
+- 46 new patches (66 in all), in families: basses, leads, struck and plucked, organs, pads, chips.
+- Waveforms for the FM operators: the PC sound card's, a square, a saw, and sixteen 8-bit single cycles drawn at
+  power-on.
+- MUTATE (SOUND): each song plays the lanes' sounds its own way, and the styles pick from four fitting sounds per
+  lane. At 0 everything plays as before. Saved settings and sets from 1.2 load with MUTATE at 40 %.
 
 Makohai 1.2: three new pictures, on RESET's knobs, in BACK and in DEMO.
 

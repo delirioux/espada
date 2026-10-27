@@ -39,7 +39,7 @@ A group is a button; pressed again, it steps to its next setting, as PRESETS doe
 | Group | Button | Settings (KNOB 1..4 = the four lanes in the window) |
 | --- | --- | --- |
 | PLAY | HOME | volume, style, sound, melody, rhythm, pitch, density, octave, change |
-| SOUND | FX | reverb, filter, resonance, wobble, brightness, drive, crush, vary |
+| SOUND | FX | reverb, filter, resonance, wobble, brightness, drive, crush, vary, mutate |
 | TRACKER | ARP | pan, autopan, pan rate, swing, echo, slide, glides (the lead: how many of the style's own glides it keeps), porta, vibrato, tremolo, tremor, gate, retrigger, rate |
 
 | SONG (GLO) | KNOB 1 | KNOB 2 | KNOB 3 | KNOB 4 |
@@ -156,9 +156,26 @@ lane faded out, a save waiting, the keys' octave off 0.
 - **Blend** moves lanes to the queued style from the bottom up: drums, then bass, pad, lead (the word under it
   says how far).
 - **Density:** 50 % is the part as written. Lower thins it; higher adds notes, hats, ghost snares and fills.
-- **Sound** (PLAY): AUTO follows the style; or one of twenty patches (FM BASS, SLAP, PIZZ, SUB, BRASS,
-  STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO, E.PIANO, CHAOS, VIOLINS, CELLOS, SUPERSAW, AH VOX, ORCH HIT), or one of
-  five drum kits (STANDARD, TRACKER, ELECTRO, DEEP, PUNCH). AH VOX is a choir's "aah": two voices a little apart, a
+- **Sound** (PLAY): AUTO follows the style (with MUTATE on, the style picks one of its fitting sounds per song, see
+  below); or one of 66 patches, or one of five drum kits (STANDARD, TRACKER, ELECTRO, DEEP, PUNCH). The patches, in
+  families:
+  - the first twenty: FM BASS, SLAP, PIZZ, SUB, BRASS, STRINGS, BELL, ORGAN, FLUTE, CHIP, RAZOR, PULSE, PIANO,
+    E.PIANO, CHAOS, VIOLINS, CELLOS, SUPERSAW, AH VOX, ORCH HIT;
+  - basses: PC BASS, SAW BASS, PICKBASS, UPRIGHT, SQR BASS, RUBBER, WARMBASS;
+  - leads: SAW LEAD, HARDSYNC, SQR LEAD, PC LEAD, PC LEAD2, WHISTLE, OBOE, CLARINET, TRUMPET, SAX, BAGPIPE, VOX LEAD;
+  - struck and plucked: MARIMBA, VIBES, KALIMBA, MUSICBOX, HARPSI, CLAV, GUITAR, MUTE GTR, HARP, KOTO, STEELPAN,
+    TUBULAR, GLOCK, TOYPIANO;
+  - organs: DRAWBAR, PERC ORG, REED ORG;
+  - pads (sections of three players): WARM PAD, GLASSPAD, VOX PAD, ENSEMBLE, SWEEP, SAW PAD, SYNBRASS;
+  - chips: CHIP 25 and CHIP 12 (pulses of a quarter and an eighth), CHIP TRI (a 16-step triangle).
+
+  All of them are FM: two operators, and each operator has a waveform. Besides the sine there are the PC sound card's
+  (half sine, rectified, quarter pulses, alternating, camel), a square and a saw, and sixteen single cycles drawn at
+  power-on, 8-bit and 256 points each as a tracker's samples: triangle, two pulses, organ, two vowels, reed, bright,
+  hollow, glass, string, clav, bassy, nasal, hard sync and the stepped triangle. The PC patches sound like a 90s
+  sound card; the drawn ones like a tracker's chip samples.
+
+  The drum kits:  (STANDARD, TRACKER, ELECTRO, DEEP, PUNCH). AH VOX is a choir's "aah": two voices a little apart, a
   breath, through the vowel's formants, swelling in slowly; DRIFT's pad sings it. PUNCH is the sharp kit: the kick
   clicks, the snare keeps its crack, the hats are bright. SUPERSAW is not FM: seven saws detuned around the note, wide and bright,
   for big chords and leads. ORCH HIT is the orchestra hit: one key plays the note with its fifth, octave and tenth
@@ -172,6 +189,12 @@ lane faded out, a save waiting, the keys' octave off 0.
   (brightness and drive), FILTER (a low-pass with resonance) or STUTTER (retrigger). VARY sets how far it reaches;
   the value shows the phrase's character. The lead starts at 40 %, the other lanes at 0. Your own settings stay as
   you set them; the lane on screen shows what plays.
+- **Mutate:** every song plays the lane's sound its own way. From the song (the lane's MELODY) and the patch, the
+  FM brightness, the modulator's ratio and waveform, a drawn waveform for another of its kind (kept as loud), and the
+  attack, decay and release move; and with SOUND on AUTO the style picks the lane's sound from four that fit it (its
+  own in half the songs; SYMPHONY's lead stays CHAOS). The same song always sounds the same; a new song (STYLE while
+  stopped) sounds new. MUTATE sets how far (it starts at 40 %, the sfx has none); at 0 every patch plays as designed
+  and every style its own sounds.
 - **The tracker's effects** (TRACKER), per lane, as the effect column has them:
   - **PORTA** (1xx / 2xx): every note keeps rising (right) or falling (left) while it sounds, up to an octave a second.
   - **VIBRATO** (4xy): the pitch wobbles from the start of each note, up to half a semitone, 5.6 times a second.

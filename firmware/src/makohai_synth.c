@@ -42,6 +42,76 @@ static uint32_t note_inc(int32_t n)             /* phase step per sample of MIDI
 }
 #define HZ_INC(hz) ((uint32_t)(hz) * 97392u)    /* 2^32 / 44100 per Hz */
 
+/* ---- the operators' waveforms: the sine; the FM chip's (half, rectified, its quarter pulses, the alternating sine,
+ * the camel, a square, a saw); then single cycles drawn at boot, 8-bit and 256 points each, as a tracker's */
+enum { W_SINE, W_HALF, W_ABS, W_QUART, W_ALT, W_CAMEL, W_SQR, W_SAW,
+       W_TRI, W_P25, W_P12, W_ORGAN, W_VOXA, W_VOXO, W_REED, W_BRIGHT,
+       W_HOLLOW, W_GLASS, W_STRING, W_CLAV, W_BASSY, W_NASAL, W_SYNC, W_STEPTRI, NWAVE };
+#define W_TAB W_TRI
+#define NWT (NWAVE - W_TAB)
+static int8_t WT[NWT][256] __attribute__((section(".pool")));
+static int16_t WDC[NWAVE], WLOUD[NWAVE];        /* each wave's mean (the carrier takes it off: no thump), its loudness */
+static int32_t wv(uint32_t w, uint32_t ph)      /* Q15 */
+{
+    uint32_t i = ph >> 22;
+    int32_t x;
+    switch (w) {
+    case W_SINE: return SIN[i];
+    case W_HALF: return i < 512u ? SIN[i] : 0;
+    case W_ABS: x = SIN[i]; return x < 0 ? -x : x;
+    case W_QUART: return (i & 511u) < 256u ? SIN[i & 255u] : 0;
+    case W_ALT: return i < 512u ? SIN[(i << 1) & 1023u] : 0;
+    case W_CAMEL: x = SIN[(i << 1) & 1023u]; return i < 512u ? (x < 0 ? -x : x) : 0;
+    case W_SQR: return i < 512u ? 26000 : -26000;
+    case W_SAW: return (int32_t)(ph >> 16) - 32768;
+    default: return (int32_t)WT[(w - W_TAB) % NWT][ph >> 24] * 256;
+    }
+}
+/* the drawn waves: harmonics 1..16 (0..255 each; a negative one starts upside down), or drawn point by point */
+static const int16_t WHARM[NWT][16] = {
+    {255, 0, -28, 0, 10, 0, -5, 0, 3, 0, -2, 0, 2, 0, -1, 0},                      /* TRI: odd, 1/n^2 */
+    {0}, {0},                                                                       /* the pulses: drawn */
+    {255, 200, 150, 180, 0, 90, 0, 120, 0, 0, 0, 40, 0, 0, 0, 30},                 /* ORGAN: the drawbars */
+    {120, 160, 220, 255, 200, 120, 80, 50, 30, 20, 10},                            /* VOX A */
+    {255, 230, 120, 60, 30, 15, 8},                                                /* VOX O */
+    {255, 60, 200, 40, 160, 20, 120, 10, 90, 0, 60, 0, 40, 0, 25},                 /* REED: odd, a little even */
+    {255, 240, 225, 210, 195, 180, 165, 150, 135, 120, 105, 90, 75, 60, 45, 30},   /* BRIGHT */
+    {255, 0, 85, 0, 51, 0, 36, 0, 28, 0, 23, 0, 20, 0, 17},                        /* HOLLOW: odd, 1/n */
+    {255, 0, 0, 140, 0, 0, 120, 0, 0, 0, 100, 0, 70},                              /* GLASS: high partials far apart */
+    {255, 128, 85, 110, 90, 75, 64, 56, 28, 25, 23, 21, 20, 18, 17, 16},           /* STRING: a saw, a bump in 4..8 */
+    {150, 255, 200, 120, 220, 180, 150, 100, 90, 80, 70, 60, 50, 40, 30, 20},       /* CLAV */
+    {255, 180, 120, 40},                                                           /* BASSY */
+    {120, 90, 140, 200, 255, 230, 160, 90, 40, 20},                                /* NASAL */
+    {0}, {0}};                                                                      /* SYNC, STEP TRI: drawn */
+static void waves_init(void)
+{
+    static int32_t acc[256];
+    uint32_t w, i, h;
+    for (w = 0; w < NWT; w++) {
+        int32_t pk = 1;
+        for (i = 0; i < 256u; i++) {
+            int32_t a = 0;
+            switch (w + W_TAB) {
+            case W_P25: a = i < 64u ? 96 : -32; break;              /* no mean: the high part three times the low */
+            case W_P12: a = i < 32u ? 112 : -16; break;
+            case W_SYNC: a = (int32_t)((i * 666u >> 8) & 255u) - 128; break;   /* a saw synced: 2.6 cycles, cut off */
+            case W_STEPTRI: a = (int32_t)((i < 128u ? i : 255u - i) >> 3) * 17 - 128; break;   /* 16 steps, as an 8-bit console's */
+            default:
+                for (h = 0; h < 16u; h++) if (WHARM[w][h]) a += WHARM[w][h] * SIN[(i * 4u * (h + 1u)) & 1023u] >> 8;
+            }
+            acc[i] = a; if ((a < 0 ? -a : a) > pk) pk = a < 0 ? -a : a;
+        }
+        for (i = 0; i < 256u; i++) WT[w][i] = (int8_t)(acc[i] * 127 / pk);
+    }
+    for (w = 0; w < NWAVE; w++) {
+        int32_t m = 0, a = 0, x;
+        for (i = 0; i < 1024u; i++) m += wv(w, i << 22);
+        WDC[w] = (int16_t)(m / 1024);
+        for (i = 0; i < 1024u; i++) { x = wv(w, i << 22) - WDC[w]; a += x < 0 ? -x : x; }
+        WLOUD[w] = (int16_t)(a / 1024);
+    }
+}
+
 /* ---- FM patches: index Q8 (phase modulation, already divided by the ratio), amp Q15 for one voice */
 typedef struct {
     const char *name;
@@ -58,6 +128,7 @@ typedef struct {
                                  * its fifth, octave and tenth in one brassy stab (ORCH HIT, the last patch);
                                  * 5: a choir's aah, saws through vowel formants (AH VOX) */
     uint8_t breath;             /* noise in the tone, following the note's level: bow, breath (0 = a clean FM tone) */
+    uint8_t cw, mw;             /* the carrier's and the modulator's waveform (W_x; 0 = the sine) */
 } patch_t;
 static const patch_t PATCH[] = {
     {"FM BASS", 16, 1138, 260, 180,   4, 6200,  178,  80, 0, 0},
@@ -80,10 +151,65 @@ static const patch_t PATCH[] = {
     {"SUPERSAW", 16,   0,   0, 100,   6, 3000,  235, 380, 0, 0,    0, 3},   /* seven saws, wide and bright */
     {"AH VOX",   16,    0,   0, 100, 280, 5500,  225, 650, 1, 0,    0, 5},   /* a choir's aah: two saws through the vowel's formants */
     {"ORCH HIT", 16, 1100, 260, 160,   1, 2300,    0, 220, 0, 0,  420, 4, 120},   /* one key, a whole orchestra: bright, a burst of noise, gone in half a second */
+    /* the families since 1.3, in the waveforms: basses */
+    {"PC BASS",  16,  900, 220, 160,   3, 5680,  170,  80, 0, 0,    0, 0,  0, W_SINE, W_HALF},     /* the sound card's: a half-sine modulator */
+    {"SAW BASS", 16,    0,   0, 100,   3, 5640,  200,  80, 0, 0,    0, 0,  0, W_SAW},
+    {"PICKBASS", 32,  800,   0, 120,   2, 7860,   60,  90, 0, 0,  260},                           /* picked: bright, then round */
+    {"UPRIGHT",  16,  500,  80, 150,   4, 6180,    0, 150, 0, 0,  900, 0,  0, W_SINE, W_ABS},      /* plucked, rings out */
+    {"SQR BASS", 16,    0,   0, 100,   3, 3740,  210,  70, 0, 0,    0, 0,  0, W_HOLLOW},
+    {"RUBBER",   16,  700, 150, 250,   3, 4820,  190,  90, 0, 0,    0, 0,  0, W_SINE, W_CAMEL},          /* round, a little hollow */
+    {"WARMBASS", 16,  200,  60, 200,   5, 7130,  220, 100, 0, 0,    0, 0,  0, W_BASSY},
+    /* leads */
+    {"SAW LEAD", 16,    0,   0, 100,   4, 2410,  225, 120, 1, 0,    0, 0,  0, W_SAW},
+    {"HARDSYNC", 16,    0,   0, 100,   3, 2570,  220, 110, 1, 0,    0, 0,  0, W_SYNC},
+    {"SQR LEAD", 16,    0,   0, 100,   4, 1680,  225, 110, 1, 0,    0, 0,  0, W_HOLLOW},
+    {"PC LEAD",  16,  650, 380, 250,   3, 4550,  215, 140, 1, 0,    0, 0,  0, W_HALF, W_SINE},
+    {"PC LEAD2", 32,  500, 250, 300,   3, 2930,  210, 140, 1, 0,    0, 0,  0, W_ALT, W_QUART},
+    {"WHISTLE",  16,   30,  30, 100,  40, 1890,  235, 120, 1, 0,    0, 0, 25},
+    {"OBOE",     16,  250, 200, 200,  35, 3140,  225, 120, 1, 0,    0, 0, 20, W_REED},
+    {"CLARINET", 16,  120, 100, 200,  40, 1640,  230, 130, 1, 0,    0, 0, 18, W_HOLLOW},
+    {"TRUMPET",  16,  300, 900,  70,  25, 1930,  215, 130, 1, 0,    0, 0, 15},                     /* opens up as it is blown */
+    {"SAX",      16,  450, 350, 200,  25, 2730,  220, 140, 1, 0,    0, 0, 35, W_REED},
+    {"BAGPIPE",  16,  150, 120, 200,  30, 5050,  240, 120, 0, 0,    0, 0, 25, W_NASAL},
+    {"VOX LEAD", 16,   80,  60, 200,  30, 4490,  230, 160, 1, 0,    0, 0, 10, W_VOXA},
+    /* struck and plucked */
+    {"MARIMBA",  64,  600,   0,  40,   1, 2790,    0, 120, 0, 0,  400},
+    {"VIBES",    64,  200,  40, 300,   1, 2780,    0, 400, 1, 0, 1600},
+    {"KALIMBA", 112,  300,   0,  30,   1, 2780,    0, 150, 0, 0,  500},
+    {"MUSICBOX", 64,  250,   0, 100,   1, 2780,    0, 300, 0, 0, 1200, 0,  0, W_SINE, W_ABS},
+    {"HARPSI",   48,  900, 300, 200,   1, 2790,    0, 150, 0, 0, 1200, 0,  0, W_SINE, W_ABS},
+    {"CLAV",     16,  400,   0, 100,   1, 2860,    0,  80, 0, 0,  300, 0,  0, W_CLAV},
+    {"GUITAR",   16,  800, 150, 250,   1, 2790,    0, 200, 0, 0, 1500, 0,  0, W_SINE, W_HALF},
+    {"MUTE GTR", 16,  700, 100,  80,   1, 2810,    0,  60, 0, 0,  160, 0,  0, W_SINE, W_HALF},
+    {"HARP",     32,  300,   0, 300,   1, 2780,    0, 400, 0, 0, 1800},
+    {"KOTO",     48,  700, 100, 120,   1, 2790,    0, 200, 0, 0,  900, 0,  0, W_SINE, W_ABS},
+    {"STEELPAN", 40,  400, 100, 300,   1, 2780,    0, 250, 0, 0,  700},                          /* 5:2, a little out of tune, as the pan */
+    {"TUBULAR",  56,  500, 100,1500,   1, 2790,    0, 800, 0, 0, 2500},
+    {"GLOCK",    80,  250,  30, 200,   1, 2780,    0, 300, 0, 0,  900},
+    {"TOYPIANO", 32,  400,  50, 200,   1, 4090,    0, 200, 0, 0,  600, 0,  0, W_CAMEL},
+    /* organs */
+    {"DRAWBAR",  16,    0,   0, 100,   3, 2450,  255,  60, 1, 0,    0, 0,  0, W_ORGAN},
+    {"PERC ORG", 48,  400,   0,  80,   3, 2450,  255,  60, 1, 0,    0, 0,  0, W_ORGAN},          /* the third harmonic's click */
+    {"REED ORG", 16,    0,   0, 100,  20, 2920,  250, 100, 1, 0,    0, 0, 10, W_REED},
+    /* pads: sections (two more players, a little out) */
+    {"WARM PAD", 16,   80,  60, 400, 400, 1770,  230, 800, 1, 0,    0, 2,  0, W_TRI},
+    {"GLASSPAD", 16,   60,  40, 400, 600, 2700,  230, 900, 1, 0,    0, 2,  0, W_GLASS},
+    {"VOX PAD",  16,    0,   0, 100, 500, 2170,  230, 800, 1, 0,    0, 2, 20, W_VOXO},
+    {"ENSEMBLE", 16,    0,   0, 100, 200, 2410,  230, 600, 1, 0,    0, 2,  0, W_STRING},
+    {"SWEEP",    16,    0, 900,2500, 300, 1530,  230, 800, 1, 0,    0, 2},                        /* opens slowly */
+    {"SAW PAD",  16,    0,   0, 100, 300, 1790,  230, 700, 1, 0,    0, 2,  0, W_SAW},
+    {"SYNBRASS", 16,  200, 600, 120,  40, 2200,  215, 200, 1, 0,    0, 2,  0, W_SAW},
+    /* the chips' */
+    {"CHIP 25",  16,    0,   0, 100,   2, 1730,  230,  50, 1, 0,    0, 0,  0, W_P25},
+    {"CHIP 12",  16,    0,   0, 100,   2, 2650,  230,  50, 1, 0,    0, 0,  0, W_P12},
+    {"CHIP TRI", 16,    0,   0, 100,   2, 2160,  240,  50, 0, 0,    0, 0,  0, W_STEPTRI},
 };
 #define NPATCH (sizeof PATCH / sizeof PATCH[0])
+#define P_ORCH 19u                              /* the orchestra hit (the styles' hits) */
 /* what a voice of each patch costs the audio interrupt, in units (a plain FM voice is 2), measured: the voice budget */
-static const uint8_t PATCH_W[] = {2, 2, 2, 2, 5, 4, 2, 2, 3, 3, 3, 3, 2, 2, 5, 5, 5, 4, 3, 4};
+static const uint8_t PATCH_W[] = {2, 2, 2, 2, 5, 4, 2, 2, 3, 3, 3, 3, 2, 2, 5, 5, 5, 4, 3, 4,
+                                  3, 3, 2, 3, 3, 2, 3,  3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,           /* a drawn or chip waveform: 3 */
+                                  2, 2, 2, 3, 3, 3, 3, 3, 2, 3, 2, 2, 2, 3,  3, 3, 3,  5, 5, 5, 5, 4, 5, 5,  3, 3, 3};
 typedef char patch_w_all[sizeof PATCH_W == NPATCH ? 1 : -1];
 
 typedef struct { const char *name; uint16_t kh, kl, kd, sf, sd, hf, hd; uint8_t sharp; } kit_t;   /* Hz and ms; sharp: a click, a crack, open hats */
@@ -120,6 +246,7 @@ typedef struct {
     int32_t pamp, brown;                        /* the pad's level (Q15, slow), the brown noise */
     uint8_t wt;                                 /* what it costs (the voice budget) */
     uint8_t key, arpk[3];                       /* the note it plays (0: an echo copy, a drum, a noise), an arpeggio's notes: the keys light them */
+    uint8_t cw, mw; int16_t cdc;                /* the operators' waveforms, the carrier's mean */
 } voice_t;
 #define NVOICE 33u
 static voice_t vc[NVOICE];
@@ -241,12 +368,14 @@ static void synth_init(void)
 {
     uint32_t i;
     for (i = 0; i < 1024u; i++) SIN[i] = (int16_t)sine_q15(i << 22);
+    waves_init();
     static const uint8_t SEND0[NLANE] = {35, 60, 3, 18, 100, 45};  /* REVERB: lead some, pad much, bass hardly, drums a little, sfx all, arp some */
     for (i = 0; i < NLANE; i++) { fx[i].aglide = 100; fx[i].level = 80; fx[i].bright = 25; fx[i].rtg_rate = 1; fx[i].inst = -1; fx[i].res = 30; fx[i].send = SEND0[i]; }
     fx[L_SFX].level = 30;
     fx[L_LEAD].level = 50;                                        /* the lead: the ear hears its range most; 50 sits it in the mix */
     fx[L_ARP].level = 60;                                         /* the arp beside it */
     fx[L_LEAD].autopan = 20; fx[L_ARP].autopan = 20;               /* every lane in the middle; lead and arp move a little, note by note */
+    for (i = 0; i < NLANE; i++) fx[i].mutate = i == L_SFX ? 0 : MUTATE0;   /* each song its own sounds */
 }
 
 static inline int32_t noise(void) { noise_s = noise_s * 1664525u + 1013904223u; return (int32_t)noise_s >> 17; }
@@ -294,6 +423,42 @@ static voice_t *alloc_voice(uint32_t lane, uint32_t wt)
     return &vc[pick];
 }
 
+/* MUTATE: each song plays a lane's sound its own way. From the lane's song seed and the patch: the FM index, the
+ * modulator's ratio and waveform, now and then the carrier's, and the envelope's times move; 0 = as designed */
+typedef struct { int32_t iq, aq, dq, rq, gq; uint32_t ratio16, cw, mw; } mut_t;
+static void mutate(const patch_t *P, uint32_t pi, uint32_t lane, mut_t *M)
+{
+    int32_t amt = fx[lane].mutate;
+    uint32_t h = ((uint32_t)fx[lane].mseed + 1u) * 2654435761u ^ (pi + 7u) * 40503u ^ lane * 97u;
+    M->iq = M->aq = M->dq = M->rq = M->gq = 256; M->ratio16 = P->ratio16; M->cw = P->cw; M->mw = P->mw;
+    if (amt <= 0) return;
+#define MR(n) (h = h * 1103515245u + 12345u, (int32_t)((h >> 16) % (uint32_t)(n)))
+    M->iq = 256 + (MR(257) - 128) * amt / 80;                       /* the brightness: up to +-60 % */
+    M->aq = 256 + (MR(257) - 128) * amt / 100;                      /* the times: up to +-50 % */
+    M->dq = 256 + (MR(257) - 128) * amt / 100;
+    M->rq = 256 + (MR(257) - 128) * amt / 100;
+    if (P->chaos <= 2u) {                                           /* an FM tone (not the saws, the hit, the choir) */
+        if (P->ratio16 % 16u == 0 && P->ratio16 <= 64u && MR(100) < amt / 2) {   /* a harmonic ratio: one next to it */
+            int32_t r = (int32_t)P->ratio16 + (MR(2) ? 16 : -16);
+            M->ratio16 = (uint32_t)(r < 16 ? 32 : r);
+        }
+        if (P->mw <= W_QUART && MR(100) < amt / 2) M->mw = (uint32_t)MR(4);   /* the sine, the half, the rectified, the quarters */
+        if (P->cw >= W_SAW && MR(100) < amt / 2) {                 /* a drawn waveform: another of its kind */
+            static const uint8_t FAM[4][4] = {{W_SAW, W_STRING, W_BRIGHT, W_SYNC}, {W_HOLLOW, W_REED, W_P25, W_CLAV},
+                                              {W_TRI, W_VOXO, W_BASSY, W_STEPTRI}, {W_VOXA, W_NASAL, W_ORGAN, W_GLASS}};
+            uint32_t f, k;
+            for (f = 0; f < 4u; f++) for (k = 0; k < 4u; k++) if (FAM[f][k] == P->cw) { M->cw = FAM[f][MR(4)]; f = 4u; break; }
+        }
+        if (P->cw == W_SINE && MR(100) < amt / 4) M->cw = W_HALF;   /* now and then a half-sine carrier (the rectified ones
+                                                                     * sound an octave up: modulators only) */
+    }
+#undef MR
+    if (M->cw != P->cw && WLOUD[M->cw] > 0) {                      /* another waveform: as loud as the patch's */
+        M->gq = WLOUD[P->cw] * 256 / WLOUD[M->cw];
+        M->gq = M->gq < 160 ? 160 : M->gq > 384 ? 384 : M->gq;  /* not past 1.5 times: spiky waves */
+    }
+}
+
 /* the effect column's porta and vibrato for the notes fire() starts now (set around the call, 0 otherwise) */
 static int32_t note_porta, note_vib;
 /* start one FM voice: lvl Q8, dur in samples; from_inc: slide start (0 = none) */
@@ -301,20 +466,24 @@ static voice_t *last_voice;                             /* the voice start_fm ju
 static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur, uint32_t lvl, uint32_t from_inc,
                      const uint32_t *arp, uint32_t arp_n, uint32_t midi)
 {
-    voice_t *v = alloc_voice(lane, PATCH_W[(uint32_t)(P - PATCH) < NPATCH ? (uint32_t)(P - PATCH) : 0u]);
+    uint32_t pi = (uint32_t)(P - PATCH) < NPATCH ? (uint32_t)(P - PATCH) : 0u;
+    mut_t M;
+    mutate(P, pi, lane, &M);
+    voice_t *v = alloc_voice(lane, PATCH_W[pi] + ((M.cw | M.mw) && !(P->cw | P->mw)));   /* a sine patch mutated into another waveform costs more */
     last_voice = v;
-    int32_t bright = fx[lane].bright, mult = 64 + bright * 768 / 100;   /* Q8: 25 -> 1.0 */
-    uint32_t a = (uint32_t)P->a_ms * 441u / 10u, i;
+    int32_t bright = fx[lane].bright, mult = (64 + bright * 768 / 100) * M.iq >> 8;   /* Q8: 25 -> 1.0 */
+    uint32_t a = (uint32_t)P->a_ms * 441u / 10u * (uint32_t)M.aq >> 8, i;
     v->kind = V_FM; v->lane = (uint8_t)lane; v->stage = 0; v->square = P->square;
-    v->target = inc; v->inc = from_inc ? from_inc : inc; v->ratio16 = P->ratio16;
+    v->cw = (uint8_t)M.cw; v->mw = (uint8_t)M.mw; v->cdc = WDC[M.cw];
+    v->target = inc; v->inc = from_inc ? from_inc : inc; v->ratio16 = M.ratio16;
     v->ph = 0; v->mph = 0;
-    v->peak = (int32_t)((P->amp * lvl) >> 8);
+    v->peak = (int32_t)((((P->amp * (uint32_t)M.gq) >> 8) * lvl) >> 8);
     v->sus = (v->peak * P->sus) >> 8;
     v->amp = 0;
     v->att = (int32_t)((uint32_t)v->peak * CTRL / (a < CTRL ? CTRL : a));
     if (v->att < 1) v->att = 1;
-    v->dec_k = tau_k(P->d_ms ? P->d_ms : 80u);
-    v->rel_k = tau_k(P->r_ms / 3u + 1u);
+    v->dec_k = tau_k((P->d_ms ? P->d_ms : 80u) * (uint32_t)M.dq >> 8);
+    v->rel_k = tau_k(((uint32_t)P->r_ms * (uint32_t)M.rq >> 8) / 3u + 1u);
     v->idx = (P->i0 * mult) >> 8; v->idx_end = (P->i1 * mult) >> 8;
     v->idx_step = (v->idx_end - v->idx) * (int32_t)CTRL / (int32_t)((uint32_t)P->it_ms * 441u / 10u + 1u);
     v->gate = dur; v->age = ++vage; v->ctr = 0;
@@ -478,7 +647,7 @@ static void fire(uint32_t lane, const uint8_t *note, uint32_t n, uint32_t flags,
     if (lane == L_DRUMS) { if (note[0] < NDK) hit_ms[note[0]] = fm1_ms; start_drum(note[0], lvl, kind_or_inst, original); return; }
     if (lane == L_SFX) { start_sfx(note[0], note[1], dur, lvl); return; }
     {
-        const patch_t *P = &PATCH[flags & EV_ORCH ? NPATCH - 1u : kind_or_inst < NPATCH ? kind_or_inst : 0];   /* ORCH HIT is the last patch */
+        const patch_t *P = &PATCH[flags & EV_ORCH ? P_ORCH : kind_or_inst < NPATCH ? kind_or_inst : 0];
         int32_t chord = n > 1u && !(flags & EV_ARP);
         uint32_t l2 = chord ? (lvl * 115u) >> 8 : lvl;                    /* chords: quieter per voice */
         if (flags & EV_ARP) {
@@ -677,9 +846,14 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                 break;
             }
             v->mph += (inc >> 4) * v->ratio16;
-            off = (uint32_t)(SIN[v->mph >> 22] * v->idx) << 6;
             v->ph += inc;
-            s = SIN[(v->ph + off) >> 22];
+            if (v->cw | v->mw) {                                        /* the other waveforms */
+                off = (uint32_t)(wv(v->mw, v->mph) * v->idx) << 6;
+                s = wv(v->cw, v->ph + off) - v->cdc;
+            } else {
+                off = (uint32_t)(SIN[v->mph >> 22] * v->idx) << 6;
+                s = SIN[(v->ph + off) >> 22];
+            }
             if (v->square) s = s >= 0 ? 26000 : -26000;
             s = (s * v->amp) >> 15;
             if (v->breath) {                                            /* bow / breath: low-passed noise at the note's level */
@@ -702,8 +876,9 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                 int32_t e;
                 v->pph1 += inc + (inc >> 8);
                 v->pph2 += inc - (inc >> 8) - (inc >> 10);
-                e = SIN[(v->pph1 + ((uint32_t)(int32_t)SIN[v->pph1 >> 22] << 14)) >> 22]
-                  + SIN[(v->pph2 + ((uint32_t)(int32_t)SIN[v->pph2 >> 22] << 14)) >> 22];
+                if (v->cw) e = wv(v->cw, v->pph1) + wv(v->cw, v->pph2) - 2 * v->cdc;   /* the players in the patch's waveform */
+                else e = SIN[(v->pph1 + ((uint32_t)(int32_t)SIN[v->pph1 >> 22] << 14)) >> 22]
+                       + SIN[(v->pph2 + ((uint32_t)(int32_t)SIN[v->pph2 >> 22] << 14)) >> 22];
                 s = ((s * 5) >> 3) + ((((e * 3) >> 3) * v->amp) >> 15);
             } else if (v->chaos) {                                      /* the light lead under a heavy pad and noise */
                 int32_t pad, br;

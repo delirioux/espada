@@ -139,6 +139,21 @@ static const prof_t PROF[] = {
      {S_STAB, S_SUS, S_ACID, S_DRAVE}, {4, 7, 0, 3, 0, 17}, 0, 138, 20, 0, 35, {AP_UP, 1, 2}},
 };
 #define NPROF (int32_t)(sizeof PROF / sizeof PROF[0])
+/* each style's other sounds that fit, per lane: LEAD, PAD, BASS, the kits, ARP; the first is the style's own. With
+ * MUTATE on, a song plays its own (half the songs) or one of the other three */
+static const uint8_t POOL[][5][4] = {
+    /* EPIC */       {{10, 27, 35, 15}, {5, 56, 59, 62}, {2, 22, 0, 23}, {1, 0, 4, 1}, {2, 47, 43, 39}},
+    /* HYPERSPACE */ {{11, 28, 29, 27}, {7, 53, 61, 63}, {0, 20, 25, 24}, {2, 4, 1, 2}, {11, 64, 63, 28}},
+    /* FUSION */     {{9, 36, 30, 32}, {13, 44, 54, 40}, {1, 22, 23, 26}, {0, 4, 1, 0}, {6, 40, 41, 51}},
+    /* OLDSKOOL */   {{8, 30, 31, 29}, {9, 63, 64, 52}, {0, 20, 65, 24}, {1, 0, 2, 1}, {9, 63, 64, 42}},
+    /* SYMPHONY */   {{14, 14, 14, 14}, {5, 59, 58, 56}, {16, 16, 16, 23}, {0, 0, 0, 0}, {2, 47, 2, 51}},   /* the lead stays CHAOS */
+    /* TROPIC */     {{8, 32, 49, 39}, {13, 45, 44, 53}, {3, 26, 23, 22}, {1, 0, 4, 1}, {13, 49, 39, 41}},
+    /* STEEL */      {{10, 28, 27, 29}, {10, 61, 62, 46}, {0, 24, 21, 20}, {0, 4, 3, 0}, {10, 46, 27, 45}},
+    /* DRIFT */      {{8, 38, 32, 34}, {18, 57, 58, 60}, {3, 26, 23, 25}, {2, 3, 0, 2}, {6, 42, 50, 41}},
+    /* FUNK */       {{11, 36, 35, 29}, {13, 44, 54, 46}, {1, 25, 22, 26}, {1, 4, 0, 1}, {13, 44, 40, 45}},
+    /* RAVE */       {{4, 62, 28, 27}, {7, 53, 54, 61}, {0, 20, 21, 25}, {3, 2, 4, 3}, {17, 17, 63, 28}},
+};
+typedef char pool_count[sizeof POOL / sizeof POOL[0] == sizeof PROF / sizeof PROF[0] ? 1 : -1];
 /* how each style plays the lanes, on top of your settings (as VARY): swing, tremolo, trance gate (tremor), gate and
  * stereo per lane, in LEAD PAD BASS DRUMS SFX ARP order. The notes' own effects are in style_fx */
 typedef struct { int8_t swing[NLANE], pan[NLANE]; uint8_t trem[NLANE], tremor[NLANE], gate[NLANE]; } sstyle_t;
@@ -201,6 +216,14 @@ typedef struct {
     uint8_t mute;                   /* ENV: faded out */
 } lane_t;
 static lane_t ln[NLANE];
+static int32_t style_inst(int32_t l, int32_t p)                 /* the sound the style gives lane l in this song */
+{
+    int32_t k = l == L_LEAD ? 0 : l == L_PAD ? 1 : l == L_BASS ? 2 : l == L_DRUMS ? 3 : l == L_ARP ? 4 : -1;
+    uint32_t h;
+    if (k < 0 || fxu[l].mutate <= 0) return PROF[p].inst[l];
+    h = (hash3(ln[l].mel, l, p * 7 + 3) >> 8) % 6u;
+    return POOL[p][k][h < 3u ? 0 : h - 2u];
+}
 static const int32_t LBASE[NLANE] = {62, 50, 38, 0, 62, 62}, LLO[NLANE] = {58, 45, 24, 0, 0, 58}, LHI[NLANE] = {98, 86, 64, 0, 0, 100};   /* bases on the tonic */
 static const int32_t LORDER[NLANE] = {3, 2, 1, 0, 4, 3};        /* blend order: drums first, the arp with the lead; sfx follows the bass */
 #define PROF_START 3                                            /* the style it starts with: OLDSKOOL */
@@ -1124,7 +1147,7 @@ static void gen_bar(int32_t b, bar_t *B)
         g_style = -1;
         r.a = hash3(g_bk, l, p) ^ ((uint32_t)GL->mel * 2654435761u);
         tools_make(&T, &H, LBASE[l] + ln[l].oct * 12 + key_off);
-        B->prof[l] = (uint8_t)p; B->inst[l] = PROF[p].inst[l]; B->user[l] = 0; B->cnt[l] = 0;
+        B->prof[l] = (uint8_t)p; B->inst[l] = (uint8_t)style_inst(l, p); B->user[l] = 0; B->cnt[l] = 0;
         B->muted[l] = (uint8_t)(!lane_active(&A, l) || !form_plays(l, b));
         if (B->muted[l]) continue;
         if (ln[l].up.on && user_bar(l, &G, &T, b)) B->user[l] = 1;
@@ -1304,6 +1327,7 @@ static void fx_apply(void)
             const sstyle_t *S = &SSTYLE[eff_prof(l, cur_bar())];
             int32_t pn = U->pan + S->pan[l];
             F->porta = U->porta; F->vibr = U->vibr; F->autopan = U->autopan; F->aprate = U->aprate;
+            F->mutate = U->mutate; F->mseed = ln[l].mel;
             F->trem = clamp100(U->trem + S->trem[l]); F->gate = clamp100(U->gate + S->gate[l]); F->swing = clamp100(U->swing + S->swing[l]);
             F->tremor = U->tremor ? U->tremor : S->tremor[l];
             F->pan = pn < -100 ? -100 : pn > 100 ? 100 : pn;

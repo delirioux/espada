@@ -192,7 +192,7 @@ static void set_bpm(int32_t b)
     seq_step_len_q8 = 169344000u / (uint32_t)b;             /* 44100 * 60 / 4 * 256 / bpm */
 }
 static const char *inst_name(int32_t l, int32_t inst) { return l == L_SFX ? SXNAME[inst] : l == L_DRUMS ? KITS[inst].name : PATCH[inst].name; }
-static int32_t inst_eff(int32_t l) { return fxu[l].inst >= 0 ? fxu[l].inst : l == L_SFX ? 0 : PROF[ln[l].prof].inst[l]; }
+static int32_t inst_eff(int32_t l) { return fxu[l].inst >= 0 ? fxu[l].inst : l == L_SFX ? 0 : style_inst(l, ln[l].prof); }
 
 /* ---- the knobs' functions: turn, and the value (and a second line) as the cards show them */
 typedef void (*turn_fn)(int32_t d);
@@ -286,6 +286,9 @@ static void t_drive(int32_t d) { fxu[sel].drive = clampi(fxu[sel].drive + d, 0, 
 static void v_drive(char *o) { s_pct(o, fxu[sel].drive); }
 static void t_send(int32_t d) { fxu[sel].send = clampi(fxu[sel].send + d, 0, 100); }
 static void v_send(char *o) { s_pct(o, fxu[sel].send); }
+static void t_mut(int32_t d) { if (sel != L_SFX) { fxu[sel].mutate = clampi(fxu[sel].mutate + d, 0, 100); invalidate(); } }
+static void v_mut(char *o) { if (sel == L_SFX) s_cat(o, "--"); else s_pct(o, fxu[sel].mutate); }
+static void s_mut(char *o) { if (sel != L_SFX) s_cat(o, fxu[sel].mutate ? "PER SONG" : "AS MADE"); }
 static void t_vary(int32_t d) { fxu[sel].vary = clampi(fxu[sel].vary + d, 0, 100); }
 static void v_vary(char *o) { s_pct(o, fxu[sel].vary); }
 static void s_vary(char *o) { if (fxu[sel].vary) s_cat(o, VARYN[vary_char[sel]]); }
@@ -461,7 +464,8 @@ static const card_t ROW_PLAY[] = {                              /* the mix, the 
     {"DENSITY", t_dens, v_dens, 0}, {"OCTAVE", t_oct, v_oct, 0}, {"CHANGE", t_chg, v_chg, s_chg}};
 static const card_t ROW_SOUND[] = {                             /* the room, the filter with its own two, the tone, the rough ones, VARY */
     {"REVERB", t_send, v_send, 0}, {"FILTER", t_filt, v_filt, s_filt}, {"RESO", t_res, v_res, 0}, {"WOBBLE", t_wob, v_wob, 0},
-    {"BRIGHT", t_bright, v_bright, 0}, {"DRIVE", t_drive, v_drive, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary}};
+    {"BRIGHT", t_bright, v_bright, 0}, {"DRIVE", t_drive, v_drive, 0}, {"CRUSH", t_crush, v_crush, 0}, {"VARY", t_vary, v_vary, s_vary},
+    {"MUTATE", t_mut, v_mut, s_mut}};
 static void t_aglide(int32_t d) { if (sel == L_LEAD) { fxu[sel].aglide = clampi(fxu[sel].aglide + d, 0, 100); invalidate(); } }
 static void v_aglide(char *o) { if (sel != L_LEAD) s_cat(o, "--"); else s_pct(o, fxu[sel].aglide); }
 static void s_aglide(char *o) { if (sel == L_LEAD) s_cat(o, "BY STYLE"); }
@@ -1673,18 +1677,18 @@ static void draw_frame(int force)
 /* ---- saving: settings (256 B) and patterns (their own sector), only while stopped (an erase stalls the sound) */
 typedef struct {
     uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy; uint8_t space;
-    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; int8_t porta, pan; uint8_t vibr, trem, gate, tremor, swing, aglide, uon, autopan, aprate; } l[NLANE];
+    struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; int8_t porta, pan; uint8_t vibr, trem, gate, tremor, swing, aglide, uon, autopan, aprate, mutate; } l[NLANE];
     uint8_t palette, screen, glow, back, backdim;
 } save_t;
 typedef char save_fits[sizeof(save_t) <= 256u ? 1 : -1];          /* settings_save takes at most 256 bytes */
-#define SAVE_VER 14
-/* older records, read and brought up to date: a lane of 33 bytes (11, 1.0), 34 (12, no PAN RATE), 35 since; the look
- * at the end 3 bytes before 14 (no BACK) */
+#define SAVE_VER 15
+/* older records, read and brought up to date: a lane of 33 bytes (11, 1.0), 34 (12, no PAN RATE), 35 (13, 14: no
+ * MUTATE), 36 since; the look at the end 3 bytes before 14 (no BACK) */
 #define SAVE_HEAD 13u
-static uint32_t save_lane(uint32_t v) { return v <= 11u ? 33u : v == 12u ? 34u : 35u; }
+static uint32_t save_lane(uint32_t v) { return v <= 11u ? 33u : v == 12u ? 34u : v <= 14u ? 35u : 36u; }
 static uint32_t save_tail(uint32_t v) { return v <= 13u ? 3u : 5u; }
 static uint32_t save_size(uint32_t v) { return SAVE_HEAD + NLANE * save_lane(v) + save_tail(v); }
-typedef char save_bytes[sizeof(save_t) == SAVE_HEAD + NLANE * 35u + 5u ? 1 : -1];   /* bytes only, no padding: the copy below relies on it */
+typedef char save_bytes[sizeof(save_t) == SAVE_HEAD + NLANE * 36u + 5u ? 1 : -1];   /* bytes only, no padding: the copy below relies on it */
 static void save_up(const uint8_t *o, uint32_t v, save_t *S)
 {
     uint8_t *d = (uint8_t *)S;
@@ -1693,6 +1697,7 @@ static void save_up(const uint8_t *o, uint32_t v, save_t *S)
     memcpy(d, o, SAVE_HEAD);
     for (l = 0; l < NLANE; l++) memcpy(d + SAVE_HEAD + l * L, o + SAVE_HEAD + l * lo, lo);
     memcpy(d + SAVE_HEAD + NLANE * L, o + SAVE_HEAD + NLANE * lo, save_tail(v));
+    if (v < 15u) for (l = 0; l < NLANE; l++) S->l[l].mutate = l == L_SFX ? 0 : MUTATE0;   /* MUTATE came in 15 */
     S->ver = SAVE_VER;
 }
 /* the own parts, in their store: [head 16 B][lanes 20 B][to 64][each lane's bars, 32 B each]; the CRC covers all
@@ -1767,6 +1772,7 @@ static void state_get(save_t *P)                                /* everything in
         S.l[l].mel = ln[l].mel; S.l[l].rhy = ln[l].rhy; S.l[l].pit = ln[l].pit; S.l[l].chg = ln[l].chg; S.l[l].mute = ln[l].mute; S.l[l].send = (uint8_t)fxu[l].send; S.l[l].midi = midi_chan[l];
         S.l[l].porta = (int8_t)fxu[l].porta; S.l[l].pan = (int8_t)fxu[l].pan; S.l[l].vibr = (uint8_t)fxu[l].vibr; S.l[l].trem = (uint8_t)fxu[l].trem;
         S.l[l].gate = (uint8_t)fxu[l].gate; S.l[l].tremor = (uint8_t)fxu[l].tremor; S.l[l].swing = (uint8_t)fxu[l].swing; S.l[l].aglide = (uint8_t)fxu[l].aglide; S.l[l].uon = ln[l].up.on; S.l[l].autopan = (uint8_t)fxu[l].autopan; S.l[l].aprate = (uint8_t)fxu[l].aprate;
+        S.l[l].mutate = (uint8_t)fxu[l].mutate;
     }
     *P = S;
 }
@@ -1798,7 +1804,7 @@ static void state_put(const save_t *P, int setup)
             ln[l].mel = (uint8_t)(S.l[l].mel % 100u); ln[l].rhy = (uint8_t)clampi(S.l[l].rhy, 0, 100); ln[l].pit = (uint8_t)clampi(S.l[l].pit, 0, 100);
             ln[l].chg = (uint8_t)clampi(S.l[l].chg, 0, 100); ln[l].mute = S.l[l].mute != 0; fxu[l].send = clampi(S.l[l].send, 0, 100);
             fxu[l].porta = clampi(S.l[l].porta, -100, 100); fxu[l].pan = clampi(S.l[l].pan, -100, 100); fxu[l].vibr = clampi(S.l[l].vibr, 0, 100);
-            fxu[l].trem = clampi(S.l[l].trem, 0, 100); fxu[l].gate = clampi(S.l[l].gate, 0, 100); fxu[l].tremor = clampi(S.l[l].tremor, 0, 3); fxu[l].swing = clampi(S.l[l].swing, 0, 100); fxu[l].aglide = clampi(S.l[l].aglide, 0, 100); fxu[l].autopan = clampi(S.l[l].autopan, 0, 100); fxu[l].aprate = clampi(S.l[l].aprate, 0, 7); if (!setup) ln[l].up.on = S.l[l].uon != 0; if (setup) midi_chan[l] = (uint8_t)(S.l[l].midi > 16u ? 16u : S.l[l].midi);
+            fxu[l].trem = clampi(S.l[l].trem, 0, 100); fxu[l].gate = clampi(S.l[l].gate, 0, 100); fxu[l].tremor = clampi(S.l[l].tremor, 0, 3); fxu[l].swing = clampi(S.l[l].swing, 0, 100); fxu[l].aglide = clampi(S.l[l].aglide, 0, 100); fxu[l].autopan = clampi(S.l[l].autopan, 0, 100); fxu[l].aprate = clampi(S.l[l].aprate, 0, 7); fxu[l].mutate = l == L_SFX ? 0 : clampi(S.l[l].mutate, 0, 100); if (!setup) ln[l].up.on = S.l[l].uon != 0; if (setup) midi_chan[l] = (uint8_t)(S.l[l].midi > 16u ? 16u : S.l[l].midi);
             fxu[l].inst = clampi(S.l[l].inst, -1, l == L_SFX ? (int32_t)NSX - 1 : l == L_DRUMS ? (int32_t)NKIT - 1 : (int32_t)NPATCH - 1);
         }
     }
@@ -1836,8 +1842,8 @@ static void sets_load(void)
     if (h[1] == sizeof(save_t)) {
         if (slots_read(16, sets, sizeof sets)) return;
         for (i = 0; i < sizeof sets; i++) c = c * 31u + ((const uint8_t *)sets)[i];
-    } else if (h[1] == save_size(11) || h[1] == save_size(12) || h[1] == save_size(13)) {   /* older sets: each brought up to date */
-        uint32_t v = h[1] == save_size(11) ? 11u : h[1] == save_size(12) ? 12u : 13u;
+    } else if (h[1] == save_size(11) || h[1] == save_size(12) || h[1] == save_size(13) || h[1] == save_size(14)) {   /* older sets: each brought up to date */
+        uint32_t v = h[1] == save_size(11) ? 11u : h[1] == save_size(12) ? 12u : h[1] == save_size(13) ? 13u : 14u;
         for (k = 0; k < NSETS; k++) {
             if (slots_read(16 + k * h[1], old, h[1])) return;
             for (i = 0; i < h[1]; i++) c = c * 31u + old[i];
@@ -1897,7 +1903,7 @@ static void drop_hit(void)
     live_push(L_DRUMS, DK_KICK, 26, 1, (uint32_t)inst_eff(L_DRUMS));
     live_push(L_SFX, SX_IMPACT, 26, 1, 0);
     harm_at(cur_bar(), &H); tools_make(&T, &H, LBASE[L_PAD] + key_off);
-    audition(L_PAD, (uint32_t)clampi(ct(&T, 0), 24, 96), NPATCH - 1u);   /* and the orchestra hit, on the chord's root */
+    audition(L_PAD, (uint32_t)clampi(ct(&T, 0), 24, 96), P_ORCH);   /* and the orchestra hit, on the chord's root */
 }
 static int is_black(int32_t k) { return (0x54Au >> ((53 + k) % 12)) & 1u; }
 static int32_t white_index(int32_t k) { int32_t i, w = 0; for (i = 0; i < k; i++) if (!is_black(i)) w++; return is_black(k) ? -1 : w; }
