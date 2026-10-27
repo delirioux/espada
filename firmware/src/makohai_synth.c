@@ -49,9 +49,11 @@ enum { W_SINE, W_HALF, W_ABS, W_QUART, W_ALT, W_CAMEL, W_SQR, W_SAW,
        W_HOLLOW, W_GLASS, W_STRING, W_CLAV, W_BASSY, W_NASAL, W_SYNC, W_STEPTRI, NWAVE };
 #define W_TAB W_TRI
 #define NWT (NWAVE - W_TAB)
-static int8_t WT[NWT][256] __attribute__((section(".pool")));
+static int16_t WV[NWAVE][256] __attribute__((section(".pool")));   /* every waveform as a table: one lookup a sample,
+                                                                     * as cheap as the sine (12 KB) */
 static int16_t WDC[NWAVE], WLOUD[NWAVE];        /* each wave's mean (the carrier takes it off: no thump), its loudness */
-static int32_t wv(uint32_t w, uint32_t ph)      /* Q15 */
+#define WVQ(w, ph) ((int32_t)WV[w][(ph) >> 24]) /* the audio interrupt's lookup, Q15 */
+static int32_t wv(uint32_t w, uint32_t ph)      /* Q15, drawn at boot into WV */
 {
     uint32_t i = ph >> 22;
     int32_t x;
@@ -64,7 +66,7 @@ static int32_t wv(uint32_t w, uint32_t ph)      /* Q15 */
     case W_CAMEL: x = SIN[(i << 1) & 1023u]; return i < 512u ? (x < 0 ? -x : x) : 0;
     case W_SQR: return i < 512u ? 26000 : -26000;
     case W_SAW: return (int32_t)(ph >> 16) - 32768;
-    default: return (int32_t)WT[(w - W_TAB) % NWT][ph >> 24] * 256;
+    default: return WV[w % NWAVE][ph >> 24];                         /* the drawn ones: drawn into the table first */
     }
 }
 /* the drawn waves: harmonics 1..16 (0..255 each; a negative one starts upside down), or drawn point by point */
@@ -101,14 +103,15 @@ static void waves_init(void)
             }
             acc[i] = a; if ((a < 0 ? -a : a) > pk) pk = a < 0 ? -a : a;
         }
-        for (i = 0; i < 256u; i++) WT[w][i] = (int8_t)(acc[i] * 127 / pk);
+        for (i = 0; i < 256u; i++) WV[w + W_TAB][i] = (int16_t)(acc[i] * 127 / pk * 256);   /* 8-bit, as a tracker's */
     }
     for (w = 0; w < NWAVE; w++) {
         int32_t m = 0, a = 0, x;
-        for (i = 0; i < 1024u; i++) m += wv(w, i << 22);
-        WDC[w] = (int16_t)(m / 1024);
-        for (i = 0; i < 1024u; i++) { x = wv(w, i << 22) - WDC[w]; a += x < 0 ? -x : x; }
-        WLOUD[w] = (int16_t)(a / 1024);
+        if (w < W_TAB) for (i = 0; i < 256u; i++) { x = wv(w, i << 24); WV[w][i] = (int16_t)(x > 32767 ? 32767 : x < -32767 ? -32767 : x); }
+        for (i = 0; i < 256u; i++) m += WV[w][i];
+        WDC[w] = (int16_t)(m / 256);
+        for (i = 0; i < 256u; i++) { x = WV[w][i] - WDC[w]; a += x < 0 ? -x : x; }
+        WLOUD[w] = (int16_t)(a / 256);
     }
 }
 
@@ -211,8 +214,8 @@ static const patch_t PATCH[] = {
 #define P_ORCH 19u                              /* the orchestra hit (the styles' hits) */
 /* what a voice of each patch costs the audio interrupt, in units (a plain FM voice is 2), measured: the voice budget */
 static const uint8_t PATCH_W[] = {2, 2, 2, 2, 5, 4, 2, 2, 3, 3, 3, 3, 2, 2, 5, 5, 5, 4, 3, 4,
-                                  3, 3, 2, 3, 3, 2, 3,  3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,           /* a drawn or chip waveform: 3 */
-                                  2, 2, 2, 3, 3, 3, 3, 3, 2, 3, 2, 2, 2, 3,  3, 3, 3,  5, 5, 5, 5, 4, 5, 5,  3, 3, 3,  4, 3};
+                                  2, 2, 2, 2, 2, 2, 2,  2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3,           /* a waveform costs what the sine does (a table) */
+                                  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,  2, 2, 3,  4, 4, 5, 4, 4, 4, 4,  2, 2, 2,  4, 3};
 typedef char patch_w_all[sizeof PATCH_W == NPATCH ? 1 : -1];
 
 typedef struct { const char *name; uint16_t kh, kl, kd, sf, sd, hf, hd; uint8_t sharp; } kit_t;   /* Hz and ms; sharp: a click, a crack, open hats */
@@ -473,7 +476,7 @@ static void start_fm(uint32_t lane, const patch_t *P, uint32_t inc, uint32_t dur
     uint32_t pi = (uint32_t)(P - PATCH) < NPATCH ? (uint32_t)(P - PATCH) : 0u;
     mut_t M;
     mutate(P, pi, lane, &M);
-    voice_t *v = alloc_voice(lane, PATCH_W[pi] + ((M.cw | M.mw) && !(P->cw | P->mw)));   /* a sine patch mutated into another waveform costs more */
+    voice_t *v = alloc_voice(lane, PATCH_W[pi]);
     last_voice = v;
     int32_t bright = fx[lane].bright, mult = (64 + bright * 768 / 100) * M.iq >> 8;   /* Q8: 25 -> 1.0 */
     uint32_t a = (uint32_t)P->a_ms * 441u / 10u * (uint32_t)M.aq >> 8, i;
@@ -852,8 +855,8 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
             v->mph += (inc >> 4) * v->ratio16;
             v->ph += inc;
             if (v->cw | v->mw) {                                        /* the other waveforms */
-                off = (uint32_t)(wv(v->mw, v->mph) * v->idx) << 6;
-                s = wv(v->cw, v->ph + off) - v->cdc;
+                off = (uint32_t)(WVQ(v->mw, v->mph) * v->idx) << 6;
+                s = WVQ(v->cw, v->ph + off) - v->cdc;
             } else {
                 off = (uint32_t)(SIN[v->mph >> 22] * v->idx) << 6;
                 s = SIN[(v->ph + off) >> 22];
@@ -880,7 +883,7 @@ static void render_voice(voice_t *v, int32_t *out, uint32_t n)
                 int32_t e;
                 v->pph1 += inc + (inc >> 8);
                 v->pph2 += inc - (inc >> 8) - (inc >> 10);
-                if (v->cw) e = wv(v->cw, v->pph1) + wv(v->cw, v->pph2) - 2 * v->cdc;   /* the players in the patch's waveform */
+                if (v->cw) e = WVQ(v->cw, v->pph1) + WVQ(v->cw, v->pph2) - 2 * v->cdc;   /* the players in the patch's waveform */
                 else e = SIN[(v->pph1 + ((uint32_t)(int32_t)SIN[v->pph1 >> 22] << 14)) >> 22]
                        + SIN[(v->pph2 + ((uint32_t)(int32_t)SIN[v->pph2 >> 22] << 14)) >> 22];
                 s = ((s * 5) >> 3) + ((((e * 3) >> 3) * v->amp) >> 15);
