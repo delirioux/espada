@@ -3,6 +3,7 @@ Since 1.2:
 - Seven new styles: DUB (105, the one drop), TRIBAL (125), FABLE (150), PC FM (125), BOOGIE (125, the shuffle),
   ZEN (60) and FACTORY (185, industrial), each with its drums, bass, pad, lead, arp, sfx and effects. Seventeen in all.
 - HONKYTNK and SHAKU patches, the METAL kit.
+- SAVE keeps VOICES LIMIT and RESET's three pictures (settings record 16; older ones load with 80 and the first three).
 - Long runs: a message no longer stays on screen after the millisecond clock wraps (49 days); voice stealing
   and the pictures stay right past their counters' wraps.
 - SYMPHONY's lead plays CHAOS.

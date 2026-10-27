@@ -1681,17 +1681,17 @@ static void draw_frame(int force)
 typedef struct {
     uint8_t ver, key, scale, prog, bpc, arc, build, peak, autod, target, bpm; int8_t energy; uint8_t space;
     struct { uint8_t prof, lock, dens; int8_t oct, filt; uint8_t res, wob, bright, drive, slide, retrig, rate, crush, echo, level; int8_t inst; uint8_t vary, mel, rhy, pit, chg, mute, send, midi; int8_t porta, pan; uint8_t vibr, trem, gate, tremor, swing, aglide, uon, autopan, aprate, mutate; } l[NLANE];
-    uint8_t palette, screen, glow, back, backdim;
+    uint8_t palette, screen, glow, back, backdim, vlimit, pic[3];   /* the look, VOICES LIMIT, RESET's three pictures */
 } save_t;
 typedef char save_fits[sizeof(save_t) <= 256u ? 1 : -1];          /* settings_save takes at most 256 bytes */
-#define SAVE_VER 15
+#define SAVE_VER 16
 /* older records, read and brought up to date: a lane of 33 bytes (11, 1.0), 34 (12, no PAN RATE), 35 (13, 14: no
- * MUTATE), 36 since; the look at the end 3 bytes before 14 (no BACK) */
+ * MUTATE), 36 since; the tail 3 bytes before 14 (no BACK), 5 before 16 (no LIMIT, no pictures) */
 #define SAVE_HEAD 13u
 static uint32_t save_lane(uint32_t v) { return v <= 11u ? 33u : v == 12u ? 34u : v <= 14u ? 35u : 36u; }
-static uint32_t save_tail(uint32_t v) { return v <= 13u ? 3u : 5u; }
+static uint32_t save_tail(uint32_t v) { return v <= 13u ? 3u : v <= 15u ? 5u : 9u; }
 static uint32_t save_size(uint32_t v) { return SAVE_HEAD + NLANE * save_lane(v) + save_tail(v); }
-typedef char save_bytes[sizeof(save_t) == SAVE_HEAD + NLANE * 36u + 5u ? 1 : -1];   /* bytes only, no padding: the copy below relies on it */
+typedef char save_bytes[sizeof(save_t) == SAVE_HEAD + NLANE * 36u + 9u ? 1 : -1];   /* bytes only, no padding: the copy below relies on it */
 static void save_up(const uint8_t *o, uint32_t v, save_t *S)
 {
     uint8_t *d = (uint8_t *)S;
@@ -1701,6 +1701,7 @@ static void save_up(const uint8_t *o, uint32_t v, save_t *S)
     for (l = 0; l < NLANE; l++) memcpy(d + SAVE_HEAD + l * L, o + SAVE_HEAD + l * lo, lo);
     memcpy(d + SAVE_HEAD + NLANE * L, o + SAVE_HEAD + NLANE * lo, save_tail(v));
     if (v < 15u) for (l = 0; l < NLANE; l++) S->l[l].mutate = l == L_SFX ? 0 : MUTATE0;   /* MUTATE came in 15 */
+    if (v < 16u) { S->vlimit = VOICE_LIMIT0; S->pic[0] = 0; S->pic[1] = 1; S->pic[2] = 2; }   /* LIMIT and the pictures in 16 */
     S->ver = SAVE_VER;
 }
 /* the own parts, in their store: [head 16 B][lanes 20 B][to 64][each lane's bars, 32 B each]; the CRC covers all
@@ -1765,7 +1766,7 @@ static void state_get(save_t *P)                                /* everything in
     save_t S;
     int32_t l;
     memset(&S, 0, sizeof S);
-    S.ver = SAVE_VER; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.back = (uint8_t)back_pic; S.backdim = (uint8_t)(back_dim | back_cyc << 6);   /* CYCLE in the top two bits */ S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
+    S.ver = SAVE_VER; S.palette = (uint8_t)palette; S.screen = (uint8_t)screen_lvl; S.glow = (uint8_t)glow_on; S.back = (uint8_t)back_pic; S.backdim = (uint8_t)(back_dim | back_cyc << 6); S.vlimit = (uint8_t)voice_limit; S.pic[0] = (uint8_t)pick[0]; S.pic[1] = (uint8_t)pick[1]; S.pic[2] = (uint8_t)pick[2];   /* CYCLE in the top two bits */ S.energy = (int8_t)energy; S.space = (uint8_t)space; S.key = (uint8_t)key; S.scale = (uint8_t)scale_sel; S.prog = (uint8_t)prog_sel; S.bpc = (uint8_t)bpc; S.arc = (uint8_t)arc_on;
     S.build = (uint8_t)build_ph; S.peak = (uint8_t)peak_ph; S.autod = (uint8_t)auto_drop; S.target = (uint8_t)target; S.bpm = (uint8_t)seq_bpm;
     for (l = 0; l < (int32_t)NLANE; l++) {
         S.l[l].prof = ln[l].prof; S.l[l].lock = ln[l].lock; S.l[l].dens = ln[l].dens; S.l[l].oct = ln[l].oct; S.l[l].filt = (int8_t)fxu[l].filt;
@@ -1794,7 +1795,8 @@ static void state_put(const save_t *P, int setup)
     const save_t S = *P;
     int32_t l;
     {
-        if (setup) { palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0; back_pic = S.back % (NPIC + 1); back_dim = S.backdim & 63 ? clampi(S.backdim & 63, 10, 60) : 30; back_cyc = S.backdim >> 6; }
+        if (setup) { palette = S.palette % 6u; screen_lvl = clampi(S.screen, 25, 100) / 25 * 25; glow_on = S.glow != 0; back_pic = S.back % (NPIC + 1); back_dim = S.backdim & 63 ? clampi(S.backdim & 63, 10, 60) : 30; back_cyc = S.backdim >> 6;
+                    voice_limit = S.vlimit ? clampi(S.vlimit, 20, 100) : VOICE_LIMIT0; pick[0] = S.pic[0] % NPIC; pick[1] = S.pic[1] % NPIC; pick[2] = S.pic[2] % NPIC; }
         energy = clampi(S.energy, -50, 50); space = clampi(S.space, 0, 100);
         set_key(S.key % 12u); scale_sel = S.scale < NSCALE ? S.scale : 0; prog_sel = S.prog <= NPROG ? S.prog : 0; bpc = clampi(S.bpc, 1, 4);
         { int32_t was = arc_on; arc_on = S.arc != 0; build_ph = clampi(S.build, 2, 16); if (arc_on && (setup || !was)) arc_restart(seq_playing ? cur_bar() + 1 : 0); } peak_ph = clampi(S.peak, 1, 8); auto_drop = S.autod != 0; target = S.target % NPROF; set_bpm(S.bpm);
@@ -1845,8 +1847,8 @@ static void sets_load(void)
     if (h[1] == sizeof(save_t)) {
         if (slots_read(16, sets, sizeof sets)) return;
         for (i = 0; i < sizeof sets; i++) c = c * 31u + ((const uint8_t *)sets)[i];
-    } else if (h[1] == save_size(11) || h[1] == save_size(12) || h[1] == save_size(13) || h[1] == save_size(14)) {   /* older sets: each brought up to date */
-        uint32_t v = h[1] == save_size(11) ? 11u : h[1] == save_size(12) ? 12u : h[1] == save_size(13) ? 13u : 14u;
+    } else if (h[1] == save_size(11) || h[1] == save_size(12) || h[1] == save_size(13) || h[1] == save_size(14) || h[1] == save_size(15)) {   /* older sets: each brought up to date */
+        uint32_t v = h[1] == save_size(11) ? 11u : h[1] == save_size(12) ? 12u : h[1] == save_size(13) ? 13u : h[1] == save_size(14) ? 14u : 15u;
         for (k = 0; k < NSETS; k++) {
             if (slots_read(16 + k * h[1], old, h[1])) return;
             for (i = 0; i < h[1]; i++) c = c * 31u + old[i];
@@ -2258,6 +2260,7 @@ static void defaults(void)
     set_key(2); set_bpm(125); scale_sel = 0; prog_sel = 0; bpc = 1; energy = 0; space = 35;
     arc_on = 0; build_ph = 6; peak_ph = 4; auto_drop = 1; target = PROF_START; blend = 0;
     palette = 0; screen_lvl = 100; glow_on = 1; back_pic = 0; back_dim = 30; back_cyc = 0; fm1_glow_all();
+    voice_limit = VOICE_LIMIT0; pick[0] = 0; pick[1] = 1; pick[2] = 2;
     if (seq_playing) invalidate_from(cur_bar()); else form_arm();
     area_dirty = 1;
 }

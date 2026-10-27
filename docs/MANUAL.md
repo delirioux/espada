@@ -84,7 +84,7 @@ wireframe that turns and wanders over the screen, melting from a cube into a sta
 ball and a pyramid), **BOBS** (shadebobs: glowing blobs that add up where they cross, in bands of colour) and
 **STATUE** (a marble bust of a young Greek god before a slow copper sky, with 3D chrome text running round its
 outline: MAKE FIRMWARE NOT WAR). Which pictures RESET
-shows is not saved. **BACK** puts one of them behind the whole screen, on every page (PLAY, SOUND, TRACKER, SONG, EDIT, SETUP), dimmed
+shows is saved with SAVE. **BACK** puts one of them behind the whole screen, on every page (PLAY, SOUND, TRACKER, SONG, EDIT, SETUP), dimmed
 so everything stays clear; the lanes' bands glow over it. With CYCLE it moves on to the next picture every 4, 8 or 16
 bars, on the bar line, with a cut (blinds, a raster wipe, a dissolve, an iris or a push). SAVE keeps BACK and CYCLE
 with the look.
@@ -94,7 +94,7 @@ supersaw and the orchestra hit 4, brass, violins, cellos and CHAOS 5, a drum or 
 cost at most LIMIT; a new note past it stops the quietest voice that is fading out (an echo's tail, mostly), else
 the oldest. The styles alone stay under 80; ECHO on many lanes would go past it, and past what the FM-1 can do in
 time (a crack across the whole sound). If LOAD ever goes near 100 %, lower LIMIT; if notes seem to vanish and LOAD
-stays well under, raise it. LIMIT is not saved.
+stays well under, raise it. SAVE keeps LIMIT.
 
 SAVE keeps the setup with everything else. SYSTEM and AUDIO only show; they are how a firmware that runs short of
 memory or time is caught before it crackles or crashes. In the browser, SYSTEM shows N/A (there is no FM-1 memory
