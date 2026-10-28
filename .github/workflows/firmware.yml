@@ -14,6 +14,11 @@ on:
     branches: [main, dev]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Rebuild a release from main (X.Y): its package replaces the release's, the site names it vX.Y"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -65,7 +70,9 @@ jobs:
 
       - name: Build Makohai
         run: |
-          if [ "${GITHUB_REF_TYPE}" = tag ]; then ./build.sh --release "${GITHUB_REF_NAME#v}"; else ./build.sh; fi
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then ./build.sh --release "${GITHUB_REF_NAME#v}"
+          elif [ -n "${{ inputs.release }}" ]; then ./build.sh --release "${{ inputs.release }}"
+          else ./build.sh; fi
 
       - name: No 64-bit division or soft-float routines in the image (a routine like __mulsf3 crashed an FM-1 in Tuna)
         run: |
@@ -90,17 +97,20 @@ jobs:
           path: dist/
 
       - name: Release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' || inputs.release != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          REL: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.release) }}
         run: |                             # a re-run replaces the package instead of failing on the release that is there
-          gh release create "$GITHUB_REF_NAME" dist/makohai-*.fwsc --title "Makohai ${GITHUB_REF_NAME#v}" --notes-file docs/RELEASE.md ||
-            gh release upload "$GITHUB_REF_NAME" dist/makohai-*.fwsc --clobber
+          gh release create "$REL" dist/makohai-*.fwsc --title "Makohai ${REL#v}" --notes-file docs/RELEASE.md ||
+            gh release upload "$REL" dist/makohai-*.fwsc --clobber
 
       - name: The site's version name (a tag's run uses the tag itself, as git describe on the runner did not see it)
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         run: |
-          if [ "${GITHUB_REF_TYPE}" = tag ]; then v="${GITHUB_REF_NAME}"; else v="$(git describe --tags --always)"; fi
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then v="${GITHUB_REF_NAME}"
+          elif [ -n "${{ inputs.release }}" ]; then v="v${{ inputs.release }}"
+          else v="$(git describe --tags --always)"; fi
           echo "SITE_VER=$v" >> "$GITHUB_ENV"
           echo "site version: $v"
 
