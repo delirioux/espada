@@ -97,17 +97,24 @@ jobs:
           gh release create "$GITHUB_REF_NAME" dist/makohai-*.fwsc --title "Makohai ${GITHUB_REF_NAME#v}" --notes-file docs/RELEASE.md ||
             gh release upload "$GITHUB_REF_NAME" dist/makohai-*.fwsc --clobber
 
+      - name: The site's version name (a tag's run uses the tag itself, as git describe on the runner did not see it)
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then v="${GITHUB_REF_NAME}"; else v="$(git describe --tags --always)"; fi
+          echo "SITE_VER=$v" >> "$GITHUB_ENV"
+          echo "site version: $v"
+
       - name: Makohai in the browser (WebAssembly, on Felucca's page)
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         continue-on-error: true            # (the site goes out without it)
         run: |
           command -v wasm-ld >/dev/null || sudo apt-get install -y -q lld
-          sh web/emu/makohai_build.sh "$(git describe --tags --always)"
+          sh web/emu/makohai_build.sh "$SITE_VER"
           node web/emu/makohai_emu_test.mjs build/makohai_emu/makohai.wasm
 
       - name: Site (the web installer with this package; a release's own, so the page shows its version)
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
-        run: python3 web/makohai_make_site.py "$(ls build/makohai*.fwsc | head -1)" "$(git describe --tags --always)" _site
+        run: python3 web/makohai_make_site.py "$(ls build/makohai*.fwsc | head -1)" "$SITE_VER" _site
 
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
