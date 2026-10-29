@@ -2,26 +2,21 @@
 # Makohai's firmware package for the FM-1, built on GitHub's Linux runners: JieLi's toolchain and three files of the
 # JieLi AC79 SDK (Apache-2.0) come from JieLi's own servers. Every push builds the package (the run's artifact
 # "makohai-firmware") and runs the host mode (artifact "makohai-host": screens as PNG, the sound as WAV).
-# A tag vX.Y builds the release package (version X.Y, identity FM-1_47625642) and attaches it to a GitHub release.
-# A push to main, and a tag vX.Y, publish the site on GitHub Pages: the web installer with that package
-# (web/makohai_make_site.py) and Makohai in the browser (web/emu); a tag's run publishes the release's own package,
-# so the page shows its version. The site needs Settings > Pages > Source: GitHub Actions, and for the tags,
-# Settings > Environments > github-pages > Deployment branches and tags: a rule for tags v*.
+# main is the release: it builds the package as the version in firmware/src/makohai_version.h (identity
+# FM-1_47625642) and publishes the site on GitHub Pages: the web installer with that package
+# (web/makohai_make_site.py) and Makohai in the browser (web/emu), named after that version. When the version has no
+# tag yet, the job release tags this commit vX.Y and makes the GitHub release with the package and docs/RELEASE.md;
+# an existing tag is never moved. dev builds a test package (version 0.0). The site needs Settings > Pages > Source:
+# GitHub Actions.
 name: Firmware
 
 on:
   push:
     branches: [main, dev]
-    tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      release:
-        description: "Rebuild a release from main (X.Y): its package replaces the release's, the site names it vX.Y"
-        required: false
-        default: ""
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   host:
@@ -50,8 +45,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0              # the site names the build with git describe
 
       - uses: actions/setup-python@v5
         with:
@@ -70,8 +63,7 @@ jobs:
 
       - name: Build Makohai
         run: |
-          if [ "${GITHUB_REF_TYPE}" = tag ]; then ./build.sh --release "${GITHUB_REF_NAME#v}"
-          elif [ -n "${{ inputs.release }}" ]; then ./build.sh --release "${{ inputs.release }}"
+          if [ "$GITHUB_REF_NAME" = main ]; then ./build.sh --release "$(sed -n 's/^#define MAKOHAI_VERSION "\([^"]*\)".*/\1/p' firmware/src/makohai_version.h)"
           else ./build.sh; fi
 
       - name: No 64-bit division or soft-float routines in the image (a routine like __mulsf3 crashed an FM-1 in Tuna)
@@ -96,43 +88,32 @@ jobs:
           name: makohai-firmware
           path: dist/
 
-      - name: Release
-        if: github.ref_type == 'tag' || inputs.release != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REL: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.release) }}
-        run: |                             # a re-run replaces the package instead of failing on the release that is there
-          gh release create "$REL" dist/makohai-*.fwsc --title "Makohai ${REL#v}" --notes-file docs/RELEASE.md ||
-            gh release upload "$REL" dist/makohai-*.fwsc --clobber
-
-      - name: The site's version name (a tag's run uses the tag itself, as git describe on the runner did not see it)
-        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+      - name: The site's version name (main's version file)
+        if: github.ref == 'refs/heads/main'
         run: |
-          if [ "${GITHUB_REF_TYPE}" = tag ]; then v="${GITHUB_REF_NAME}"
-          elif [ -n "${{ inputs.release }}" ]; then v="v${{ inputs.release }}"
-          else v="$(git describe --tags --always)"; fi
+          v="v$(sed -n 's/^#define MAKOHAI_VERSION "\([^"]*\)".*/\1/p' firmware/src/makohai_version.h)"
           echo "SITE_VER=$v" >> "$GITHUB_ENV"
           echo "site version: $v"
 
       - name: Makohai in the browser (WebAssembly, on Felucca's page)
-        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        if: github.ref == 'refs/heads/main'
         continue-on-error: true            # (the site goes out without it)
         run: |
           command -v wasm-ld >/dev/null || sudo apt-get install -y -q lld
           sh web/emu/makohai_build.sh "$SITE_VER"
           node web/emu/makohai_emu_test.mjs build/makohai_emu/makohai.wasm
 
-      - name: Site (the web installer with this package; a release's own, so the page shows its version)
-        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+      - name: Site (the web installer with this package, named after its version)
+        if: github.ref == 'refs/heads/main'
         run: python3 web/makohai_make_site.py "$(ls build/makohai*.fwsc | head -1)" "$SITE_VER" _site
 
       - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        if: github.ref == 'refs/heads/main'
         with:
           path: _site
 
-  pages:                                    # a push to main and a release's tag both publish; one after the other, the last wins
-    if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+  pages:                                    # main's pushes publish one after the other, the last wins
+    if: github.ref == 'refs/heads/main'
     needs: build
     concurrency:
       group: pages
@@ -147,3 +128,28 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  release:
+    # main with a version that has no tag yet: the tag vX.Y on this commit and a GitHub release with the package
+    # and docs/RELEASE.md as its notes. An existing tag is never moved; a new version (makohai_version.h) makes the next.
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: makohai-firmware
+          path: dist
+      - name: Tag and release (once per version)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(sed -n 's/^#define MAKOHAI_VERSION "\([^"]*\)".*/\1/p' firmware/src/makohai_version.h)
+          if git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null; then
+            echo "v$V is already tagged: nothing to do"; exit 0
+          fi
+          PKG=$(ls dist/makohai-*.fwsc | head -1)
+          gh release create "v$V" "$PKG" --target "$GITHUB_SHA" --title "Makohai $V" --notes-file docs/RELEASE.md

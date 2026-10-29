@@ -110,7 +110,9 @@ node web/emu/makohai_emu_test.mjs build/makohai_emu/makohai.wasm
 
 CI (`.github/workflows/firmware.yml`) runs the name check and host mode, builds the firmware with JieLi's
 toolchain, checks the image for 64-bit division and soft-float routines, packages it, builds the browser version
-and publishes the site with the web installer. A tag `v*` makes a release with [RELEASE.md](RELEASE.md) as notes.
+and publishes the site with the web installer. main is the release: it builds as the version in
+`firmware/src/makohai_version.h`, and when that version has no tag yet, CI tags the commit `vX.Y` and makes the
+release with [RELEASE.md](RELEASE.md) as notes. To release, raise the version on main; tags are never moved.
 
 ## Open risks
 
@@ -151,4 +153,4 @@ register, and its likeness to "Mako" is judged acceptable):
 3. **Licences and credits**: GPL-3.0-only; Dinghy's, SLOOP's and Felucca's credits in the README and on the
    site; the JieLi files' Apache-2.0 and the fonts' licences (LICENSING.md says where).
 4. **Other names**: "for the M-VAVE FM-1" in words only, no logos, nothing that suggests it is official.
-5. **Release notes**: [RELEASE.md](RELEASE.md) brought up to date, a tag `v1.0`.
+5. **Release notes**: [RELEASE.md](RELEASE.md) brought up to date, the version raised in `makohai_version.h`.
